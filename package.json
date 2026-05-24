@@ -1,0 +1,17 @@
+{
+  "name": "trs-compteur",
+  "private": true,
+  "description": "TRS/OEE Compteur Continu — Blistereuse & Géluleuse",
+  "scripts": {
+    "dev:api": "pnpm --filter @trs/api dev",
+    "dev:web": "pnpm --filter @trs/web dev",
+    "build": "pnpm -r build",
+    "db:push": "pnpm --filter @trs/db push",
+    "db:seed": "pnpm --filter @trs/api seed",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

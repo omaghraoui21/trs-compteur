@@ -1,0 +1,179 @@
+import { Router } from "express";
+import { eq, and } from "drizzle-orm";
+import { lotEntries, downtimeEvents, sessionEvents } from "@trs/db";
+import { diffMinutes } from "@trs/engine";
+import { authenticate } from "../middleware";
+
+export const lotsRouter = Router();
+lotsRouter.use(authenticate);
+
+// ─── Start a lot within a session ─────────────────────────────
+
+lotsRouter.post("/", async (req, res) => {
+  const { db, userId } = req;
+  const { sessionId, productId, batchNumber, cadenceUsed, cadenceUnit } = req.body;
+
+  if (!sessionId || !productId || !batchNumber || !cadenceUsed || !userId) {
+    res.status(400).json({ error: "sessionId, productId, batchNumber, cadenceUsed requis" });
+    return;
+  }
+
+  // Check no active lot in this session
+  const [activeLot] = await db.select().from(lotEntries)
+    .where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active")))
+    .limit(1);
+  if (activeLot) {
+    res.status(409).json({ error: "Un lot est déjà actif dans cette session", lotId: activeLot.id });
+    return;
+  }
+
+  // Get lot order
+  const existingLots = await db.select().from(lotEntries)
+    .where(eq(lotEntries.sessionId, sessionId));
+  const lotOrder = existingLots.length + 1;
+
+  const now = new Date();
+
+  // Create lot_start event
+  const [lot] = await db.insert(lotEntries).values({
+    sessionId,
+    productId,
+    batchNumber,
+    lotOrder,
+    cadenceUsed: String(cadenceUsed),
+    cadenceUnit: cadenceUnit || "u/h",
+    operatorId: userId,
+    startedAt: now,
+    status: "active",
+  }).returning();
+
+  // Add lot_start event to session timeline
+  const existingEvents = await db.select().from(sessionEvents)
+    .where(eq(sessionEvents.sessionId, sessionId));
+  const maxOrder = existingEvents.reduce((max, e) => Math.max(max, e.sortOrder), 0);
+
+  await db.insert(sessionEvents).values({
+    sessionId,
+    eventType: "lot_start",
+    startedAt: now,
+    isPlanned: false,
+    lotEntryId: lot.id,
+    sortOrder: maxOrder + 1,
+  });
+
+  res.status(201).json(lot);
+});
+
+// ─── Close a lot (update quantities) ──────────────────────────
+
+lotsRouter.post("/:id/close", async (req, res) => {
+  const { db } = req;
+  const { quantityProduced, quantityConforming, quantityRejected } = req.body;
+
+  const now = new Date();
+
+  const [lot] = await db.update(lotEntries).set({
+    quantityProduced: quantityProduced ?? 0,
+    quantityConforming: quantityConforming ?? 0,
+    quantityRejected: quantityRejected ?? 0,
+    endedAt: now,
+    status: "closed",
+  }).where(eq(lotEntries.id, String(req.params.id))).returning();
+
+  if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
+
+  // Add lot_end event
+  const existingEvents = await db.select().from(sessionEvents)
+    .where(eq(sessionEvents.sessionId, lot.sessionId));
+  const maxOrder = existingEvents.reduce((max, e) => Math.max(max, e.sortOrder), 0);
+
+  await db.insert(sessionEvents).values({
+    sessionId: lot.sessionId,
+    eventType: "lot_end",
+    startedAt: now,
+    endedAt: now,
+    durationMinutes: 0,
+    isPlanned: false,
+    lotEntryId: lot.id,
+    sortOrder: maxOrder + 1,
+  });
+
+  res.json(lot);
+});
+
+// ─── Update lot quantities (while active) ─────────────────────
+
+lotsRouter.patch("/:id", async (req, res) => {
+  const { db } = req;
+  const updates: Record<string, any> = {};
+  if (req.body.quantityProduced !== undefined) updates.quantityProduced = req.body.quantityProduced;
+  if (req.body.quantityConforming !== undefined) updates.quantityConforming = req.body.quantityConforming;
+  if (req.body.quantityRejected !== undefined) updates.quantityRejected = req.body.quantityRejected;
+  if (req.body.cadenceUsed !== undefined) updates.cadenceUsed = String(req.body.cadenceUsed);
+  if (req.body.cadenceUnit !== undefined) updates.cadenceUnit = req.body.cadenceUnit;
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "Aucune mise à jour" });
+    return;
+  }
+
+  const [lot] = await db.update(lotEntries).set(updates)
+    .where(eq(lotEntries.id, String(req.params.id))).returning();
+  if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
+  res.json(lot);
+});
+
+// ─── Add downtime to a lot ────────────────────────────────────
+
+lotsRouter.post("/:id/downtimes", async (req, res) => {
+  const { db, userId } = req;
+  const { categoryId, durationMinutes, comment } = req.body;
+
+  if (!categoryId || !durationMinutes) {
+    res.status(400).json({ error: "categoryId et durationMinutes requis" });
+    return;
+  }
+
+  const now = new Date();
+  const endedAt = new Date(now.getTime() + durationMinutes * 60_000);
+
+  const [dt] = await db.insert(downtimeEvents).values({
+    lotEntryId: String(req.params.id),
+    categoryId,
+    startedAt: now,
+    endedAt,
+    durationMinutes,
+    status: "closed",
+    comment,
+    createdBy: userId,
+  }).returning();
+
+  res.status(201).json(dt);
+});
+
+// ─── Get lot downtimes ────────────────────────────────────────
+
+lotsRouter.get("/:id/downtimes", async (req, res) => {
+  const { db } = req;
+  const data = await db.select().from(downtimeEvents)
+    .where(eq(downtimeEvents.lotEntryId, String(req.params.id)));
+  res.json(data);
+});
+
+// ─── Supervisor validate/reject lot ───────────────────────────
+
+lotsRouter.post("/:id/validate", authenticate, async (req, res) => {
+  const { db, userId } = req;
+  const { action, comment } = req.body; // action: "validate" | "reject"
+  const status = action === "reject" ? "rejected" : "validated";
+
+  const [lot] = await db.update(lotEntries).set({
+    status,
+    supervisorId: userId,
+    supervisorComment: comment,
+    validatedAt: new Date(),
+  }).where(eq(lotEntries.id, String(req.params.id))).returning();
+
+  if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
+  res.json(lot);
+});
