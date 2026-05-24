@@ -21020,7 +21020,7 @@ var require_application = __commonJS({
   "node_modules/.pnpm/express@4.22.2/node_modules/express/lib/application.js"(exports, module) {
     "use strict";
     var finalhandler = require_finalhandler();
-    var Router6 = require_router();
+    var Router7 = require_router();
     var methods = require_methods();
     var middleware = require_init();
     var query = require_query();
@@ -21085,7 +21085,7 @@ var require_application = __commonJS({
     };
     app2.lazyrouter = function lazyrouter() {
       if (!this._router) {
-        this._router = new Router6({
+        this._router = new Router7({
           caseSensitive: this.enabled("case sensitive routing"),
           strict: this.enabled("strict routing")
         });
@@ -22949,7 +22949,7 @@ var require_express = __commonJS({
     var mixin = require_merge_descriptors();
     var proto = require_application();
     var Route = require_route();
-    var Router6 = require_router();
+    var Router7 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -22972,7 +22972,7 @@ var require_express = __commonJS({
     exports.request = req;
     exports.response = res;
     exports.Route = Route;
-    exports.Router = Router6;
+    exports.Router = Router7;
     exports.json = bodyParser.json;
     exports.query = require_query();
     exports.raw = bodyParser.raw;
@@ -28862,7 +28862,7 @@ var require_jsonwebtoken = __commonJS({
 })();
 
 // packages/api/src/server.ts
-var import_express6 = __toESM(require_express2(), 1);
+var import_express7 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // node_modules/.pnpm/postgres@3.4.9/node_modules/postgres/src/index.js
@@ -37796,6 +37796,16 @@ function authenticate(req, res, next) {
 function signToken(userId, role) {
   return import_jsonwebtoken.default.sign({ sub: userId, role }, JWT_SECRET, { expiresIn: "12h" });
 }
+function requireRole(...roles) {
+  return (req, res, next) => {
+    const r = req.userRole;
+    if (!r || !roles.includes(r)) {
+      res.status(403).json({ error: "Acc\xE8s interdit" });
+      return;
+    }
+    next();
+  };
+}
 
 // packages/api/src/routes/auth.ts
 var authRouter = (0, import_express.Router)();
@@ -38267,10 +38277,182 @@ dashboardRouter.get("/pending-lots", async (req, res) => {
   res.json(lots);
 });
 
+// packages/api/src/routes/admin.ts
+var import_express6 = __toESM(require_express2(), 1);
+var adminRouter = (0, import_express6.Router)();
+adminRouter.use(authenticate);
+adminRouter.use(requireRole("admin", "supervisor"));
+adminRouter.get("/rooms", async (req, res) => {
+  const data = await req.db.select().from(rooms).orderBy(rooms.name);
+  res.json(data);
+});
+adminRouter.post("/rooms", async (req, res) => {
+  const { code, name, description } = req.body;
+  if (!code || !name) {
+    res.status(400).json({ error: "code et name requis" });
+    return;
+  }
+  const [row] = await req.db.insert(rooms).values({ code, name, description }).returning();
+  res.status(201).json(row);
+});
+adminRouter.patch("/rooms/:id", async (req, res) => {
+  const { code, name, description, isActive } = req.body;
+  const updates = {};
+  if (code !== void 0) updates.code = code;
+  if (name !== void 0) updates.name = name;
+  if (description !== void 0) updates.description = description;
+  if (isActive !== void 0) updates.isActive = isActive;
+  const [row] = await req.db.update(rooms).set(updates).where(eq(rooms.id, req.params.id)).returning();
+  if (!row) {
+    res.status(404).json({ error: "Local introuvable" });
+    return;
+  }
+  res.json(row);
+});
+adminRouter.delete("/rooms/:id", async (req, res) => {
+  const [row] = await req.db.update(rooms).set({ isActive: false }).where(eq(rooms.id, req.params.id)).returning();
+  if (!row) {
+    res.status(404).json({ error: "Local introuvable" });
+    return;
+  }
+  res.json(row);
+});
+adminRouter.get("/equipments", async (req, res) => {
+  const data = await req.db.select().from(equipments).orderBy(equipments.name);
+  res.json(data);
+});
+adminRouter.post("/equipments", async (req, res) => {
+  const { code, name, roomId, equipmentType, trsObjective, defaultCadenceUnit } = req.body;
+  if (!code || !name || !roomId) {
+    res.status(400).json({ error: "code, name et roomId requis" });
+    return;
+  }
+  const [row] = await req.db.insert(equipments).values({
+    code,
+    name,
+    roomId,
+    equipmentType,
+    trsObjective: trsObjective || "75",
+    defaultCadenceUnit: defaultCadenceUnit || "u/min"
+  }).returning();
+  res.status(201).json(row);
+});
+adminRouter.patch("/equipments/:id", async (req, res) => {
+  const { code, name, roomId, equipmentType, trsObjective, defaultCadenceUnit, isActive } = req.body;
+  const updates = {};
+  if (code !== void 0) updates.code = code;
+  if (name !== void 0) updates.name = name;
+  if (roomId !== void 0) updates.roomId = roomId;
+  if (equipmentType !== void 0) updates.equipmentType = equipmentType;
+  if (trsObjective !== void 0) updates.trsObjective = trsObjective;
+  if (defaultCadenceUnit !== void 0) updates.defaultCadenceUnit = defaultCadenceUnit;
+  if (isActive !== void 0) updates.isActive = isActive;
+  const [row] = await req.db.update(equipments).set(updates).where(eq(equipments.id, req.params.id)).returning();
+  if (!row) {
+    res.status(404).json({ error: "Equipement introuvable" });
+    return;
+  }
+  res.json(row);
+});
+adminRouter.delete("/equipments/:id", async (req, res) => {
+  const [row] = await req.db.update(equipments).set({ isActive: false }).where(eq(equipments.id, req.params.id)).returning();
+  if (!row) {
+    res.status(404).json({ error: "Equipement introuvable" });
+    return;
+  }
+  res.json(row);
+});
+adminRouter.get("/products", async (req, res) => {
+  const data = await req.db.select().from(products).orderBy(products.name);
+  res.json(data);
+});
+adminRouter.post("/products", async (req, res) => {
+  const { code, name, defaultCadence, cadenceUnit, unit } = req.body;
+  if (!code || !name) {
+    res.status(400).json({ error: "code et name requis" });
+    return;
+  }
+  const [row] = await req.db.insert(products).values({
+    code,
+    name,
+    defaultCadence: defaultCadence || null,
+    cadenceUnit: cadenceUnit || "u/min",
+    unit: unit || "unit\xE9s"
+  }).returning();
+  res.status(201).json(row);
+});
+adminRouter.patch("/products/:id", async (req, res) => {
+  const { code, name, defaultCadence, cadenceUnit, unit, isActive } = req.body;
+  const updates = {};
+  if (code !== void 0) updates.code = code;
+  if (name !== void 0) updates.name = name;
+  if (defaultCadence !== void 0) updates.defaultCadence = defaultCadence;
+  if (cadenceUnit !== void 0) updates.cadenceUnit = cadenceUnit;
+  if (unit !== void 0) updates.unit = unit;
+  if (isActive !== void 0) updates.isActive = isActive;
+  const [row] = await req.db.update(products).set(updates).where(eq(products.id, req.params.id)).returning();
+  if (!row) {
+    res.status(404).json({ error: "Produit introuvable" });
+    return;
+  }
+  res.json(row);
+});
+adminRouter.delete("/products/:id", async (req, res) => {
+  const [row] = await req.db.update(products).set({ isActive: false }).where(eq(products.id, req.params.id)).returning();
+  if (!row) {
+    res.status(404).json({ error: "Produit introuvable" });
+    return;
+  }
+  res.json(row);
+});
+adminRouter.get("/downtime-categories", async (req, res) => {
+  const data = await req.db.select().from(downtimeCategories).orderBy(downtimeCategories.famille, downtimeCategories.label);
+  res.json(data);
+});
+adminRouter.post("/downtime-categories", async (req, res) => {
+  const { code, label, famille, isPlanned, appliesToEquipmentType } = req.body;
+  if (!code || !label || !famille) {
+    res.status(400).json({ error: "code, label et famille requis" });
+    return;
+  }
+  const [row] = await req.db.insert(downtimeCategories).values({
+    code,
+    label,
+    famille,
+    isPlanned: isPlanned ?? false,
+    appliesToEquipmentType: appliesToEquipmentType || null
+  }).returning();
+  res.status(201).json(row);
+});
+adminRouter.patch("/downtime-categories/:id", async (req, res) => {
+  const { code, label, famille, isPlanned, appliesToEquipmentType, isActive } = req.body;
+  const updates = {};
+  if (code !== void 0) updates.code = code;
+  if (label !== void 0) updates.label = label;
+  if (famille !== void 0) updates.famille = famille;
+  if (isPlanned !== void 0) updates.isPlanned = isPlanned;
+  if (appliesToEquipmentType !== void 0) updates.appliesToEquipmentType = appliesToEquipmentType || null;
+  if (isActive !== void 0) updates.isActive = isActive;
+  const [row] = await req.db.update(downtimeCategories).set(updates).where(eq(downtimeCategories.id, req.params.id)).returning();
+  if (!row) {
+    res.status(404).json({ error: "Categorie introuvable" });
+    return;
+  }
+  res.json(row);
+});
+adminRouter.delete("/downtime-categories/:id", async (req, res) => {
+  const [row] = await req.db.update(downtimeCategories).set({ isActive: false }).where(eq(downtimeCategories.id, req.params.id)).returning();
+  if (!row) {
+    res.status(404).json({ error: "Categorie introuvable" });
+    return;
+  }
+  res.json(row);
+});
+
 // packages/api/src/server.ts
-var app = (0, import_express6.default)();
+var app = (0, import_express7.default)();
 app.use((0, import_cors.default)());
-app.use(import_express6.default.json());
+app.use(import_express7.default.json());
 var db = createDb();
 app.use((req, _res, next) => {
   req.db = db;
@@ -38281,6 +38463,7 @@ app.use("/api/sessions", sessionsRouter);
 app.use("/api/lots", lotsRouter);
 app.use("/api/ref", refRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/admin", adminRouter);
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", version: "1.0.0" });
 });

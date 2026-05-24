@@ -58,6 +58,45 @@ export const api = {
   dashboardTrs: (equipmentId: string, from: string, to: string) =>
     request<DashboardTrsResponse>(`/dashboard/trs?equipmentId=${equipmentId}&from=${from}&to=${to}`),
   pendingLots: () => request<LotEntry[]>("/dashboard/pending-lots"),
+
+  // Admin CRUD
+  admin: {
+    // Rooms
+    listRooms: () => request<AdminRoom[]>("/admin/rooms"),
+    createRoom: (data: { code: string; name: string; description?: string }) =>
+      request<AdminRoom>("/admin/rooms", { method: "POST", body: JSON.stringify(data) }),
+    updateRoom: (id: string, data: Partial<{ code: string; name: string; description: string; isActive: boolean }>) =>
+      request<AdminRoom>(`/admin/rooms/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteRoom: (id: string) =>
+      request<AdminRoom>(`/admin/rooms/${id}`, { method: "DELETE" }),
+
+    // Equipments
+    listEquipments: () => request<AdminEquipment[]>("/admin/equipments"),
+    createEquipment: (data: { code: string; name: string; roomId: string; equipmentType?: string; trsObjective?: string; defaultCadenceUnit?: string }) =>
+      request<AdminEquipment>("/admin/equipments", { method: "POST", body: JSON.stringify(data) }),
+    updateEquipment: (id: string, data: Partial<{ code: string; name: string; roomId: string; equipmentType: string; trsObjective: string; defaultCadenceUnit: string; isActive: boolean }>) =>
+      request<AdminEquipment>(`/admin/equipments/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteEquipment: (id: string) =>
+      request<AdminEquipment>(`/admin/equipments/${id}`, { method: "DELETE" }),
+
+    // Products
+    listProducts: () => request<AdminProduct[]>("/admin/products"),
+    createProduct: (data: { code: string; name: string; defaultCadence?: string; cadenceUnit?: string; unit?: string }) =>
+      request<AdminProduct>("/admin/products", { method: "POST", body: JSON.stringify(data) }),
+    updateProduct: (id: string, data: Partial<{ code: string; name: string; defaultCadence: string; cadenceUnit: string; unit: string; isActive: boolean }>) =>
+      request<AdminProduct>(`/admin/products/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteProduct: (id: string) =>
+      request<AdminProduct>(`/admin/products/${id}`, { method: "DELETE" }),
+
+    // Downtime Categories
+    listDowntimeCategories: () => request<AdminDowntimeCategory[]>("/admin/downtime-categories"),
+    createDowntimeCategory: (data: { code: string; label: string; famille: string; isPlanned?: boolean; appliesToEquipmentType?: string }) =>
+      request<AdminDowntimeCategory>("/admin/downtime-categories", { method: "POST", body: JSON.stringify(data) }),
+    updateDowntimeCategory: (id: string, data: Partial<{ code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null; isActive: boolean }>) =>
+      request<AdminDowntimeCategory>(`/admin/downtime-categories/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteDowntimeCategory: (id: string) =>
+      request<AdminDowntimeCategory>(`/admin/downtime-categories/${id}`, { method: "DELETE" }),
+  },
 };
 
 // ─── Types ──────────────────────────────────────────────
@@ -81,3 +120,9 @@ export interface AddEventInput { eventType: string; label?: string; durationMinu
 export interface StartLotInput { sessionId: string; productId: string; batchNumber: string; cadenceUsed: number; cadenceUnit?: string }
 export interface CloseLotInput { quantityProduced: number; quantityConforming: number; quantityRejected?: number }
 export interface AddDowntimeInput { categoryId: string; durationMinutes: number; comment?: string }
+
+// Admin types (include all fields, not just active)
+export interface AdminRoom { id: string; code: string; name: string; description: string | null; isActive: boolean; createdAt: string }
+export interface AdminEquipment { id: string; roomId: string; code: string; name: string; equipmentType: string | null; trsObjective: string; defaultCadenceUnit: string; isActive: boolean; createdAt: string }
+export interface AdminProduct { id: string; code: string; name: string; defaultCadence: string | null; cadenceUnit: string; unit: string; isActive: boolean; createdAt: string }
+export interface AdminDowntimeCategory { id: string; code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null; isActive: boolean; createdAt: string }

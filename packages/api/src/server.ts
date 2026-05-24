@@ -7,6 +7,7 @@ import { sessionsRouter } from "./routes/sessions";
 import { lotsRouter } from "./routes/lots";
 import { refRouter } from "./routes/ref";
 import { dashboardRouter } from "./routes/dashboard";
+import { adminRouter } from "./routes/admin";
 
 const app = express();
 app.use(cors());
@@ -25,6 +26,7 @@ app.use("/api/sessions", sessionsRouter);
 app.use("/api/lots", lotsRouter);
 app.use("/api/ref", refRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/admin", adminRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", version: "1.0.0" });
