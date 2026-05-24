@@ -1,0 +1,14 @@
+{
+  "buildCommand": "node scripts/build-api.mjs && cd packages/web && npx vite build",
+  "outputDirectory": "packages/web/dist",
+  "installCommand": "npm install -g pnpm && pnpm install",
+  "framework": "vite",
+  "functions": {
+    "api/index.mjs": {
+      "includeFiles": "api/handler.mjs"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" }
+  ]
+}
