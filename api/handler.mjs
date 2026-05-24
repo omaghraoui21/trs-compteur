@@ -38285,7 +38285,7 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", version: "1.0.0" });
 });
 var PORT = process.env.PORT || 3001;
-if (process.env.NODE_ENV !== "vercel") {
+if (!process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`TRS API running on port ${PORT}`);
   });
