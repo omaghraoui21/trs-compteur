@@ -1,10 +1,13 @@
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
-import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ComparisonResponse, type TrsMetrics, type DailyTrs } from "@/lib/api";
+import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ComparisonResponse, type TrsMetrics, type DailyTrs, type ByProductResponse, type SixLossesResponse, type HeatmapResponse } from "@/lib/api";
 import { fmtPct, fmtDuration, trsColor, familleToNorme } from "@trs/engine";
 import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, ChevronUp, AlertTriangle, Info } from "lucide-react";
 import TrsChart from "@/components/dashboard/TrsChart";
 import ParetoChart from "@/components/dashboard/ParetoChart";
 import WaterfallChart from "@/components/dashboard/WaterfallChart";
+import ByProductChart from "@/components/dashboard/ByProductChart";
+import SixLossesChart from "@/components/dashboard/SixLossesChart";
+import HeatmapChart from "@/components/dashboard/HeatmapChart";
 
 type ZoomLevel = "day" | "week" | "month" | "custom";
 
@@ -37,6 +40,9 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardTrsResponse | null>(null);
   const [paretoData, setParetoData] = useState<ParetoResponse | null>(null);
   const [comparisonData, setComparisonData] = useState<ComparisonResponse | null>(null);
+  const [byProductData, setByProductData] = useState<ByProductResponse | null>(null);
+  const [sixLossesData, setSixLossesData] = useState<SixLossesResponse | null>(null);
+  const [heatmapData, setHeatmapData] = useState<HeatmapResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
@@ -57,12 +63,18 @@ export default function DashboardPage() {
     if (!selectedEquipment || !from || !to) return;
     setLoading(true);
     try {
-      const [trsRes, paretoRes] = await Promise.all([
+      const [trsRes, paretoRes, prodRes, lossesRes, heatRes] = await Promise.all([
         api.dashboardTrs(selectedEquipment, from, to),
         api.dashboardPareto(selectedEquipment, from, to),
+        api.dashboardByProduct(selectedEquipment, from, to).catch(() => null),
+        api.dashboardSixLosses(selectedEquipment, from, to).catch(() => null),
+        api.dashboardHeatmap(selectedEquipment, from, to).catch(() => null),
       ]);
       setData(trsRes);
       setParetoData(paretoRes);
+      setByProductData(prodRes);
+      setSixLossesData(lossesRes);
+      setHeatmapData(heatRes);
 
       if (showComparison) {
         try {
@@ -75,6 +87,9 @@ export default function DashboardPage() {
     } catch {
       setData(null);
       setParetoData(null);
+      setByProductData(null);
+      setSixLossesData(null);
+      setHeatmapData(null);
     } finally {
       setLoading(false);
     }
@@ -204,9 +219,16 @@ export default function DashboardPage() {
             {paretoData && <ParetoChart pareto={paretoData.pareto} totalMin={paretoData.totalMin} />}
           </div>
 
-          {/* ─── Waterfall ───────────────────────────────────── */}
-          <div className="mb-4">
+          {/* ─── By-Product + Six Losses row ───────────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+            {byProductData && <ByProductChart byProduct={byProductData.byProduct} />}
+            {sixLossesData && <SixLossesChart data={sixLossesData.total} />}
+          </div>
+
+          {/* ─── Waterfall + Heatmap row ─────────────────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
             <WaterfallChart metrics={data.total} />
+            {heatmapData && <HeatmapChart heatmap={heatmapData.heatmap} />}
           </div>
 
           {/* ─── Daily breakdown table ───────────────────────── */}
