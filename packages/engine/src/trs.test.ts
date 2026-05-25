@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeLotTrs, computeSessionTrs, computeZoomTrs, familleToNorme } from "./trs";
+import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, familleToNorme } from "./trs";
 
 describe("familleToNorme", () => {
   it("maps app families to NF E 60-182 codes", () => {
@@ -428,6 +428,148 @@ describe("Excel regression — Blistereuse Mai 2026", () => {
   });
 });
 
+// ─── V: Weighted aggregation verification ───────────────────
+
+describe("computeZoomTrs — weighted aggregation (V)", () => {
+  it("uses time-weighted aggregation, NOT simple average", () => {
+    const auditA = { tF_norme: 405, tF_lots: 405, tF_delta: 0, formula: "" };
+    const sessionA = {
+      tT: 1440, tO: 540, fermeture: 900, tAP: 120, tR: 420, tF: 405, tN: 390, tU: 386,
+      nonQualiteMin: 4, ecartCadenceMin: 15, totalUnplannedMin: 15,
+      DO: 405 / 420, TP: 390 / 405, TQ: 386 / 390,
+      TRS: 386 / 420, TRG: 386 / 540,
+      lotCount: 2, totalProduced: 46800, totalConforming: 46320, totalRebut: 480,
+      downtimeByFamille: {}, downtimeByNorme: {}, warnings: [], audit: auditA,
+    };
+    const auditB = { tF_norme: 15, tF_lots: 15, tF_delta: 0, formula: "" };
+    const sessionB = {
+      tT: 1440, tO: 40, fermeture: 1400, tAP: 10, tR: 30, tF: 15, tN: 10, tU: 9,
+      nonQualiteMin: 1, ecartCadenceMin: 5, totalUnplannedMin: 15,
+      DO: 15 / 30, TP: 10 / 15, TQ: 9 / 10,
+      TRS: 9 / 30, TRG: 9 / 40,
+      lotCount: 1, totalProduced: 1200, totalConforming: 1080, totalRebut: 120,
+      downtimeByFamille: {}, downtimeByNorme: {}, warnings: [], audit: auditB,
+    };
+
+    const result = computeZoomTrs({ sessions: [sessionA, sessionB] });
+
+    // Weighted DO = (405+15) / (420+30) = 420/450 = 93.3%
+    expect(result.DO).toBeCloseTo(420 / 450, 3);
+    // Simple average would be (405/420 + 15/30) / 2 = 0.732
+    expect(result.DO).not.toBeCloseTo(0.732, 2);
+
+    // TRS = tU/tR = (386+9)/(420+30) = 395/450
+    expect(result.TRS).toBeCloseTo(395 / 450, 3);
+
+    // DO × TP × TQ = TRS
+    expect(result.DO * result.TP * result.TQ).toBeCloseTo(result.TRS, 3);
+  });
+});
+
+// ─── W: Product-level aggregation ───────────────────────────
+
+describe("computeProductTrs (W)", () => {
+  it("aggregates lots by product with time-weighted metrics", () => {
+    const lots = [
+      { productId: "p1", productName: "Aerofor 12µg", cadence: 120, cadenceUnit: "u/min" as const,
+        produced: 34000, conforming: 33800, lotDurationMin: 300, unplannedMin: 20, tF: 280, tN: 283.33, tU: 281.67 },
+      { productId: "p1", productName: "Aerofor 12µg", cadence: 120, cadenceUnit: "u/min" as const,
+        produced: 28000, conforming: 27800, lotDurationMin: 250, unplannedMin: 10, tF: 240, tN: 233.33, tU: 231.67 },
+      { productId: "p2", productName: "Combifor 12/400µg", cadence: 100, cadenceUnit: "u/min" as const,
+        produced: 15000, conforming: 14900, lotDurationMin: 180, unplannedMin: 15, tF: 165, tN: 150, tU: 149 },
+    ];
+
+    const results = computeProductTrs(lots);
+    expect(results).toHaveLength(2);
+
+    const aerofor = results.find(r => r.productId === "p1")!;
+    const combifor = results.find(r => r.productId === "p2")!;
+
+    expect(aerofor.lotCount).toBe(2);
+    expect(aerofor.totalProduced).toBe(62000);
+    expect(aerofor.totalConforming).toBe(61600);
+    expect(aerofor.totalRebut).toBe(400);
+    expect(aerofor.totalDurationMin).toBe(550);
+    expect(aerofor.DO).toBeCloseTo(520 / 550, 3);
+    expect(aerofor.TQ).toBeCloseTo(61600 / 62000, 3);
+
+    expect(combifor.lotCount).toBe(1);
+    expect(combifor.totalProduced).toBe(15000);
+    expect(combifor.DO).toBeCloseTo(165 / 180, 3);
+  });
+
+  it("returns empty array for no lots", () => {
+    expect(computeProductTrs([])).toEqual([]);
+  });
+
+  it("computes weighted average cadence", () => {
+    const lots = [
+      { productId: "p1", productName: "X", cadence: 100, cadenceUnit: "u/min" as const,
+        produced: 10000, conforming: 10000, lotDurationMin: 100, unplannedMin: 0, tF: 100, tN: 100, tU: 100 },
+      { productId: "p1", productName: "X", cadence: 120, cadenceUnit: "u/min" as const,
+        produced: 24000, conforming: 24000, lotDurationMin: 200, unplannedMin: 0, tF: 200, tN: 200, tU: 200 },
+    ];
+    const results = computeProductTrs(lots);
+    expect(results[0].avgCadencePerMin).toBeCloseTo(113.33, 1);
+  });
+});
+
+// ─── X: Six Big Losses ──────────────────────────────────────
+
+describe("computeSixBigLosses (X)", () => {
+  it("classifies losses into 6 Nakajima categories", () => {
+    const sessionTrs = {
+      tT: 1440, tO: 540, fermeture: 900, tAP: 60, tR: 480, tF: 405,
+      tN: 390, tU: 386, nonQualiteMin: 4, ecartCadenceMin: 15, totalUnplannedMin: 75,
+      DO: 405 / 480, TP: 390 / 405, TQ: 386 / 390,
+      TRS: 386 / 480, TRG: 386 / 540,
+      lotCount: 2, totalProduced: 46800, totalConforming: 46320, totalRebut: 480,
+      downtimeByFamille: {}, downtimeByNorme: {}, warnings: [],
+      audit: { tF_norme: 405, tF_lots: 405, tF_delta: 0, formula: "" },
+    };
+
+    const downtimeDetails = [
+      { durationMinutes: 45, famille: "Panne équipement", isPlanned: false },
+      { durationMinutes: 30, famille: "CHSB", isPlanned: true },
+      { durationMinutes: 3, famille: "Micro-arrêt", isPlanned: false },
+      { durationMinutes: 2, famille: "Micro-arrêt", isPlanned: false },
+    ];
+
+    const result = computeSixBigLosses(sessionTrs, downtimeDetails, 5);
+    expect(result.losses).toHaveLength(6);
+
+    const breakdown = result.losses.find(l => l.category === "breakdown")!;
+    expect(breakdown.minutes).toBe(45);
+    expect(breakdown.oeeComponent).toBe("availability");
+
+    const setup = result.losses.find(l => l.category === "setup")!;
+    expect(setup.minutes).toBe(30 + 60); // planned DT + tAP
+    expect(setup.oeeComponent).toBe("availability");
+
+    const microStop = result.losses.find(l => l.category === "micro_stop")!;
+    expect(microStop.minutes).toBe(5);
+    expect(microStop.oeeComponent).toBe("performance");
+
+    const speedLoss = result.losses.find(l => l.category === "speed_loss")!;
+    expect(speedLoss.minutes).toBe(15);
+    expect(speedLoss.oeeComponent).toBe("performance");
+  });
+
+  it("returns zeros when no losses", () => {
+    const sessionTrs = {
+      tT: 1440, tO: 1440, fermeture: 0, tAP: 0, tR: 1440, tF: 1440,
+      tN: 1440, tU: 1440, nonQualiteMin: 0, ecartCadenceMin: 0, totalUnplannedMin: 0,
+      DO: 1, TP: 1, TQ: 1, TRS: 1, TRG: 1,
+      lotCount: 1, totalProduced: 100, totalConforming: 100, totalRebut: 0,
+      downtimeByFamille: {}, downtimeByNorme: {}, warnings: [],
+      audit: { tF_norme: 1440, tF_lots: 1440, tF_delta: 0, formula: "" },
+    };
+
+    const result = computeSixBigLosses(sessionTrs, []);
+    expect(result.losses.every(l => l.minutes === 0)).toBe(true);
+  });
+});
+
 describe("Excel regression — Géluleuse Mai 2026", () => {
   it("Row 7: Aeronide 400µg, lot 26016, cadence 1020 gél/min", () => {
     // Excel: tO=540, tAP=90 (Pause=0, CHSG=0, APR=90, MQCH=0), tR=450
@@ -462,5 +604,147 @@ describe("Excel regression — Géluleuse Mai 2026", () => {
     expect(session.TP).toBeCloseTo(tN / 428, 3);
     expect(session.TRS).toBeCloseTo(tU / 450, 3);
     expect(session.DO * session.TP * session.TQ).toBeCloseTo(session.TRS, 3);
+  });
+});
+
+// ─── V: Weighted aggregation verification ───────────────────
+
+describe("computeZoomTrs — weighted aggregation (V)", () => {
+  it("uses time-weighted aggregation, NOT simple average", () => {
+    const auditA = { tF_norme: 405, tF_lots: 405, tF_delta: 0, formula: "" };
+    const sessionA = {
+      tT: 1440, tO: 540, fermeture: 900, tAP: 120, tR: 420, tF: 405, tN: 390, tU: 386,
+      nonQualiteMin: 4, ecartCadenceMin: 15, totalUnplannedMin: 15,
+      DO: 405 / 420, TP: 390 / 405, TQ: 386 / 390,
+      TRS: 386 / 420, TRG: 386 / 540,
+      lotCount: 2, totalProduced: 46800, totalConforming: 46320, totalRebut: 480,
+      downtimeByFamille: {}, downtimeByNorme: {}, warnings: [], audit: auditA,
+    };
+    const auditB = { tF_norme: 15, tF_lots: 15, tF_delta: 0, formula: "" };
+    const sessionB = {
+      tT: 1440, tO: 40, fermeture: 1400, tAP: 10, tR: 30, tF: 15, tN: 10, tU: 9,
+      nonQualiteMin: 1, ecartCadenceMin: 5, totalUnplannedMin: 15,
+      DO: 15 / 30, TP: 10 / 15, TQ: 9 / 10,
+      TRS: 9 / 30, TRG: 9 / 40,
+      lotCount: 1, totalProduced: 1200, totalConforming: 1080, totalRebut: 120,
+      downtimeByFamille: {}, downtimeByNorme: {}, warnings: [], audit: auditB,
+    };
+
+    const result = computeZoomTrs({ sessions: [sessionA, sessionB] });
+
+    // Weighted DO = (405+15) / (420+30) = 420/450 = 93.3%
+    expect(result.DO).toBeCloseTo(420 / 450, 3);
+    // Simple average would be (405/420 + 15/30) / 2 = 0.732
+    expect(result.DO).not.toBeCloseTo(0.732, 2);
+
+    // TRS = tU/tR = (386+9)/(420+30) = 395/450
+    expect(result.TRS).toBeCloseTo(395 / 450, 3);
+
+    // DO × TP × TQ = TRS
+    expect(result.DO * result.TP * result.TQ).toBeCloseTo(result.TRS, 3);
+  });
+});
+
+// ─── W: Product-level aggregation ───────────────────────────
+
+describe("computeProductTrs (W)", () => {
+  it("aggregates lots by product with time-weighted metrics", () => {
+    const lots = [
+      { productId: "p1", productName: "Aerofor 12µg", cadence: 120, cadenceUnit: "u/min" as const,
+        produced: 34000, conforming: 33800, lotDurationMin: 300, unplannedMin: 20, tF: 280, tN: 283.33, tU: 281.67 },
+      { productId: "p1", productName: "Aerofor 12µg", cadence: 120, cadenceUnit: "u/min" as const,
+        produced: 28000, conforming: 27800, lotDurationMin: 250, unplannedMin: 10, tF: 240, tN: 233.33, tU: 231.67 },
+      { productId: "p2", productName: "Combifor 12/400µg", cadence: 100, cadenceUnit: "u/min" as const,
+        produced: 15000, conforming: 14900, lotDurationMin: 180, unplannedMin: 15, tF: 165, tN: 150, tU: 149 },
+    ];
+
+    const results = computeProductTrs(lots);
+    expect(results).toHaveLength(2);
+
+    const aerofor = results.find(r => r.productId === "p1")!;
+    const combifor = results.find(r => r.productId === "p2")!;
+
+    expect(aerofor.lotCount).toBe(2);
+    expect(aerofor.totalProduced).toBe(62000);
+    expect(aerofor.totalConforming).toBe(61600);
+    expect(aerofor.totalRebut).toBe(400);
+    expect(aerofor.totalDurationMin).toBe(550);
+    expect(aerofor.DO).toBeCloseTo(520 / 550, 3);
+    expect(aerofor.TQ).toBeCloseTo(61600 / 62000, 3);
+
+    expect(combifor.lotCount).toBe(1);
+    expect(combifor.totalProduced).toBe(15000);
+    expect(combifor.DO).toBeCloseTo(165 / 180, 3);
+  });
+
+  it("returns empty array for no lots", () => {
+    expect(computeProductTrs([])).toEqual([]);
+  });
+
+  it("computes weighted average cadence", () => {
+    const lots = [
+      { productId: "p1", productName: "X", cadence: 100, cadenceUnit: "u/min" as const,
+        produced: 10000, conforming: 10000, lotDurationMin: 100, unplannedMin: 0, tF: 100, tN: 100, tU: 100 },
+      { productId: "p1", productName: "X", cadence: 120, cadenceUnit: "u/min" as const,
+        produced: 24000, conforming: 24000, lotDurationMin: 200, unplannedMin: 0, tF: 200, tN: 200, tU: 200 },
+    ];
+    const results = computeProductTrs(lots);
+    expect(results[0].avgCadencePerMin).toBeCloseTo(113.33, 1);
+  });
+});
+
+// ─── X: Six Big Losses ──────────────────────────────────────
+
+describe("computeSixBigLosses (X)", () => {
+  it("classifies losses into 6 Nakajima categories", () => {
+    const sessionTrs = {
+      tT: 1440, tO: 540, fermeture: 900, tAP: 60, tR: 480, tF: 405,
+      tN: 390, tU: 386, nonQualiteMin: 4, ecartCadenceMin: 15, totalUnplannedMin: 75,
+      DO: 405 / 480, TP: 390 / 405, TQ: 386 / 390,
+      TRS: 386 / 480, TRG: 386 / 540,
+      lotCount: 2, totalProduced: 46800, totalConforming: 46320, totalRebut: 480,
+      downtimeByFamille: {}, downtimeByNorme: {}, warnings: [],
+      audit: { tF_norme: 405, tF_lots: 405, tF_delta: 0, formula: "" },
+    };
+
+    const downtimeDetails = [
+      { durationMinutes: 45, famille: "Panne équipement", isPlanned: false },
+      { durationMinutes: 30, famille: "CHSB", isPlanned: true },
+      { durationMinutes: 3, famille: "Micro-arrêt", isPlanned: false },
+      { durationMinutes: 2, famille: "Micro-arrêt", isPlanned: false },
+    ];
+
+    const result = computeSixBigLosses(sessionTrs, downtimeDetails, 5);
+    expect(result.losses).toHaveLength(6);
+
+    const breakdown = result.losses.find(l => l.category === "breakdown")!;
+    expect(breakdown.minutes).toBe(45);
+    expect(breakdown.oeeComponent).toBe("availability");
+
+    const setup = result.losses.find(l => l.category === "setup")!;
+    expect(setup.minutes).toBe(30 + 60); // planned DT + tAP
+    expect(setup.oeeComponent).toBe("availability");
+
+    const microStop = result.losses.find(l => l.category === "micro_stop")!;
+    expect(microStop.minutes).toBe(5);
+    expect(microStop.oeeComponent).toBe("performance");
+
+    const speedLoss = result.losses.find(l => l.category === "speed_loss")!;
+    expect(speedLoss.minutes).toBe(15);
+    expect(speedLoss.oeeComponent).toBe("performance");
+  });
+
+  it("returns zeros when no losses", () => {
+    const sessionTrs = {
+      tT: 1440, tO: 1440, fermeture: 0, tAP: 0, tR: 1440, tF: 1440,
+      tN: 1440, tU: 1440, nonQualiteMin: 0, ecartCadenceMin: 0, totalUnplannedMin: 0,
+      DO: 1, TP: 1, TQ: 1, TRS: 1, TRG: 1,
+      lotCount: 1, totalProduced: 100, totalConforming: 100, totalRebut: 0,
+      downtimeByFamille: {}, downtimeByNorme: {}, warnings: [],
+      audit: { tF_norme: 1440, tF_lots: 1440, tF_delta: 0, formula: "" },
+    };
+
+    const result = computeSixBigLosses(sessionTrs, []);
+    expect(result.losses.every(l => l.minutes === 0)).toBe(true);
   });
 });

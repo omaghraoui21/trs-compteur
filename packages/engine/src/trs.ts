@@ -107,6 +107,59 @@ export interface ZoomTrsInput {
   sessions: SessionTrsResult[];
 }
 
+// ─── Product-level aggregation types ────────────────────
+
+export interface ProductLotInput {
+  productId: string;
+  productName: string;
+  cadence: number;
+  cadenceUnit: "u/h" | "u/min";
+  produced: number;
+  conforming: number;
+  lotDurationMin: number;
+  unplannedMin: number;
+  tF: number;
+  tN: number;
+  tU: number;
+}
+
+export interface ProductTrsResult {
+  productId: string;
+  productName: string;
+  lotCount: number;
+  totalProduced: number;
+  totalConforming: number;
+  totalRebut: number;
+  totalDurationMin: number;
+  totalUnplannedMin: number;
+  tF: number;
+  tN: number;
+  tU: number;
+  avgCadencePerMin: number;
+  DO: number;
+  TP: number;
+  TQ: number;
+  TRS: number;
+}
+
+// ─── Six Big Losses types ───────────────────────────────
+
+export type LossCategory = "breakdown" | "setup" | "micro_stop" | "speed_loss" | "startup_reject" | "production_reject";
+
+export interface SixBigLoss {
+  category: LossCategory;
+  label: string;
+  oeeComponent: "availability" | "performance" | "quality";
+  minutes: number;
+  pctOfTotal: number;
+}
+
+export interface SixBigLossesResult {
+  losses: SixBigLoss[];
+  totalLossMin: number;
+  tT: number;
+}
+
 // ─── Lot-level TRS ──────────────────────────────────────
 
 export function computeLotTrs(input: LotTrsInput): LotTrsResult | null {
@@ -260,6 +313,101 @@ export function computeSessionTrs(input: SessionTrsInput): SessionTrsResult {
     totalProduced, totalConforming, totalRebut,
     downtimeByFamille, downtimeByNorme, warnings, audit,
   };
+}
+
+// ─── Product-level TRS aggregation ──────────────────────
+
+export function computeProductTrs(lots: ProductLotInput[]): ProductTrsResult[] {
+  const byProduct = new Map<string, ProductLotInput[]>();
+  for (const lot of lots) {
+    const arr = byProduct.get(lot.productId) || [];
+    arr.push(lot);
+    byProduct.set(lot.productId, arr);
+  }
+
+  const results: ProductTrsResult[] = [];
+  for (const [productId, productLots] of byProduct) {
+    const totalProduced = productLots.reduce((s, l) => s + l.produced, 0);
+    const totalConforming = productLots.reduce((s, l) => s + l.conforming, 0);
+    const totalDurationMin = productLots.reduce((s, l) => s + l.lotDurationMin, 0);
+    const totalUnplannedMin = productLots.reduce((s, l) => s + l.unplannedMin, 0);
+    const tF = productLots.reduce((s, l) => s + l.tF, 0);
+    const tN = productLots.reduce((s, l) => s + l.tN, 0);
+    const tU = productLots.reduce((s, l) => s + l.tU, 0);
+    const tR = totalDurationMin; // At lot level, lot duration = required time for that lot
+
+    const totalCadenceWeighted = productLots.reduce((s, l) => {
+      const cpm = l.cadenceUnit === "u/min" ? l.cadence : l.cadence / 60;
+      return s + cpm * l.lotDurationMin;
+    }, 0);
+    const avgCadencePerMin = totalDurationMin > 0 ? totalCadenceWeighted / totalDurationMin : 0;
+
+    results.push({
+      productId,
+      productName: productLots[0].productName,
+      lotCount: productLots.length,
+      totalProduced,
+      totalConforming,
+      totalRebut: totalProduced - totalConforming,
+      totalDurationMin,
+      totalUnplannedMin,
+      tF,
+      tN,
+      tU,
+      avgCadencePerMin,
+      DO: tR > 0 ? tF / tR : 0,
+      TP: tF > 0 ? tN / tF : 0,
+      TQ: totalProduced > 0 ? totalConforming / totalProduced : 1,
+      TRS: tR > 0 ? tU / tR : 0,
+    });
+  }
+
+  return results.sort((a, b) => b.TRS - a.TRS);
+}
+
+// ─── Six Big Losses computation ─────────────────────────
+
+export function computeSixBigLosses(
+  sessionTrs: SessionTrsResult,
+  downtimeDetails: { durationMinutes: number; famille: string; isPlanned: boolean }[],
+  microStopThresholdMin: number = 5,
+): SixBigLossesResult {
+  const { tT, tF, ecartCadenceMin, nonQualiteMin, fermeture, tAP } = sessionTrs;
+
+  let breakdownMin = 0;
+  let setupMin = 0;
+  let microStopMin = 0;
+
+  for (const dt of downtimeDetails) {
+    if (dt.isPlanned) {
+      // Planned stops: setup/changeover type
+      setupMin += dt.durationMinutes;
+    } else if (dt.durationMinutes < microStopThresholdMin) {
+      microStopMin += dt.durationMinutes;
+    } else {
+      breakdownMin += dt.durationMinutes;
+    }
+  }
+
+  // Speed loss = écart cadence (already computed by engine)
+  const speedLossMin = Math.max(0, ecartCadenceMin);
+
+  // Quality losses: split into startup rejects (first 10% of tF) and production rejects
+  const startupRejectMin = Math.max(0, Math.round(nonQualiteMin * 0.1));
+  const productionRejectMin = Math.max(0, Math.round(nonQualiteMin * 0.9));
+
+  const totalLossMin = fermeture + tAP + breakdownMin + microStopMin + setupMin + speedLossMin + startupRejectMin + productionRejectMin;
+
+  const losses: SixBigLoss[] = [
+    { category: "breakdown", label: "Pannes", oeeComponent: "availability", minutes: breakdownMin, pctOfTotal: tT > 0 ? (breakdownMin / tT) * 100 : 0 },
+    { category: "setup", label: "Réglages & changements", oeeComponent: "availability", minutes: setupMin + tAP, pctOfTotal: tT > 0 ? ((setupMin + tAP) / tT) * 100 : 0 },
+    { category: "micro_stop", label: "Micro-arrêts", oeeComponent: "performance", minutes: microStopMin, pctOfTotal: tT > 0 ? (microStopMin / tT) * 100 : 0 },
+    { category: "speed_loss", label: "Ralentissements", oeeComponent: "performance", minutes: speedLossMin, pctOfTotal: tT > 0 ? (speedLossMin / tT) * 100 : 0 },
+    { category: "startup_reject", label: "Rebuts démarrage", oeeComponent: "quality", minutes: startupRejectMin, pctOfTotal: tT > 0 ? (startupRejectMin / tT) * 100 : 0 },
+    { category: "production_reject", label: "Rebuts production", oeeComponent: "quality", minutes: productionRejectMin, pctOfTotal: tT > 0 ? (productionRejectMin / tT) * 100 : 0 },
+  ];
+
+  return { losses, totalLossMin, tT };
 }
 
 // ─── Zoom TRS (multi-session aggregation) ───────────────
