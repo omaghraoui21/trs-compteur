@@ -234,3 +234,17 @@ export const dailySummaries = pgTable("daily_summaries", {
   unique("uq_daily_summary_equip_date").on(t.equipmentId, t.summaryDate),
   index("idx_daily_summaries_date").on(t.summaryDate),
 ]);
+
+// ─── Product × Equipment Cadences ──────────────────────
+
+export const productEquipmentCadences = pgTable("product_equipment_cadences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  productId: uuid("product_id").notNull().references(() => products.id),
+  equipmentId: uuid("equipment_id").notNull().references(() => equipments.id),
+  cadenceValue: numeric("cadence_value", { precision: 10, scale: 2 }).notNull(),
+  cadenceUnit: text("cadence_unit").notNull().default("u/min"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, (t) => [
+  unique("uq_product_equipment_cadence").on(t.productId, t.equipmentId),
+]);

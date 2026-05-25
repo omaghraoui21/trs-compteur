@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
-import { rooms, equipments, products, downtimeCategories } from "@trs/db";
+import { eq, and } from "drizzle-orm";
+import { rooms, equipments, products, downtimeCategories, productEquipmentCadences } from "@trs/db";
 import { authenticate, requireRole } from "../middleware";
 
 export const adminRouter = Router();
@@ -156,5 +156,37 @@ adminRouter.patch("/downtime-categories/:id", async (req, res) => {
 adminRouter.delete("/downtime-categories/:id", async (req, res) => {
   const [row] = await req.db.update(downtimeCategories).set({ isActive: false }).where(eq(downtimeCategories.id, req.params.id)).returning();
   if (!row) { res.status(404).json({ error: "Categorie introuvable" }); return; }
+  res.json(row);
+});
+
+// ─── Product × Equipment Cadences CRUD ──────────────────
+
+adminRouter.get("/cadences", async (req, res) => {
+  const data = await req.db.select().from(productEquipmentCadences);
+  res.json(data);
+});
+
+adminRouter.post("/cadences", async (req, res) => {
+  const { productId, equipmentId, cadenceValue, cadenceUnit } = req.body;
+  if (!productId || !equipmentId || !cadenceValue) {
+    res.status(400).json({ error: "productId, equipmentId et cadenceValue requis" }); return;
+  }
+  const [row] = await req.db.insert(productEquipmentCadences).values({
+    productId, equipmentId,
+    cadenceValue: String(cadenceValue),
+    cadenceUnit: cadenceUnit || "u/min",
+  }).onConflictDoUpdate({
+    target: [productEquipmentCadences.productId, productEquipmentCadences.equipmentId],
+    set: {
+      cadenceValue: String(cadenceValue),
+      cadenceUnit: cadenceUnit || "u/min",
+    },
+  }).returning();
+  res.status(201).json(row);
+});
+
+adminRouter.delete("/cadences/:id", async (req, res) => {
+  const [row] = await req.db.delete(productEquipmentCadences).where(eq(productEquipmentCadences.id, req.params.id)).returning();
+  if (!row) { res.status(404).json({ error: "Cadence introuvable" }); return; }
   res.json(row);
 });

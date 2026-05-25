@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory } from "@/lib/api";
-import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight } from "lucide-react";
+import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type ProductEquipmentCadence } from "@/lib/api";
+import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge } from "lucide-react";
 
-type Tab = "rooms" | "equipments" | "products" | "downtimes";
+type Tab = "rooms" | "equipments" | "products" | "downtimes" | "cadences";
 
 const TABS: { key: Tab; label: string; icon: typeof Building2 }[] = [
   { key: "rooms", label: "Locaux", icon: Building2 },
   { key: "equipments", label: "Équipements", icon: Cpu },
   { key: "products", label: "Produits", icon: Package },
+  { key: "cadences", label: "Cadences", icon: Gauge },
   { key: "downtimes", label: "Arrêts", icon: AlertTriangle },
 ];
 
@@ -49,6 +50,7 @@ export default function AdminPage() {
       {activeTab === "rooms" && <RoomsPanel />}
       {activeTab === "equipments" && <EquipmentsPanel />}
       {activeTab === "products" && <ProductsPanel />}
+      {activeTab === "cadences" && <CadencesPanel />}
       {activeTab === "downtimes" && <DowntimesPanel />}
     </div>
   );
@@ -343,6 +345,128 @@ function ProductsPanel() {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ─── Cadences Panel (Product × Equipment) ────────────────
+
+function CadencesPanel() {
+  const [cadences, setCadences] = useState<ProductEquipmentCadence[]>([]);
+  const [productsList, setProductsList] = useState<AdminProduct[]>([]);
+  const [equipmentsList, setEquipmentsList] = useState<AdminEquipment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ productId: "", equipmentId: "", cadenceValue: "", cadenceUnit: "u/min" });
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [c, p, e] = await Promise.all([api.admin.listCadences(), api.admin.listProducts(), api.admin.listEquipments()]);
+      setCadences(c); setProductsList(p.filter(x => x.isActive)); setEquipmentsList(e.filter(x => x.isActive));
+    } catch (e: any) { setError(e.message); }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const resetForm = () => { setForm({ productId: "", equipmentId: "", cadenceValue: "", cadenceUnit: "u/min" }); setShowForm(false); setError(""); };
+
+  const save = async () => {
+    setError("");
+    if (!form.productId || !form.equipmentId || !form.cadenceValue) { setError("Tous les champs sont requis"); return; }
+    try {
+      await api.admin.upsertCadence({ productId: form.productId, equipmentId: form.equipmentId, cadenceValue: Number(form.cadenceValue), cadenceUnit: form.cadenceUnit });
+      resetForm(); load();
+    } catch (e: any) { setError(e.message); }
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm("Supprimer cette cadence ?")) return;
+    try { await api.admin.deleteCadence(id); load(); } catch (e: any) { setError(e.message); }
+  };
+
+  const productName = (id: string) => productsList.find(p => p.id === id)?.name || id;
+  const equipmentName = (id: string) => equipmentsList.find(e => e.id === id)?.name || id;
+
+  if (loading) return <Spinner />;
+
+  // Group by equipment
+  const grouped = cadences.reduce<Record<string, ProductEquipmentCadence[]>>((acc, c) => {
+    const name = equipmentName(c.equipmentId);
+    (acc[name] ||= []).push(c);
+    return acc;
+  }, {});
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <p className="text-sm text-gray-500">{cadences.length} cadences configurées</p>
+          <p className="text-xs text-gray-400 mt-1">Cadence théorique par couple produit × équipement. Pré-remplit automatiquement le formulaire opérateur.</p>
+        </div>
+        <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Ajouter</button>
+      </div>
+
+      {error && <ErrorBanner msg={error} onClose={() => setError("")} />}
+
+      {showForm && (
+        <FormCard title="Cadence produit × équipement" onCancel={resetForm} onSave={save}>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Produit</label>
+            <select value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} className="input-field">
+              <option value="">Sélectionner un produit</option>
+              {productsList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Équipement</label>
+            <select value={form.equipmentId} onChange={(e) => setForm({ ...form, equipmentId: e.target.value })} className="input-field">
+              <option value="">Sélectionner un équipement</option>
+              {equipmentsList.map(eq => <option key={eq.id} value={eq.id}>{eq.name}</option>)}
+            </select>
+          </div>
+          <Field label="Cadence" value={form.cadenceValue} onChange={(v) => setForm({ ...form, cadenceValue: v })} type="number" placeholder="100" />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Unité</label>
+            <select value={form.cadenceUnit} onChange={(e) => setForm({ ...form, cadenceUnit: e.target.value })} className="input-field">
+              <option value="u/min">u/min</option>
+              <option value="u/h">u/h</option>
+            </select>
+          </div>
+        </FormCard>
+      )}
+
+      {Object.entries(grouped).map(([eqName, items]) => (
+        <div key={eqName} className="mb-6">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+            <Cpu className="h-4 w-4" /> {eqName}
+            <span className="text-xs font-normal text-gray-400">({items.length} produits)</span>
+          </h3>
+          <table className="w-full text-sm">
+            <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Produit</th><th className="py-2 px-3">Cadence</th><th className="py-2 px-3">Unité</th><th className="py-2 px-3 w-16">Action</th></tr></thead>
+            <tbody>
+              {items.map(c => (
+                <tr key={c.id} className="border-b hover:bg-gray-50">
+                  <td className="py-2 px-3 font-medium">{productName(c.productId)}</td>
+                  <td className="py-2 px-3">{c.cadenceValue}</td>
+                  <td className="py-2 px-3">{c.cadenceUnit}</td>
+                  <td className="py-2 px-3">
+                    <IconBtn icon={Trash2} onClick={() => remove(c.id)} title="Supprimer" className="text-red-500 hover:bg-red-50" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+
+      {cadences.length === 0 && (
+        <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-400 text-sm">
+          Aucune cadence configurée. Ajoutez des cadences pour pré-remplir automatiquement le formulaire opérateur.
+        </div>
+      )}
     </div>
   );
 }

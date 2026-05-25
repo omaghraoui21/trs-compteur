@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, and } from "drizzle-orm";
-import { rooms, equipments, products, downtimeCategories } from "@trs/db";
+import { rooms, equipments, products, downtimeCategories, productEquipmentCadences } from "@trs/db";
 
 import { authenticate } from "../middleware";
 
@@ -38,6 +38,16 @@ refRouter.get("/downtime-categories", async (req, res) => {
   let data = await db.select().from(downtimeCategories).where(eq(downtimeCategories.isActive, true));
   if (eqType) {
     data = data.filter(c => !c.appliesToEquipmentType || c.appliesToEquipmentType === eqType);
+  }
+  res.json(data);
+});
+
+refRouter.get("/cadences", async (req, res) => {
+  const { db } = req;
+  const equipmentId = req.query.equipmentId as string | undefined;
+  let data = await db.select().from(productEquipmentCadences);
+  if (equipmentId) {
+    data = data.filter(c => c.equipmentId === equipmentId);
   }
   res.json(data);
 });
