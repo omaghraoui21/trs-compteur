@@ -35,6 +35,9 @@ describe("computeLotTrs", () => {
     expect(result!.tF).toBe(292);
     expect(result!.TP).toBeCloseTo(0.998, 2);
     expect(result!.TQ).toBeCloseTo(34794 / 34987, 3);
+    expect(result!.rebut).toBe(193);
+    expect(result!.nonQualiteMin).toBeCloseTo(result!.tN - result!.tU, 5);
+    expect(result!.downtimeByFamille).toEqual({ "Non classé": 168 });
   });
 
   it("computes 100% quality when all produced is conforming", () => {
@@ -94,13 +97,15 @@ describe("computeSessionTrs", () => {
     // Planned stops: nettoyage(30) + vide_ligne(15) + chsb(15) + remplissage(15) + pause(30) + remplissage(15) = 120 min
     // tR = 540 - 120 = 420 min
     const lot1 = {
-      lotDurationMin: 225, unplannedMin: 15, tF: 210, tN: 200, tU: 198,
-      TP: 200 / 210, TQ: 0.99, cadencePerMin: 120, ecartCadence: 10,
+      lotDurationMin: 225, plannedMin: 0, unplannedMin: 15, tF: 210, tN: 200, tU: 198,
+      nonQualiteMin: 2, TP: 200 / 210, TQ: 0.99, cadencePerMin: 120, ecartCadence: 10,
+      rebut: 240, downtimeByFamille: { "Panne équipement": 15 },
       produced: 24000, conforming: 23760,
     };
     const lot2 = {
-      lotDurationMin: 195, unplannedMin: 0, tF: 195, tN: 190, tU: 188,
-      TP: 190 / 195, TQ: 0.99, cadencePerMin: 120, ecartCadence: 5,
+      lotDurationMin: 195, plannedMin: 0, unplannedMin: 0, tF: 195, tN: 190, tU: 188,
+      nonQualiteMin: 2, TP: 190 / 195, TQ: 0.99, cadencePerMin: 120, ecartCadence: 5,
+      rebut: 240, downtimeByFamille: {},
       produced: 22800, conforming: 22560,
     };
     const result = computeSessionTrs({
@@ -110,17 +115,21 @@ describe("computeSessionTrs", () => {
       lots: [lot1, lot2],
     });
 
+    expect(result.tT).toBe(1440);
     expect(result.tO).toBe(540);
+    expect(result.fermeture).toBe(900);
     expect(result.tR).toBe(420);
     expect(result.tF).toBe(405);   // 210 + 195
     expect(result.lotCount).toBe(2);
     expect(result.totalProduced).toBe(46800);
     expect(result.totalConforming).toBe(46320);
+    expect(result.totalRebut).toBe(480);
     expect(result.DO).toBeCloseTo(405 / 420, 3);
     expect(result.TRS).toBeGreaterThan(0);
     expect(result.TRS).toBeLessThanOrEqual(1);
-    // TRS = DO × TP × TQ
     expect(result.TRS).toBeCloseTo(result.DO * result.TP * result.TQ, 2);
+    expect(result.downtimeByFamille).toEqual({ "Panne équipement": 15 });
+    expect(result.totalUnplannedMin).toBe(15);
   });
 
   it("handles empty session (no lots)", () => {
@@ -140,31 +149,41 @@ describe("computeSessionTrs", () => {
 describe("computeZoomTrs", () => {
   it("aggregates multiple sessions (monthly zoom)", () => {
     const session1 = {
-      tO: 540, tAP: 120, tR: 420, tF: 405, tN: 390, tU: 386,
+      tT: 1440, tO: 540, fermeture: 900, tAP: 120, tR: 420, tF: 405, tN: 390, tU: 386,
+      nonQualiteMin: 4, ecartCadenceMin: 15, totalUnplannedMin: 15,
       DO: 405 / 420, TP: 390 / 405, TQ: 0.99,
       TRS: 386 / 420, TRG: 386 / 540,
-      lotCount: 2, totalProduced: 46800, totalConforming: 46320,
+      lotCount: 2, totalProduced: 46800, totalConforming: 46320, totalRebut: 480,
+      downtimeByFamille: { "Panne équipement": 15 },
     };
     const session2 = {
-      tO: 480, tAP: 90, tR: 390, tF: 370, tN: 360, tU: 355,
+      tT: 1440, tO: 480, fermeture: 960, tAP: 90, tR: 390, tF: 370, tN: 360, tU: 355,
+      nonQualiteMin: 5, ecartCadenceMin: 10, totalUnplannedMin: 20,
       DO: 370 / 390, TP: 360 / 370, TQ: 0.985,
       TRS: 355 / 390, TRG: 355 / 480,
-      lotCount: 1, totalProduced: 43200, totalConforming: 42552,
+      lotCount: 1, totalProduced: 43200, totalConforming: 42552, totalRebut: 648,
+      downtimeByFamille: { "Attente matière": 20 },
     };
 
     const result = computeZoomTrs({ sessions: [session1, session2] });
 
+    expect(result.tT).toBe(2880);         // 1440 + 1440
     expect(result.tO).toBe(1020);         // 540 + 480
+    expect(result.fermeture).toBe(1860);  // 900 + 960
     expect(result.tR).toBe(810);          // 420 + 390
     expect(result.lotCount).toBe(3);      // 2 + 1
     expect(result.totalProduced).toBe(90000);
+    expect(result.totalRebut).toBe(1128);
     expect(result.TRS).toBeGreaterThan(0);
     expect(result.TRS).toBeLessThanOrEqual(1);
+    expect(result.downtimeByFamille).toEqual({ "Panne équipement": 15, "Attente matière": 20 });
   });
 
   it("returns zeros for empty zoom", () => {
     const result = computeZoomTrs({ sessions: [] });
     expect(result.TRS).toBe(0);
     expect(result.tO).toBe(0);
+    expect(result.tT).toBe(0);
+    expect(result.downtimeByFamille).toEqual({});
   });
 });

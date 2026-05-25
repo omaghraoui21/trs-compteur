@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, and, desc } from "drizzle-orm";
-import { sessions, sessionEvents, lotEntries, downtimeEvents } from "@trs/db";
+import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, diffMinutes } from "@trs/engine";
 import { authenticate } from "../middleware";
 
@@ -160,7 +160,13 @@ sessionsRouter.get("/:id/trs", async (req, res) => {
 
   const lotResults = [];
   for (const lot of lots) {
-    const dts = await db.select().from(downtimeEvents).where(eq(downtimeEvents.lotEntryId, lot.id));
+    const dts = await db.select({
+      durationMinutes: downtimeEvents.durationMinutes,
+      famille: downtimeCategories.famille,
+      isPlanned: downtimeCategories.isPlanned,
+    }).from(downtimeEvents)
+      .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+      .where(eq(downtimeEvents.lotEntryId, lot.id));
     const lotTrs = computeLotTrs({
       cadence: Number(lot.cadenceUsed),
       cadenceUnit: lot.cadenceUnit as "u/h" | "u/min",
@@ -170,7 +176,8 @@ sessionsRouter.get("/:id/trs", async (req, res) => {
       endedAt: lot.endedAt ?? closedAt,
       downtimes: dts.map(d => ({
         durationMinutes: d.durationMinutes,
-        isPlanned: false, // lot-level downtimes are unplanned
+        isPlanned: d.isPlanned,
+        famille: d.famille,
       })),
     });
     if (lotTrs) {
