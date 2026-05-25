@@ -28,6 +28,7 @@ adminRouter.patch("/rooms/:id", async (req, res) => {
   if (name !== undefined) updates.name = name;
   if (description !== undefined) updates.description = description;
   if (isActive !== undefined) updates.isActive = isActive;
+  if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Aucune mise à jour" }); return; }
   const [row] = await req.db.update(rooms).set(updates).where(eq(rooms.id, req.params.id)).returning();
   if (!row) { res.status(404).json({ error: "Local introuvable" }); return; }
   res.json(row);
@@ -67,6 +68,7 @@ adminRouter.patch("/equipments/:id", async (req, res) => {
   if (trsObjective !== undefined) updates.trsObjective = trsObjective;
   if (defaultCadenceUnit !== undefined) updates.defaultCadenceUnit = defaultCadenceUnit;
   if (isActive !== undefined) updates.isActive = isActive;
+  if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Aucune mise à jour" }); return; }
   const [row] = await req.db.update(equipments).set(updates).where(eq(equipments.id, req.params.id)).returning();
   if (!row) { res.status(404).json({ error: "Equipement introuvable" }); return; }
   res.json(row);
@@ -106,6 +108,7 @@ adminRouter.patch("/products/:id", async (req, res) => {
   if (cadenceUnit !== undefined) updates.cadenceUnit = cadenceUnit;
   if (unit !== undefined) updates.unit = unit;
   if (isActive !== undefined) updates.isActive = isActive;
+  if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Aucune mise à jour" }); return; }
   const [row] = await req.db.update(products).set(updates).where(eq(products.id, req.params.id)).returning();
   if (!row) { res.status(404).json({ error: "Produit introuvable" }); return; }
   res.json(row);
@@ -144,6 +147,7 @@ adminRouter.patch("/downtime-categories/:id", async (req, res) => {
   if (isPlanned !== undefined) updates.isPlanned = isPlanned;
   if (appliesToEquipmentType !== undefined) updates.appliesToEquipmentType = appliesToEquipmentType || null;
   if (isActive !== undefined) updates.isActive = isActive;
+  if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Aucune mise à jour" }); return; }
   const [row] = await req.db.update(downtimeCategories).set(updates).where(eq(downtimeCategories.id, req.params.id)).returning();
   if (!row) { res.status(404).json({ error: "Categorie introuvable" }); return; }
   res.json(row);
