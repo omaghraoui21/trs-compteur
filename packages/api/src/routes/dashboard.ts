@@ -307,9 +307,10 @@ dashboardRouter.get("/by-product", async (req, res) => {
       const cadenceUnit = lot.cadenceUnit as "u/h" | "u/min";
       const cadencePerMin = cadenceUnit === "u/min" ? cadence : cadence / 60;
 
+      const plannedMin = dts.filter((d: any) => d.isPlanned).reduce((s: number, d: any) => s + d.durationMinutes, 0);
       const unplannedMin = dts.filter((d: any) => !d.isPlanned).reduce((s: number, d: any) => s + d.durationMinutes, 0);
       const lotDurationMin = Math.round((new Date(lot.endedAt).getTime() - new Date(lot.startedAt).getTime()) / 60_000);
-      const tF = Math.max(0, lotDurationMin - unplannedMin);
+      const tF = Math.max(0, lotDurationMin - plannedMin - unplannedMin);
       const tN = cadencePerMin > 0 ? lot.quantityProduced / cadencePerMin : 0;
       const tU = cadencePerMin > 0 ? lot.quantityConforming / cadencePerMin : 0;
 
