@@ -436,25 +436,36 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                   <td className="px-3 py-2 text-right font-bold" style={{ color: trsColor(d.TRS) }}>{fmtPct(d.TRS)}</td>
                   <td className="px-3 py-2 text-right" style={{ color: trsColor(d.TRG) }}>{fmtPct(d.TRG)}</td>
                 </tr>
-                {/* Expanded lot details */}
+                {/* U7: Enhanced lot drill-down */}
                 {expandedDay === d.date && d.lots && d.lots.map((lot: any) => (
                   <tr key={lot.lotId} className="bg-blue-50/50 text-xs">
-                    <td className="px-3 py-1"></td>
-                    <td className="px-3 py-1 text-gray-500 pl-6">
-                      └ {lot.productName} ({lot.batchNumber})
+                    <td className="px-3 py-1.5"></td>
+                    <td className="px-3 py-1.5 text-gray-600 pl-6">
+                      <div className="flex items-center gap-1">
+                        <span className="text-gray-400">└</span>
+                        <span className="font-medium">{lot.productName}</span>
+                        <span className="text-gray-400">({lot.batchNumber})</span>
+                      </div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">
+                        Cadence: {lot.cadencePerMin ? `${lot.cadencePerMin.toFixed(0)} u/min` : "—"}
+                        {lot.unplannedMin > 0 && <span className="ml-2 text-red-500">Arrêts NP: {fmtDuration(lot.unplannedMin)}</span>}
+                        {lot.ecartCadence != null && lot.ecartCadence > 5 && (
+                          <span className="ml-2 text-amber-600">Ecart cadence: {fmtDuration(Math.round(lot.ecartCadence))}</span>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-3 py-1 text-right text-gray-400">{fmtDuration(lot.lotDurationMin)}</td>
-                    <td className="px-3 py-1 text-right text-gray-400">{fmtDuration(lot.plannedMin || 0)}</td>
-                    <td className="px-3 py-1 text-right text-gray-400">—</td>
-                    <td className="px-3 py-1 text-right text-gray-400">{fmtDuration(Math.round(lot.tF))}</td>
-                    <td className="px-3 py-1 text-right">1</td>
-                    <td className="px-3 py-1 text-right">{lot.quantityProduced?.toLocaleString()}</td>
-                    <td className="px-3 py-1 text-right text-red-500">{lot.rebut}</td>
-                    <td className="px-3 py-1 text-right">—</td>
-                    <td className="px-3 py-1 text-right">{fmtPct(lot.TP)}</td>
-                    <td className="px-3 py-1 text-right">{fmtPct(lot.TQ)}</td>
-                    <td className="px-3 py-1 text-right" style={{ color: trsColor(lot.TP * lot.TQ) }}>{fmtPct(lot.TP * lot.TQ)}</td>
-                    <td className="px-3 py-1 text-right">—</td>
+                    <td className="px-3 py-1.5 text-right text-gray-400">{fmtDuration(lot.lotDurationMin)}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-400">{fmtDuration(lot.plannedMin || 0)}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-400">—</td>
+                    <td className="px-3 py-1.5 text-right text-gray-400">{fmtDuration(Math.round(lot.tF))}</td>
+                    <td className="px-3 py-1.5 text-right">1</td>
+                    <td className="px-3 py-1.5 text-right">{lot.quantityProduced?.toLocaleString()}</td>
+                    <td className="px-3 py-1.5 text-right text-red-500">{lot.rebut}</td>
+                    <td className="px-3 py-1.5 text-right">—</td>
+                    <td className="px-3 py-1.5 text-right" style={{ color: lot.TP > 1 ? "#d97706" : undefined }}>{fmtPct(lot.TP)}</td>
+                    <td className="px-3 py-1.5 text-right" style={{ color: lot.TQ > 1 ? "#dc2626" : undefined }}>{fmtPct(lot.TQ)}</td>
+                    <td className="px-3 py-1.5 text-right" style={{ color: trsColor(lot.TP * lot.TQ) }}>{fmtPct(lot.TP * lot.TQ)}</td>
+                    <td className="px-3 py-1.5 text-right">—</td>
                   </tr>
                 ))}
               </Fragment>

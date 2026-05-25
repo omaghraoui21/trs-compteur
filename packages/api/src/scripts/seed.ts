@@ -1,6 +1,6 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
-import { createDb, rooms, equipments, products, users, downtimeCategories } from "@trs/db";
+import { createDb, rooms, equipments, products, users, downtimeCategories, productEquipmentCadences } from "@trs/db";
 
 const db = createDb();
 
@@ -51,26 +51,31 @@ async function seed() {
   console.log("  ✓ Rooms created");
 
   // ─── Equipments ───────────────────────────────────────
+  let eqBli: { id: string } | undefined;
+  let eqGel: { id: string } | undefined;
+
   if (roomBli) {
-    await db.insert(equipments).values({
+    const [row] = await db.insert(equipments).values({
       roomId: roomBli.id,
       code: "BLI-IMA-TR135S",
       name: "Blistereuse IMA TR135S",
       equipmentType: "blistereuse",
       trsObjective: "75",
       defaultCadenceUnit: "u/min",
-    }).onConflictDoNothing();
+    }).onConflictDoNothing().returning();
+    eqBli = row;
   }
 
   if (roomGel) {
-    await db.insert(equipments).values({
+    const [row] = await db.insert(equipments).values({
       roomId: roomGel.id,
       code: "GEL-HH-MODUC",
       name: "Géluleuse Harro Höfliger Modu-C",
       equipmentType: "geluleuse",
       trsObjective: "75",
       defaultCadenceUnit: "u/min",
-    }).onConflictDoNothing();
+    }).onConflictDoNothing().returning();
+    eqGel = row;
   }
 
   console.log("  ✓ Equipments created");
@@ -84,11 +89,41 @@ async function seed() {
     { code: "COMBIFOR-12-400", name: "Combifor 12/400µg", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" },
   ];
 
+  const insertedProducts: Record<string, string> = {};
   for (const p of productData) {
-    await db.insert(products).values(p).onConflictDoNothing();
+    const [row] = await db.insert(products).values(p).onConflictDoNothing().returning();
+    if (row) insertedProducts[p.code] = row.id;
   }
 
   console.log("  ✓ Products created (5)");
+
+  // ─── Product × Equipment Cadences ──────────────────────
+  // Cadences from Excel: Blistereuse varies by product, Géluleuse = 1020 u/min for all
+  const cadenceData: { productCode: string; eqId: string | undefined; cadence: string; unit: string }[] = [
+    { productCode: "AEROFOR-12", eqId: eqBli?.id, cadence: "100", unit: "u/min" },
+    { productCode: "AERONIDE-200", eqId: eqBli?.id, cadence: "120", unit: "u/min" },
+    { productCode: "AERONIDE-400", eqId: eqBli?.id, cadence: "120", unit: "u/min" },
+    { productCode: "COMBIFOR-12-200", eqId: eqBli?.id, cadence: "107", unit: "u/min" },
+    { productCode: "COMBIFOR-12-400", eqId: eqBli?.id, cadence: "50", unit: "u/min" },
+    // Géluleuse: all products at 1020 u/min
+    { productCode: "AEROFOR-12", eqId: eqGel?.id, cadence: "1020", unit: "u/min" },
+    { productCode: "AERONIDE-200", eqId: eqGel?.id, cadence: "1020", unit: "u/min" },
+    { productCode: "AERONIDE-400", eqId: eqGel?.id, cadence: "1020", unit: "u/min" },
+    { productCode: "COMBIFOR-12-200", eqId: eqGel?.id, cadence: "1020", unit: "u/min" },
+    { productCode: "COMBIFOR-12-400", eqId: eqGel?.id, cadence: "1020", unit: "u/min" },
+  ];
+
+  for (const c of cadenceData) {
+    const productId = insertedProducts[c.productCode];
+    if (productId && c.eqId) {
+      await db.insert(productEquipmentCadences).values({
+        productId, equipmentId: c.eqId,
+        cadenceValue: c.cadence, cadenceUnit: c.unit,
+      }).onConflictDoNothing();
+    }
+  }
+
+  console.log("  ✓ Product×Equipment cadences created");
 
   // ─── Downtime Categories ──────────────────────────────
   const categories = [

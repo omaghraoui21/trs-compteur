@@ -24,6 +24,7 @@ export const api = {
   equipments: (roomId?: string) => roomId ? request<Equipment[]>(`/ref/rooms/${roomId}/equipments`) : request<Equipment[]>("/ref/equipments"),
   products: () => request<Product[]>("/ref/products"),
   downtimeCategories: (eqType?: string) => request<DowntimeCategory[]>(`/ref/downtime-categories${eqType ? `?equipmentType=${eqType}` : ""}`),
+  cadences: (equipmentId?: string) => request<ProductEquipmentCadence[]>(`/ref/cadences${equipmentId ? `?equipmentId=${equipmentId}` : ""}`),
 
   // Sessions
   sessions: (params?: { date?: string; equipmentId?: string }) => {
@@ -100,6 +101,13 @@ export const api = {
       request<AdminDowntimeCategory>(`/admin/downtime-categories/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deleteDowntimeCategory: (id: string) =>
       request<AdminDowntimeCategory>(`/admin/downtime-categories/${id}`, { method: "DELETE" }),
+
+    // Cadences
+    listCadences: () => request<ProductEquipmentCadence[]>("/admin/cadences"),
+    upsertCadence: (data: { productId: string; equipmentId: string; cadenceValue: number; cadenceUnit: string }) =>
+      request<ProductEquipmentCadence>("/admin/cadences", { method: "POST", body: JSON.stringify(data) }),
+    deleteCadence: (id: string) =>
+      request<ProductEquipmentCadence>(`/admin/cadences/${id}`, { method: "DELETE" }),
   },
 };
 
@@ -138,3 +146,4 @@ export interface AdminRoom { id: string; code: string; name: string; description
 export interface AdminEquipment { id: string; roomId: string; code: string; name: string; equipmentType: string | null; trsObjective: string; defaultCadenceUnit: string; isActive: boolean; createdAt: string }
 export interface AdminProduct { id: string; code: string; name: string; defaultCadence: string | null; cadenceUnit: string; unit: string; isActive: boolean; createdAt: string }
 export interface AdminDowntimeCategory { id: string; code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null; isActive: boolean; createdAt: string }
+export interface ProductEquipmentCadence { id: string; productId: string; equipmentId: string; cadenceValue: string; cadenceUnit: string }
