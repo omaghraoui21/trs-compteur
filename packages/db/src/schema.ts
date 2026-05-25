@@ -64,6 +64,7 @@ export const equipments = pgTable("equipments", {
   equipmentType: text("equipment_type"), // blistereuse | geluleuse
   trsObjective: numeric("trs_objective", { precision: 5, scale: 2 }).notNull().default("75"),
   defaultCadenceUnit: text("default_cadence_unit").notNull().default("u/h"), // u/h or u/min
+  microStopThresholdMin: integer("micro_stop_threshold_min").notNull().default(5), // AA: seuil micro-arrêts
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -243,6 +244,7 @@ export const productEquipmentCadences = pgTable("product_equipment_cadences", {
   equipmentId: uuid("equipment_id").notNull().references(() => equipments.id),
   cadenceValue: numeric("cadence_value", { precision: 10, scale: 2 }).notNull(),
   cadenceUnit: text("cadence_unit").notNull().default("u/min"),
+  trsObjective: numeric("trs_objective_product", { precision: 5, scale: 2 }), // Z: objectif TRS par produit×équipement
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 }, (t) => [

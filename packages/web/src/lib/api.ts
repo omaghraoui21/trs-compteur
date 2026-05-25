@@ -62,6 +62,12 @@ export const api = {
     request<ParetoResponse>(`/dashboard/pareto?equipmentId=${equipmentId}&from=${from}&to=${to}`),
   dashboardComparison: (from: string, to: string) =>
     request<ComparisonResponse>(`/dashboard/comparison?from=${from}&to=${to}`),
+  dashboardByProduct: (equipmentId: string, from: string, to: string) =>
+    request<ByProductResponse>(`/dashboard/by-product?equipmentId=${equipmentId}&from=${from}&to=${to}`),
+  dashboardSixLosses: (equipmentId: string, from: string, to: string) =>
+    request<SixLossesResponse>(`/dashboard/six-losses?equipmentId=${equipmentId}&from=${from}&to=${to}`),
+  dashboardHeatmap: (equipmentId: string, from: string, to: string) =>
+    request<HeatmapResponse>(`/dashboard/heatmap?equipmentId=${equipmentId}&from=${from}&to=${to}`),
   pendingLots: () => request<LotEntry[]>("/dashboard/pending-lots"),
 
   // Admin CRUD
@@ -77,9 +83,9 @@ export const api = {
 
     // Equipments
     listEquipments: () => request<AdminEquipment[]>("/admin/equipments"),
-    createEquipment: (data: { code: string; name: string; roomId: string; equipmentType?: string; trsObjective?: string; defaultCadenceUnit?: string }) =>
+    createEquipment: (data: { code: string; name: string; roomId: string; equipmentType?: string; trsObjective?: string; defaultCadenceUnit?: string; microStopThresholdMin?: number }) =>
       request<AdminEquipment>("/admin/equipments", { method: "POST", body: JSON.stringify(data) }),
-    updateEquipment: (id: string, data: Partial<{ code: string; name: string; roomId: string; equipmentType: string; trsObjective: string; defaultCadenceUnit: string; isActive: boolean }>) =>
+    updateEquipment: (id: string, data: Partial<{ code: string; name: string; roomId: string; equipmentType: string; trsObjective: string; defaultCadenceUnit: string; microStopThresholdMin: number; isActive: boolean }>) =>
       request<AdminEquipment>(`/admin/equipments/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deleteEquipment: (id: string) =>
       request<AdminEquipment>(`/admin/equipments/${id}`, { method: "DELETE" }),
@@ -104,7 +110,7 @@ export const api = {
 
     // Cadences
     listCadences: () => request<ProductEquipmentCadence[]>("/admin/cadences"),
-    upsertCadence: (data: { productId: string; equipmentId: string; cadenceValue: number; cadenceUnit: string }) =>
+    upsertCadence: (data: { productId: string; equipmentId: string; cadenceValue: number; cadenceUnit: string; trsObjective?: number }) =>
       request<ProductEquipmentCadence>("/admin/cadences", { method: "POST", body: JSON.stringify(data) }),
     deleteCadence: (id: string) =>
       request<ProductEquipmentCadence>(`/admin/cadences/${id}`, { method: "DELETE" }),
@@ -143,7 +149,21 @@ export interface AddDowntimeInput { categoryId: string; durationMinutes: number;
 
 // Admin types (include all fields, not just active)
 export interface AdminRoom { id: string; code: string; name: string; description: string | null; isActive: boolean; createdAt: string }
-export interface AdminEquipment { id: string; roomId: string; code: string; name: string; equipmentType: string | null; trsObjective: string; defaultCadenceUnit: string; isActive: boolean; createdAt: string }
+export interface AdminEquipment { id: string; roomId: string; code: string; name: string; equipmentType: string | null; trsObjective: string; defaultCadenceUnit: string; microStopThresholdMin: number; isActive: boolean; createdAt: string }
 export interface AdminProduct { id: string; code: string; name: string; defaultCadence: string | null; cadenceUnit: string; unit: string; isActive: boolean; createdAt: string }
 export interface AdminDowntimeCategory { id: string; code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null; isActive: boolean; createdAt: string }
-export interface ProductEquipmentCadence { id: string; productId: string; equipmentId: string; cadenceValue: string; cadenceUnit: string }
+export interface ProductEquipmentCadence { id: string; productId: string; equipmentId: string; cadenceValue: string; cadenceUnit: string; trsObjective: string | null }
+
+// W: By-Product aggregation
+export interface ProductTrs { productId: string; productName: string; lotCount: number; totalProduced: number; totalConforming: number; totalRebut: number; totalDurationMin: number; totalUnplannedMin: number; tF: number; tN: number; tU: number; avgCadencePerMin: number; DO: number; TP: number; TQ: number; TRS: number }
+export interface ByProductResponse { period: { from: string; to: string; equipmentId: string }; byProduct: ProductTrs[] }
+
+// X: Six Big Losses
+export interface SixBigLoss { category: string; label: string; oeeComponent: string; minutes: number; pctOfTotal: number }
+export interface SixLossesResult { losses: SixBigLoss[]; totalLossMin: number; tT: number }
+export interface DailySixLosses extends SixLossesResult { date: string }
+export interface SixLossesResponse { period: { from: string; to: string; equipmentId: string }; total: SixLossesResult; daily: DailySixLosses[] }
+
+// Y: Heatmap
+export interface HeatmapDataPoint { date: string; TRS: number; DO: number; TP: number; TQ: number; lotCount: number }
+export interface HeatmapResponse { period: { from: string; to: string; equipmentId: string }; heatmap: HeatmapDataPoint[] }

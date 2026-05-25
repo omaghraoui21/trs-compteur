@@ -48,18 +48,19 @@ adminRouter.get("/equipments", async (req, res) => {
 });
 
 adminRouter.post("/equipments", async (req, res) => {
-  const { code, name, roomId, equipmentType, trsObjective, defaultCadenceUnit } = req.body;
+  const { code, name, roomId, equipmentType, trsObjective, defaultCadenceUnit, microStopThresholdMin } = req.body;
   if (!code || !name || !roomId) { res.status(400).json({ error: "code, name et roomId requis" }); return; }
   const [row] = await req.db.insert(equipments).values({
     code, name, roomId, equipmentType,
     trsObjective: trsObjective || "75",
     defaultCadenceUnit: defaultCadenceUnit || "u/min",
+    microStopThresholdMin: microStopThresholdMin ?? 5,
   }).returning();
   res.status(201).json(row);
 });
 
 adminRouter.patch("/equipments/:id", async (req, res) => {
-  const { code, name, roomId, equipmentType, trsObjective, defaultCadenceUnit, isActive } = req.body;
+  const { code, name, roomId, equipmentType, trsObjective, defaultCadenceUnit, isActive, microStopThresholdMin } = req.body;
   const updates: Record<string, unknown> = {};
   if (code !== undefined) updates.code = code;
   if (name !== undefined) updates.name = name;
@@ -67,6 +68,7 @@ adminRouter.patch("/equipments/:id", async (req, res) => {
   if (equipmentType !== undefined) updates.equipmentType = equipmentType;
   if (trsObjective !== undefined) updates.trsObjective = trsObjective;
   if (defaultCadenceUnit !== undefined) updates.defaultCadenceUnit = defaultCadenceUnit;
+  if (microStopThresholdMin !== undefined) updates.microStopThresholdMin = Number(microStopThresholdMin);
   if (isActive !== undefined) updates.isActive = isActive;
   if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Aucune mise à jour" }); return; }
   const [row] = await req.db.update(equipments).set(updates).where(eq(equipments.id, req.params.id)).returning();
@@ -171,15 +173,18 @@ adminRouter.post("/cadences", async (req, res) => {
   if (!productId || !equipmentId || !cadenceValue) {
     res.status(400).json({ error: "productId, equipmentId et cadenceValue requis" }); return;
   }
+  const { trsObjective } = req.body;
   const [row] = await req.db.insert(productEquipmentCadences).values({
     productId, equipmentId,
     cadenceValue: String(cadenceValue),
     cadenceUnit: cadenceUnit || "u/min",
+    trsObjective: trsObjective != null ? String(trsObjective) : null,
   }).onConflictDoUpdate({
     target: [productEquipmentCadences.productId, productEquipmentCadences.equipmentId],
     set: {
       cadenceValue: String(cadenceValue),
       cadenceUnit: cadenceUnit || "u/min",
+      trsObjective: trsObjective != null ? String(trsObjective) : null,
     },
   }).returning();
   res.status(201).json(row);
