@@ -57,6 +57,10 @@ export const api = {
   // Dashboard
   dashboardTrs: (equipmentId: string, from: string, to: string) =>
     request<DashboardTrsResponse>(`/dashboard/trs?equipmentId=${equipmentId}&from=${from}&to=${to}`),
+  dashboardPareto: (equipmentId: string, from: string, to: string) =>
+    request<ParetoResponse>(`/dashboard/pareto?equipmentId=${equipmentId}&from=${from}&to=${to}`),
+  dashboardComparison: (from: string, to: string) =>
+    request<ComparisonResponse>(`/dashboard/comparison?from=${from}&to=${to}`),
   pendingLots: () => request<LotEntry[]>("/dashboard/pending-lots"),
 };
 
@@ -74,8 +78,14 @@ export interface LotEntry { id: string; sessionId: string; productId: string; ba
 export interface DowntimeEvent { id: string; lotEntryId: string; categoryId: string; startedAt: string; endedAt: string | null; durationMinutes: number; comment: string | null }
 
 export interface SessionDetail { session: Session; events: SessionEvent[]; lots: LotEntry[]; downtimes: DowntimeEvent[] }
-export interface SessionTrsResponse { session: { tO: number; tAP: number; tR: number; tF: number; tN: number; tU: number; DO: number; TP: number; TQ: number; TRS: number; TRG: number; lotCount: number; totalProduced: number; totalConforming: number }; lots: any[] }
-export interface DashboardTrsResponse { period: { from: string; to: string; equipmentId: string }; daily: any[]; total: SessionTrsResponse["session"] }
+export interface TrsMetrics { tT: number; tO: number; fermeture: number; tAP: number; tR: number; tF: number; tN: number; tU: number; nonQualiteMin: number; ecartCadenceMin: number; totalUnplannedMin: number; DO: number; TP: number; TQ: number; TRS: number; TRG: number; lotCount: number; totalProduced: number; totalConforming: number; totalRebut: number; downtimeByFamille: Record<string, number> }
+export interface DailyTrs extends TrsMetrics { date: string; notes?: string; lots?: any[] }
+export interface SessionTrsResponse { session: TrsMetrics; lots: any[] }
+export interface DashboardTrsResponse { period: { from: string; to: string; equipmentId: string }; daily: DailyTrs[]; total: TrsMetrics }
+export interface ParetoItem { code: string; label: string; famille: string; isPlanned: boolean; totalMin: number; count: number; pctOfTotal: number; cumulPct: number }
+export interface ParetoResponse { pareto: ParetoItem[]; totalMin: number }
+export interface ComparisonEquipment { equipmentId: string; equipmentName: string; equipmentCode: string; equipmentType: string; trsObjective: number; daily: DailyTrs[]; total: TrsMetrics }
+export interface ComparisonResponse { period: { from: string; to: string }; equipments: ComparisonEquipment[] }
 
 export interface AddEventInput { eventType: string; label?: string; durationMinutes?: number; isPlanned?: boolean; comment?: string }
 export interface StartLotInput { sessionId: string; productId: string; batchNumber: string; cadenceUsed: number; cadenceUnit?: string }
