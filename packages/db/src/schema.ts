@@ -124,6 +124,7 @@ export const sessions = pgTable("sessions", {
 }, (t) => [
   index("idx_sessions_date").on(t.sessionDate),
   index("idx_sessions_equipment").on(t.equipmentId),
+  index("idx_sessions_equip_date").on(t.equipmentId, t.sessionDate),
   index("idx_sessions_status").on(t.status),
 ]);
 
@@ -234,6 +235,7 @@ export const dailySummaries = pgTable("daily_summaries", {
 }, (t) => [
   unique("uq_daily_summary_equip_date").on(t.equipmentId, t.summaryDate),
   index("idx_daily_summaries_date").on(t.summaryDate),
+  index("idx_daily_summaries_equipment").on(t.equipmentId),
 ]);
 
 // ─── Product × Equipment Cadences ──────────────────────
