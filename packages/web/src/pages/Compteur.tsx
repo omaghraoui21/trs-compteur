@@ -939,7 +939,7 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
           <input value={comment} onChange={e => setComment(e.target.value)}
             className="w-full border rounded-lg px-3 py-3 text-base" />
         </div>
-        <button type="submit" disabled={loading || !catId || (!duration && mode === "manual")}
+        <button type="submit" disabled={loading || !catId || !duration}
           className={`w-full bg-orange-500 text-white ${BTN_PRIMARY} hover:bg-orange-600 disabled:opacity-50`}>
           Enregistrer l'arret
         </button>

@@ -171,14 +171,16 @@ adminRouter.post("/cadences", async (req, res) => {
   if (!productId || !equipmentId || !cadenceValue) {
     res.status(400).json({ error: "productId, equipmentId et cadenceValue requis" }); return;
   }
-  // Upsert: delete existing then insert
-  await req.db.delete(productEquipmentCadences).where(
-    and(eq(productEquipmentCadences.productId, productId), eq(productEquipmentCadences.equipmentId, equipmentId))
-  );
   const [row] = await req.db.insert(productEquipmentCadences).values({
     productId, equipmentId,
     cadenceValue: String(cadenceValue),
     cadenceUnit: cadenceUnit || "u/min",
+  }).onConflictDoUpdate({
+    target: [productEquipmentCadences.productId, productEquipmentCadences.equipmentId],
+    set: {
+      cadenceValue: String(cadenceValue),
+      cadenceUnit: cadenceUnit || "u/min",
+    },
   }).returning();
   res.status(201).json(row);
 });
