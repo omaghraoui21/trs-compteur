@@ -186,7 +186,8 @@ export function computeLotTrs(input: LotTrsInput): LotTrsResult | null {
     downtimeByNorme[normeKey] = (downtimeByNorme[normeKey] || 0) + d.durationMinutes;
   }
 
-  const tF = Math.max(0, lotDurationMin - unplannedMin);
+  // NF E 60-182 §2.2.6: tF = temps de production - TOUS les arrêts (propres + induits)
+  const tF = Math.max(0, lotDurationMin - plannedMin - unplannedMin);
   const tN = produced / cadencePerMin;
   const tU = conforming / cadencePerMin;
   const ecartCadence = tF - tN;
@@ -225,9 +226,11 @@ export function computeSessionTrs(input: SessionTrsInput): SessionTrsResult {
   const tT = 1440;
   const fermeture = Math.max(0, tT - tO);
 
-  // NF E 60-182: tF = tR - Σ(arrêts NP) at session level
+  // NF E 60-182 §2.2.6: tF = tR - TOUS les arrêts (planifiés lot + non planifiés)
+  const totalPlannedLotMin = input.lots.reduce((s, l) => s + (l.plannedMin ?? 0), 0);
   const totalUnplannedMin = input.lots.reduce((s, l) => s + (l.unplannedMin ?? 0), 0);
-  const tF = Math.max(0, tR - totalUnplannedMin);
+  const totalArrets = totalPlannedLotMin + totalUnplannedMin;
+  const tF = Math.max(0, tR - totalArrets);
 
   // Also compute lot-aggregated tF for audit/reconciliation
   const tF_lots = input.lots.reduce((s, l) => s + l.tF, 0);
@@ -302,7 +305,7 @@ export function computeSessionTrs(input: SessionTrsInput): SessionTrsResult {
     tF_norme: tF,
     tF_lots: tF_lots,
     tF_delta: tF_delta,
-    formula: `tF = tR(${tR}) - tAI(${totalUnplannedMin}) = ${tF}`,
+    formula: `tF = tR(${tR}) - tAP(${totalPlannedLotMin}) - tAI(${totalUnplannedMin}) = ${tF}`,
   };
 
   return {

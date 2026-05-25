@@ -132,6 +132,28 @@ describe("computeLotTrs", () => {
     expect(result!.warnings.some(w => w.code === "TP_OVER_100")).toBe(true);
   });
 
+  it("subtracts planned + unplanned downtimes from tF (NF E 60-182 §2.2.6)", () => {
+    // Lot: 120min, 10min planned (changement format), 20min unplanned (panne)
+    // tF = 120 - 10 - 20 = 90 (NOT 100)
+    const result = computeLotTrs({
+      cadence: 100,
+      cadenceUnit: "u/min",
+      produced: 8000,
+      conforming: 7900,
+      startedAt: new Date("2026-05-04T09:00:00Z"),
+      endedAt: new Date("2026-05-04T11:00:00Z"),
+      downtimes: [
+        { durationMinutes: 10, isPlanned: true, famille: "Nettoyage" },
+        { durationMinutes: 20, isPlanned: false, famille: "Panne équipement" },
+      ],
+    });
+    expect(result).not.toBeNull();
+    expect(result!.plannedMin).toBe(10);
+    expect(result!.unplannedMin).toBe(20);
+    expect(result!.tF).toBe(90); // 120 - 10 - 20
+    expect(result!.TP).toBeCloseTo(8000 / 100 / 90, 3); // tN/tF
+  });
+
   it("does NOT cap TP at 1 anymore", () => {
     const result = computeLotTrs({
       cadence: 10,
@@ -193,6 +215,30 @@ describe("computeSessionTrs", () => {
     expect(result.audit.tF_norme).toBe(405);
     expect(result.audit.tF_lots).toBe(405);
     expect(result.audit.tF_delta).toBe(0);
+  });
+
+  it("subtracts planned lot downtimes from tF (NF E 60-182)", () => {
+    // Session: 08:00 → 16:00 = 480min, session events=60min → tR=420min
+    // Lot 1: 200min, 10min planned downtime, 15min unplanned → lot tF=175
+    // tF_norme = tR - (10+15) = 395
+    const lot1 = {
+      lotDurationMin: 200, plannedMin: 10, unplannedMin: 15, tF: 175, tN: 170, tU: 168,
+      nonQualiteMin: 2, TP: 170 / 175, TQ: 0.988, cadencePerMin: 120, ecartCadence: 5,
+      rebut: 240, downtimeByFamille: { "Nettoyage": 10, "Panne équipement": 15 }, downtimeByNorme: { "AP": 10, "AB": 15 },
+      produced: 20400, conforming: 20160, warnings: [],
+    };
+    const result = computeSessionTrs({
+      openedAt: new Date("2026-05-04T08:00:00Z"),
+      closedAt: new Date("2026-05-04T16:00:00Z"),
+      plannedStopsMin: 60,
+      lots: [lot1],
+    });
+    // tF = tR(420) - planned lot(10) - unplanned(15) = 395
+    expect(result.tF).toBe(395);
+    expect(result.DO).toBeCloseTo(395 / 420, 3);
+    expect(result.TRS).toBeCloseTo(168 / 420, 3); // tU/tR unchanged
+    // DO × TP × TQ = TRS
+    expect(result.DO * result.TP * result.TQ).toBeCloseTo(result.TRS, 3);
   });
 
   it("correctly handles inter-lot gap (tF_norme > tF_lots)", () => {
