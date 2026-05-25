@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
 import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ComparisonResponse, type TrsMetrics, type DailyTrs } from "@/lib/api";
-import { fmtPct, fmtDuration, trsColor } from "@trs/engine";
+import { fmtPct, fmtDuration, trsColor, familleToNorme } from "@trs/engine";
 import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, ChevronUp, AlertTriangle, Info } from "lucide-react";
 import TrsChart from "@/components/dashboard/TrsChart";
 import ParetoChart from "@/components/dashboard/ParetoChart";
@@ -345,10 +345,11 @@ function TimeBuckets({ metrics }: { metrics: TrsMetrics }) {
           {Object.entries(metrics.downtimeByFamille)
             .sort(([, a], [, b]) => b - a)
             .map(([famille, min]) => {
-              const normeCode = metrics.downtimeByNorme ? Object.entries(metrics.downtimeByNorme).find(([, v]) => v === min)?.[0] : undefined;
+              const normeCode = familleToNorme(famille);
+              const showNormeCode = normeCode !== famille;
               return (
                 <span key={famille} className="inline-flex items-center gap-1 bg-orange-50 text-orange-800 rounded-full px-2 py-0.5 text-xs">
-                  {normeCode && <span className="font-mono font-bold">{normeCode}</span>}
+                  {showNormeCode && <span className="font-mono font-bold">{normeCode}</span>}
                   {famille}: {fmtDuration(min)}
                 </span>
               );
