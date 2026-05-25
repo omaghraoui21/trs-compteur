@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
 import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ComparisonResponse, type TrsMetrics, type DailyTrs } from "@/lib/api";
 import { fmtPct, fmtDuration, trsColor } from "@trs/engine";
 import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, ChevronUp } from "lucide-react";
@@ -65,8 +65,12 @@ export default function DashboardPage() {
       setParetoData(paretoRes);
 
       if (showComparison) {
-        const compRes = await api.dashboardComparison(from, to);
-        setComparisonData(compRes);
+        try {
+          const compRes = await api.dashboardComparison(from, to);
+          setComparisonData(compRes);
+        } catch {
+          setComparisonData(null);
+        }
       }
     } catch {
       setData(null);
@@ -350,8 +354,8 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
           </thead>
           <tbody className="divide-y">
             {daily.map(d => (
-              <>
-                <tr key={d.date} className="hover:bg-gray-50 cursor-pointer" onClick={() => onToggleDay(d.date)}>
+              <Fragment key={d.date}>
+                <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => onToggleDay(d.date)}>
                   <td className="px-3 py-2">
                     {d.lots && d.lots.length > 0 && (
                       expandedDay === d.date ? <ChevronUp className="h-3 w-3 text-gray-400" /> : <ChevronDown className="h-3 w-3 text-gray-400" />
@@ -392,7 +396,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                     <td className="px-3 py-1 text-right">—</td>
                   </tr>
                 ))}
-              </>
+              </Fragment>
             ))}
             {/* TOTAL row */}
             <tr className="bg-gray-100 font-bold border-t-2">
