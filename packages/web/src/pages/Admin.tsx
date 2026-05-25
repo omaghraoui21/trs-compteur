@@ -173,7 +173,7 @@ function EquipmentsPanel() {
   const save = async () => {
     setError("");
     try {
-      const payload = { ...form, microStopThresholdMin: Number(form.microStopThresholdMin) || 5 };
+      const val = Number(form.microStopThresholdMin); const payload = { ...form, microStopThresholdMin: isNaN(val) ? 5 : val };
       if (editingId) {
         await api.admin.updateEquipment(editingId, payload);
       } else {

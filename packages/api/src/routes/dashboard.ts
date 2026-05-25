@@ -346,7 +346,7 @@ dashboardRouter.get("/six-losses", async (req, res) => {
 
   // Get equipment for micro-stop threshold
   const [equipment] = await db.select().from(equipments).where(eq(equipments.id, equipmentId as string)).limit(1);
-  const microStopThreshold = equipment?.microStopThresholdMin ? Number(equipment.microStopThresholdMin) : 5;
+  const microStopThreshold = equipment?.microStopThresholdMin != null ? Number(equipment.microStopThresholdMin) : 5;
 
   const closedSessions = await db.select().from(sessions)
     .where(and(
