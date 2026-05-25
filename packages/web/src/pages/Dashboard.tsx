@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
 import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ComparisonResponse, type TrsMetrics, type DailyTrs } from "@/lib/api";
 import { fmtPct, fmtDuration, trsColor } from "@trs/engine";
-import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, ChevronUp } from "lucide-react";
+import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, ChevronUp, AlertTriangle, Info } from "lucide-react";
 import TrsChart from "@/components/dashboard/TrsChart";
 import ParetoChart from "@/components/dashboard/ParetoChart";
 import WaterfallChart from "@/components/dashboard/WaterfallChart";
@@ -268,6 +268,44 @@ function KpiCard({ metrics, title, objective }: { metrics: TrsMetrics; title: st
           Objectif: {objective}% — {metrics.TRS >= objective / 100 ? "Atteint ✓" : "Non atteint"}
         </div>
       )}
+
+      <WarningsBanner warnings={metrics.warnings} audit={metrics.audit} />
+    </div>
+  );
+}
+
+function WarningsBanner({ warnings, audit }: { warnings?: TrsMetrics["warnings"]; audit?: TrsMetrics["audit"] }) {
+  if ((!warnings || warnings.length === 0) && !audit?.tF_delta) return null;
+
+  const errors = warnings?.filter(w => w.level === "error") || [];
+  const warns = warnings?.filter(w => w.level === "warning") || [];
+
+  return (
+    <div className="mt-3 space-y-1">
+      {errors.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-red-700 space-y-0.5">
+            {errors.map((w, i) => <div key={i}>{w.message}</div>)}
+          </div>
+        </div>
+      )}
+      {warns.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-amber-700 space-y-0.5">
+            {warns.map((w, i) => <div key={i}>{w.message}</div>)}
+          </div>
+        </div>
+      )}
+      {audit && Math.abs(audit.tF_delta) > 5 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-start gap-2">
+          <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <div className="text-xs text-blue-700">
+            Audit: {audit.formula} (écart lots: {audit.tF_delta.toFixed(0)}min)
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -301,16 +339,20 @@ function TimeBuckets({ metrics }: { metrics: TrsMetrics }) {
         ))}
       </div>
 
-      {/* Downtime by famille */}
+      {/* Downtime by famille + NF E 60-182 codes */}
       {Object.keys(metrics.downtimeByFamille).length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           {Object.entries(metrics.downtimeByFamille)
             .sort(([, a], [, b]) => b - a)
-            .map(([famille, min]) => (
-              <span key={famille} className="inline-flex items-center gap-1 bg-orange-50 text-orange-800 rounded-full px-2 py-0.5 text-xs">
-                {famille}: {fmtDuration(min)}
-              </span>
-            ))}
+            .map(([famille, min]) => {
+              const normeCode = metrics.downtimeByNorme ? Object.entries(metrics.downtimeByNorme).find(([, v]) => v === min)?.[0] : undefined;
+              return (
+                <span key={famille} className="inline-flex items-center gap-1 bg-orange-50 text-orange-800 rounded-full px-2 py-0.5 text-xs">
+                  {normeCode && <span className="font-mono font-bold">{normeCode}</span>}
+                  {famille}: {fmtDuration(min)}
+                </span>
+              );
+            })}
         </div>
       )}
     </div>
@@ -367,7 +409,19 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                       expandedDay === d.date ? <ChevronUp className="h-3 w-3 text-gray-400" /> : <ChevronDown className="h-3 w-3 text-gray-400" />
                     )}
                   </td>
-                  <td className="px-3 py-2 font-medium">{d.date}</td>
+                  <td className="px-3 py-2 font-medium flex items-center gap-1">
+                    {d.date}
+                    {d.warnings && d.warnings.filter(w => w.level === "error").length > 0 && (
+                      <span className="inline-flex items-center bg-red-100 text-red-700 rounded px-1 text-[10px] font-bold">
+                        {d.warnings.filter(w => w.level === "error").length} err
+                      </span>
+                    )}
+                    {d.warnings && d.warnings.filter(w => w.level === "warning").length > 0 && (
+                      <span className="inline-flex items-center bg-amber-100 text-amber-700 rounded px-1 text-[10px] font-bold">
+                        {d.warnings.filter(w => w.level === "warning").length} warn
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-right text-gray-500">{fmtDuration(d.tO)}</td>
                   <td className="px-3 py-2 text-right text-gray-500">{fmtDuration(d.tAP)}</td>
                   <td className="px-3 py-2 text-right text-gray-500">{fmtDuration(d.tR)}</td>

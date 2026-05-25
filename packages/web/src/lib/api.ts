@@ -117,7 +117,9 @@ export interface LotEntry { id: string; sessionId: string; productId: string; ba
 export interface DowntimeEvent { id: string; lotEntryId: string; categoryId: string; startedAt: string; endedAt: string | null; durationMinutes: number; comment: string | null }
 
 export interface SessionDetail { session: Session; events: SessionEvent[]; lots: LotEntry[]; downtimes: DowntimeEvent[] }
-export interface TrsMetrics { tT: number; tO: number; fermeture: number; tAP: number; tR: number; tF: number; tN: number; tU: number; nonQualiteMin: number; ecartCadenceMin: number; totalUnplannedMin: number; DO: number; TP: number; TQ: number; TRS: number; TRG: number; lotCount: number; totalProduced: number; totalConforming: number; totalRebut: number; downtimeByFamille: Record<string, number> }
+export interface TrsWarning { code: string; level: "error" | "warning"; message: string; field: string; value?: number }
+export interface TrsAudit { tF_norme: number; tF_lots: number; tF_delta: number; formula: string }
+export interface TrsMetrics { tT: number; tO: number; fermeture: number; tAP: number; tR: number; tF: number; tN: number; tU: number; nonQualiteMin: number; ecartCadenceMin: number; totalUnplannedMin: number; DO: number; TP: number; TQ: number; TRS: number; TRG: number; lotCount: number; totalProduced: number; totalConforming: number; totalRebut: number; downtimeByFamille: Record<string, number>; downtimeByNorme?: Record<string, number>; warnings?: TrsWarning[]; audit?: TrsAudit }
 export interface DailyTrs extends TrsMetrics { date: string; notes?: string; lots?: any[] }
 export interface SessionTrsResponse { session: TrsMetrics; lots: any[] }
 export interface DashboardTrsResponse { period: { from: string; to: string; equipmentId: string }; daily: DailyTrs[]; total: TrsMetrics }
