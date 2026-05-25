@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
 import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ComparisonResponse, type TrsMetrics, type DailyTrs, type ByProductResponse, type SixLossesResponse, type HeatmapResponse } from "@/lib/api";
 import { fmtPct, fmtDuration, trsColor, familleToNorme } from "@trs/engine";
-import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, ChevronUp, AlertTriangle, Info } from "lucide-react";
+import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, ChevronUp, AlertTriangle, Info, FileText } from "lucide-react";
+// PDF is lazy-loaded on demand to reduce bundle size
 import TrsChart from "@/components/dashboard/TrsChart";
 import ParetoChart from "@/components/dashboard/ParetoChart";
 import WaterfallChart from "@/components/dashboard/WaterfallChart";
@@ -142,6 +143,32 @@ export default function DashboardPage() {
     URL.revokeObjectURL(url);
   };
 
+  const exportPdf = async () => {
+    if (!data) return;
+    const [{ pdf }, { default: PdfReport }] = await Promise.all([
+      import("@react-pdf/renderer"),
+      import("@/components/dashboard/PdfReport"),
+    ]);
+    const doc = (
+      <PdfReport
+        total={data.total}
+        daily={data.daily}
+        equipmentName={eq?.name || ""}
+        from={from}
+        to={to}
+        byProduct={byProductData?.byProduct}
+        sixLosses={sixLossesData?.total.losses}
+      />
+    );
+    const blob = await pdf(doc).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `TRS_${sanitizeFilename(eq?.name || "export")}_${from}_${to}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
       <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
@@ -188,6 +215,10 @@ export default function DashboardPage() {
           <button onClick={exportCsv}
             className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border text-gray-600 hover:bg-gray-50">
             <Download className="h-4 w-4" /> CSV
+          </button>
+          <button onClick={exportPdf}
+            className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border text-gray-600 hover:bg-gray-50">
+            <FileText className="h-4 w-4" /> PDF
           </button>
         </div>
       </div>

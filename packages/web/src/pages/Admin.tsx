@@ -149,7 +149,7 @@ function EquipmentsPanel() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: "", name: "", roomId: "", equipmentType: "blistereuse", trsObjective: "75", defaultCadenceUnit: "u/min" });
+  const [form, setForm] = useState({ code: "", name: "", roomId: "", equipmentType: "blistereuse", trsObjective: "75", defaultCadenceUnit: "u/min", microStopThresholdMin: "5" });
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -163,20 +163,21 @@ function EquipmentsPanel() {
 
   useEffect(() => { load(); }, [load]);
 
-  const resetForm = () => { setForm({ code: "", name: "", roomId: "", equipmentType: "blistereuse", trsObjective: "75", defaultCadenceUnit: "u/min" }); setShowForm(false); setEditingId(null); setError(""); };
+  const resetForm = () => { setForm({ code: "", name: "", roomId: "", equipmentType: "blistereuse", trsObjective: "75", defaultCadenceUnit: "u/min", microStopThresholdMin: "5" }); setShowForm(false); setEditingId(null); setError(""); };
 
   const startEdit = (e: AdminEquipment) => {
-    setForm({ code: e.code, name: e.name, roomId: e.roomId, equipmentType: e.equipmentType || "blistereuse", trsObjective: e.trsObjective, defaultCadenceUnit: e.defaultCadenceUnit });
+    setForm({ code: e.code, name: e.name, roomId: e.roomId, equipmentType: e.equipmentType || "blistereuse", trsObjective: e.trsObjective, defaultCadenceUnit: e.defaultCadenceUnit, microStopThresholdMin: String(e.microStopThresholdMin ?? 5) });
     setEditingId(e.id); setShowForm(true);
   };
 
   const save = async () => {
     setError("");
     try {
+      const payload = { ...form, microStopThresholdMin: Number(form.microStopThresholdMin) || 5 };
       if (editingId) {
-        await api.admin.updateEquipment(editingId, form);
+        await api.admin.updateEquipment(editingId, payload);
       } else {
-        await api.admin.createEquipment(form);
+        await api.admin.createEquipment(payload);
       }
       resetForm(); load();
     } catch (e: any) { setError(e.message); }
@@ -219,6 +220,7 @@ function EquipmentsPanel() {
             </select>
           </div>
           <Field label="Objectif TRS (%)" value={form.trsObjective} onChange={(v) => setForm({ ...form, trsObjective: v })} type="number" />
+          <Field label="Seuil micro-arrêts (min)" value={form.microStopThresholdMin} onChange={(v) => setForm({ ...form, microStopThresholdMin: v })} type="number" />
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Unité cadence</label>
             <select value={form.defaultCadenceUnit} onChange={(e) => setForm({ ...form, defaultCadenceUnit: e.target.value })} className="input-field">
@@ -230,7 +232,7 @@ function EquipmentsPanel() {
       )}
 
       <table className="w-full text-sm">
-        <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Nom</th><th className="py-2 px-3">Local</th><th className="py-2 px-3">Type</th><th className="py-2 px-3">Obj. TRS</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
+        <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Nom</th><th className="py-2 px-3">Local</th><th className="py-2 px-3">Type</th><th className="py-2 px-3">Obj. TRS</th><th className="py-2 px-3">Micro-arrêt</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
         <tbody>
           {items.map((e) => (
             <tr key={e.id} className={`border-b hover:bg-gray-50 ${!e.isActive ? "opacity-50" : ""}`}>
@@ -239,6 +241,7 @@ function EquipmentsPanel() {
               <td className="py-2 px-3">{roomName(e.roomId)}</td>
               <td className="py-2 px-3 capitalize">{e.equipmentType || "—"}</td>
               <td className="py-2 px-3">{e.trsObjective}%</td>
+              <td className="py-2 px-3">{e.microStopThresholdMin ?? 5} min</td>
               <td className="py-2 px-3"><StatusBadge active={e.isActive} /></td>
               <td className="py-2 px-3">
                 <div className="flex gap-1">
@@ -357,7 +360,7 @@ function CadencesPanel() {
   const [equipmentsList, setEquipmentsList] = useState<AdminEquipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ productId: "", equipmentId: "", cadenceValue: "", cadenceUnit: "u/min" });
+  const [form, setForm] = useState({ productId: "", equipmentId: "", cadenceValue: "", cadenceUnit: "u/min", trsObjective: "" });
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -371,13 +374,13 @@ function CadencesPanel() {
 
   useEffect(() => { load(); }, [load]);
 
-  const resetForm = () => { setForm({ productId: "", equipmentId: "", cadenceValue: "", cadenceUnit: "u/min" }); setShowForm(false); setError(""); };
+  const resetForm = () => { setForm({ productId: "", equipmentId: "", cadenceValue: "", cadenceUnit: "u/min", trsObjective: "" }); setShowForm(false); setError(""); };
 
   const save = async () => {
     setError("");
     if (!form.productId || !form.equipmentId || !form.cadenceValue) { setError("Tous les champs sont requis"); return; }
     try {
-      await api.admin.upsertCadence({ productId: form.productId, equipmentId: form.equipmentId, cadenceValue: Number(form.cadenceValue), cadenceUnit: form.cadenceUnit });
+      await api.admin.upsertCadence({ productId: form.productId, equipmentId: form.equipmentId, cadenceValue: Number(form.cadenceValue), cadenceUnit: form.cadenceUnit, trsObjective: form.trsObjective ? Number(form.trsObjective) : undefined });
       resetForm(); load();
     } catch (e: any) { setError(e.message); }
   };
@@ -428,6 +431,7 @@ function CadencesPanel() {
             </select>
           </div>
           <Field label="Cadence" value={form.cadenceValue} onChange={(v) => setForm({ ...form, cadenceValue: v })} type="number" placeholder="100" />
+          <Field label="Objectif TRS (%) — optionnel" value={form.trsObjective} onChange={(v) => setForm({ ...form, trsObjective: v })} type="number" placeholder="85" />
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Unité</label>
             <select value={form.cadenceUnit} onChange={(e) => setForm({ ...form, cadenceUnit: e.target.value })} className="input-field">
@@ -445,13 +449,14 @@ function CadencesPanel() {
             <span className="text-xs font-normal text-gray-400">({items.length} produits)</span>
           </h3>
           <table className="w-full text-sm">
-            <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Produit</th><th className="py-2 px-3">Cadence</th><th className="py-2 px-3">Unité</th><th className="py-2 px-3 w-16">Action</th></tr></thead>
+            <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Produit</th><th className="py-2 px-3">Cadence</th><th className="py-2 px-3">Unité</th><th className="py-2 px-3">Obj. TRS</th><th className="py-2 px-3 w-16">Action</th></tr></thead>
             <tbody>
               {items.map(c => (
                 <tr key={c.id} className="border-b hover:bg-gray-50">
                   <td className="py-2 px-3 font-medium">{productName(c.productId)}</td>
                   <td className="py-2 px-3">{c.cadenceValue}</td>
                   <td className="py-2 px-3">{c.cadenceUnit}</td>
+                  <td className="py-2 px-3">{c.trsObjective ? `${c.trsObjective}%` : "—"}</td>
                   <td className="py-2 px-3">
                     <IconBtn icon={Trash2} onClick={() => remove(c.id)} title="Supprimer" className="text-red-500 hover:bg-red-50" />
                   </td>

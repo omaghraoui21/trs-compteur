@@ -83,9 +83,9 @@ export const api = {
 
     // Equipments
     listEquipments: () => request<AdminEquipment[]>("/admin/equipments"),
-    createEquipment: (data: { code: string; name: string; roomId: string; equipmentType?: string; trsObjective?: string; defaultCadenceUnit?: string }) =>
+    createEquipment: (data: { code: string; name: string; roomId: string; equipmentType?: string; trsObjective?: string; defaultCadenceUnit?: string; microStopThresholdMin?: number }) =>
       request<AdminEquipment>("/admin/equipments", { method: "POST", body: JSON.stringify(data) }),
-    updateEquipment: (id: string, data: Partial<{ code: string; name: string; roomId: string; equipmentType: string; trsObjective: string; defaultCadenceUnit: string; isActive: boolean }>) =>
+    updateEquipment: (id: string, data: Partial<{ code: string; name: string; roomId: string; equipmentType: string; trsObjective: string; defaultCadenceUnit: string; microStopThresholdMin: number; isActive: boolean }>) =>
       request<AdminEquipment>(`/admin/equipments/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deleteEquipment: (id: string) =>
       request<AdminEquipment>(`/admin/equipments/${id}`, { method: "DELETE" }),
@@ -110,7 +110,7 @@ export const api = {
 
     // Cadences
     listCadences: () => request<ProductEquipmentCadence[]>("/admin/cadences"),
-    upsertCadence: (data: { productId: string; equipmentId: string; cadenceValue: number; cadenceUnit: string }) =>
+    upsertCadence: (data: { productId: string; equipmentId: string; cadenceValue: number; cadenceUnit: string; trsObjective?: number }) =>
       request<ProductEquipmentCadence>("/admin/cadences", { method: "POST", body: JSON.stringify(data) }),
     deleteCadence: (id: string) =>
       request<ProductEquipmentCadence>(`/admin/cadences/${id}`, { method: "DELETE" }),
@@ -149,7 +149,7 @@ export interface AddDowntimeInput { categoryId: string; durationMinutes: number;
 
 // Admin types (include all fields, not just active)
 export interface AdminRoom { id: string; code: string; name: string; description: string | null; isActive: boolean; createdAt: string }
-export interface AdminEquipment { id: string; roomId: string; code: string; name: string; equipmentType: string | null; trsObjective: string; defaultCadenceUnit: string; isActive: boolean; createdAt: string }
+export interface AdminEquipment { id: string; roomId: string; code: string; name: string; equipmentType: string | null; trsObjective: string; defaultCadenceUnit: string; microStopThresholdMin: number; isActive: boolean; createdAt: string }
 export interface AdminProduct { id: string; code: string; name: string; defaultCadence: string | null; cadenceUnit: string; unit: string; isActive: boolean; createdAt: string }
 export interface AdminDowntimeCategory { id: string; code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null; isActive: boolean; createdAt: string }
 export interface ProductEquipmentCadence { id: string; productId: string; equipmentId: string; cadenceValue: string; cadenceUnit: string; trsObjective: string | null }

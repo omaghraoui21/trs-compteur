@@ -10,6 +10,7 @@
     "lint": "echo ok"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.5.1",
     "@trs/engine": "workspace:*",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
