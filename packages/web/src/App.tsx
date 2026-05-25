@@ -5,6 +5,7 @@ import LoginPage from "./pages/Login";
 import CompteurPage from "./pages/Compteur";
 import SupervisorPage from "./pages/Supervisor";
 import DashboardPage from "./pages/Dashboard";
+import AdminPage from "./pages/Admin";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/" element={<CompteurPage />} />
         <Route path="/supervisor" element={<SupervisorPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Layout>

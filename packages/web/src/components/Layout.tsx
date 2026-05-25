@@ -1,12 +1,13 @@
 import { type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { Timer, ClipboardCheck, BarChart3, LogOut } from "lucide-react";
+import { Timer, ClipboardCheck, BarChart3, Settings, LogOut } from "lucide-react";
 
 const navItems = [
   { to: "/", label: "Compteur", icon: Timer },
   { to: "/supervisor", label: "Validation", icon: ClipboardCheck },
   { to: "/dashboard", label: "Tableau de bord", icon: BarChart3 },
+  { to: "/admin", label: "Configuration", icon: Settings, roles: ["admin", "supervisor"] },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -29,7 +30,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       <div className="flex-1 flex">
         <nav className="w-48 bg-white border-r flex flex-col py-2 shrink-0">
-          {navItems.map((item) => (
+          {navItems.filter(item => !item.roles || item.roles.includes(user?.role || "")).map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
