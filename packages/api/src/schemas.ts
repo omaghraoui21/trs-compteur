@@ -84,3 +84,59 @@ export const validateLotSchema = z.object({
   action: z.enum(["validate", "reject"]),
   comment: z.string().optional(),
 });
+
+// ─── Admin schemas (M3) ─────────────────────────────────────────
+
+const equipmentType = z.enum(["blistereuse", "geluleuse"]);
+
+export const createRoomSchema = z.object({
+  code: z.string().min(1, "code requis"),
+  name: z.string().min(1, "name requis"),
+  description: z.string().optional(),
+});
+export const updateRoomSchema = createRoomSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
+
+export const createEquipmentSchema = z.object({
+  code: z.string().min(1, "code requis"),
+  name: z.string().min(1, "name requis"),
+  roomId: z.string().uuid("roomId invalide"),
+  equipmentType: equipmentType.optional(),
+  trsObjective: z.string().optional(),
+  defaultCadenceUnit: cadenceUnit.optional(),
+  microStopThresholdMin: z.number().int().min(1).optional(),
+});
+export const updateEquipmentSchema = createEquipmentSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
+
+export const createProductSchema = z.object({
+  code: z.string().min(1, "code requis"),
+  name: z.string().min(1, "name requis"),
+  defaultCadence: z.string().optional(),
+  cadenceUnit: cadenceUnit.optional(),
+  unit: z.string().optional(),
+});
+export const updateProductSchema = createProductSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
+
+export const createDowntimeCategorySchema = z.object({
+  code: z.string().min(1, "code requis"),
+  label: z.string().min(1, "label requis"),
+  famille: z.string().min(1, "famille requise"),
+  isPlanned: z.boolean().optional(),
+  appliesToEquipmentType: z.string().nullable().optional(),
+});
+export const updateDowntimeCategorySchema = createDowntimeCategorySchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
+
+export const createCadenceSchema = z.object({
+  productId: z.string().uuid("productId invalide"),
+  equipmentId: z.string().uuid("equipmentId invalide"),
+  cadenceValue: z.number().positive("cadenceValue doit être positive"),
+  cadenceUnit: cadenceUnit.optional(),
+  trsObjective: z.number().min(0).max(100).optional(),
+});

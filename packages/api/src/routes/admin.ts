@@ -2,7 +2,14 @@ import { Router } from "express";
 import { eq, and } from "drizzle-orm";
 import { rooms, equipments, products, downtimeCategories, productEquipmentCadences } from "@trs/db";
 import { authenticate, requireRole } from "../middleware";
-import { asyncHandler } from "../lib/http";
+import { asyncHandler, validate } from "../lib/http";
+import {
+  createRoomSchema, updateRoomSchema,
+  createEquipmentSchema, updateEquipmentSchema,
+  createProductSchema, updateProductSchema,
+  createDowntimeCategorySchema, updateDowntimeCategorySchema,
+  createCadenceSchema,
+} from "../schemas";
 
 export const adminRouter = Router();
 adminRouter.use(authenticate);
@@ -15,14 +22,13 @@ adminRouter.get("/rooms", asyncHandler(async (req, res) => {
   res.json(data);
 }));
 
-adminRouter.post("/rooms", asyncHandler(async (req, res) => {
+adminRouter.post("/rooms", validate(createRoomSchema), asyncHandler(async (req, res) => {
   const { code, name, description } = req.body;
-  if (!code || !name) { res.status(400).json({ error: "code et name requis" }); return; }
   const [row] = await req.db.insert(rooms).values({ code, name, description }).returning();
   res.status(201).json(row);
 }));
 
-adminRouter.patch("/rooms/:id", asyncHandler(async (req, res) => {
+adminRouter.patch("/rooms/:id", validate(updateRoomSchema), asyncHandler(async (req, res) => {
   const { code, name, description, isActive } = req.body;
   const updates: Record<string, unknown> = {};
   if (code !== undefined) updates.code = code;
@@ -48,9 +54,8 @@ adminRouter.get("/equipments", asyncHandler(async (req, res) => {
   res.json(data);
 }));
 
-adminRouter.post("/equipments", asyncHandler(async (req, res) => {
+adminRouter.post("/equipments", validate(createEquipmentSchema), asyncHandler(async (req, res) => {
   const { code, name, roomId, equipmentType, trsObjective, defaultCadenceUnit, microStopThresholdMin } = req.body;
-  if (!code || !name || !roomId) { res.status(400).json({ error: "code, name et roomId requis" }); return; }
   const [row] = await req.db.insert(equipments).values({
     code, name, roomId, equipmentType,
     trsObjective: trsObjective || "75",
@@ -60,7 +65,7 @@ adminRouter.post("/equipments", asyncHandler(async (req, res) => {
   res.status(201).json(row);
 }));
 
-adminRouter.patch("/equipments/:id", asyncHandler(async (req, res) => {
+adminRouter.patch("/equipments/:id", validate(updateEquipmentSchema), asyncHandler(async (req, res) => {
   const { code, name, roomId, equipmentType, trsObjective, defaultCadenceUnit, isActive, microStopThresholdMin } = req.body;
   const updates: Record<string, unknown> = {};
   if (code !== undefined) updates.code = code;
@@ -90,9 +95,8 @@ adminRouter.get("/products", asyncHandler(async (req, res) => {
   res.json(data);
 }));
 
-adminRouter.post("/products", asyncHandler(async (req, res) => {
+adminRouter.post("/products", validate(createProductSchema), asyncHandler(async (req, res) => {
   const { code, name, defaultCadence, cadenceUnit, unit } = req.body;
-  if (!code || !name) { res.status(400).json({ error: "code et name requis" }); return; }
   const [row] = await req.db.insert(products).values({
     code, name,
     defaultCadence: defaultCadence || null,
@@ -102,7 +106,7 @@ adminRouter.post("/products", asyncHandler(async (req, res) => {
   res.status(201).json(row);
 }));
 
-adminRouter.patch("/products/:id", asyncHandler(async (req, res) => {
+adminRouter.patch("/products/:id", validate(updateProductSchema), asyncHandler(async (req, res) => {
   const { code, name, defaultCadence, cadenceUnit, unit, isActive } = req.body;
   const updates: Record<string, unknown> = {};
   if (code !== undefined) updates.code = code;
@@ -130,9 +134,8 @@ adminRouter.get("/downtime-categories", asyncHandler(async (req, res) => {
   res.json(data);
 }));
 
-adminRouter.post("/downtime-categories", asyncHandler(async (req, res) => {
+adminRouter.post("/downtime-categories", validate(createDowntimeCategorySchema), asyncHandler(async (req, res) => {
   const { code, label, famille, isPlanned, appliesToEquipmentType } = req.body;
-  if (!code || !label || !famille) { res.status(400).json({ error: "code, label et famille requis" }); return; }
   const [row] = await req.db.insert(downtimeCategories).values({
     code, label, famille,
     isPlanned: isPlanned ?? false,
@@ -141,7 +144,7 @@ adminRouter.post("/downtime-categories", asyncHandler(async (req, res) => {
   res.status(201).json(row);
 }));
 
-adminRouter.patch("/downtime-categories/:id", asyncHandler(async (req, res) => {
+adminRouter.patch("/downtime-categories/:id", validate(updateDowntimeCategorySchema), asyncHandler(async (req, res) => {
   const { code, label, famille, isPlanned, appliesToEquipmentType, isActive } = req.body;
   const updates: Record<string, unknown> = {};
   if (code !== undefined) updates.code = code;
@@ -169,12 +172,8 @@ adminRouter.get("/cadences", asyncHandler(async (req, res) => {
   res.json(data);
 }));
 
-adminRouter.post("/cadences", asyncHandler(async (req, res) => {
-  const { productId, equipmentId, cadenceValue, cadenceUnit } = req.body;
-  if (!productId || !equipmentId || !cadenceValue) {
-    res.status(400).json({ error: "productId, equipmentId et cadenceValue requis" }); return;
-  }
-  const { trsObjective } = req.body;
+adminRouter.post("/cadences", validate(createCadenceSchema), asyncHandler(async (req, res) => {
+  const { productId, equipmentId, cadenceValue, cadenceUnit, trsObjective } = req.body;
   const [row] = await req.db.insert(productEquipmentCadences).values({
     productId, equipmentId,
     cadenceValue: String(cadenceValue),

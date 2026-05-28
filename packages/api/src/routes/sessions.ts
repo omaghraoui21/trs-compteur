@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, diffMinutes } from "@trs/engine";
 import { authenticate } from "../middleware";
@@ -38,13 +38,11 @@ sessionsRouter.get("/:id", asyncHandler(async (req, res) => {
     .where(eq(lotEntries.sessionId, session.id))
     .orderBy(lotEntries.lotOrder);
 
-  // Fetch downtimes for all lots
+  // M1: single query instead of N+1 loop
   const lotIds = lots.map(l => l.id);
-  let allDowntimes: (typeof downtimeEvents.$inferSelect)[] = [];
-  for (const lotId of lotIds) {
-    const dts = await db.select().from(downtimeEvents).where(eq(downtimeEvents.lotEntryId, lotId));
-    allDowntimes.push(...dts);
-  }
+  const allDowntimes = lotIds.length > 0
+    ? await db.select().from(downtimeEvents).where(inArray(downtimeEvents.lotEntryId, lotIds))
+    : [];
 
   res.json({ session, events, lots, downtimes: allDowntimes });
 }));
@@ -165,15 +163,27 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
     .where(eq(lotEntries.sessionId, session.id))
     .orderBy(lotEntries.lotOrder);
 
+  // M1: single join query for all lots instead of N+1 loop
+  const lotIds2 = lots.map(l => l.id);
+  const allDts = lotIds2.length > 0
+    ? await db.select({
+        lotEntryId: downtimeEvents.lotEntryId,
+        durationMinutes: downtimeEvents.durationMinutes,
+        famille: downtimeCategories.famille,
+        isPlanned: downtimeCategories.isPlanned,
+      }).from(downtimeEvents)
+      .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+      .where(inArray(downtimeEvents.lotEntryId, lotIds2))
+    : [];
+
+  const dtsByLot: Record<string, typeof allDts> = {};
+  for (const dt of allDts) {
+    (dtsByLot[dt.lotEntryId] ??= []).push(dt);
+  }
+
   const lotResults = [];
   for (const lot of lots) {
-    const dts = await db.select({
-      durationMinutes: downtimeEvents.durationMinutes,
-      famille: downtimeCategories.famille,
-      isPlanned: downtimeCategories.isPlanned,
-    }).from(downtimeEvents)
-      .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
-      .where(eq(downtimeEvents.lotEntryId, lot.id));
+    const dts = dtsByLot[lot.id] ?? [];
     const lotTrs = computeLotTrs({
       cadence: Number(lot.cadenceUsed),
       cadenceUnit: lot.cadenceUnit as "u/h" | "u/min",
