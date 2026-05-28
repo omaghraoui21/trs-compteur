@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
 import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ComparisonResponse, type TrsMetrics, type DailyTrs, type ByProductResponse, type SixLossesResponse, type HeatmapResponse } from "@/lib/api";
-import { fmtPct, fmtDuration, trsColor, familleToNorme } from "@trs/engine";
+import { fmtPct, fmtDuration, trsColor, familleToNorme, computeOeeBenchmark } from "@trs/engine";
+import type { BenchmarkRating } from "@trs/engine";
 import { useToast } from "@/components/Toast";
+import { DashboardSkeleton } from "@/components/Skeleton";
 import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, ChevronUp, AlertTriangle, Info, FileText } from "lucide-react";
 // PDF is lazy-loaded on demand to reduce bundle size
 import TrsChart from "@/components/dashboard/TrsChart";
@@ -17,20 +19,25 @@ function dateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-function getPresetDates(zoom: ZoomLevel): { from: string; to: string } {
-  const now = new Date();
+function getPresetDates(zoom: ZoomLevel, ref = new Date()): { from: string; to: string } {
   if (zoom === "day") {
-    const s = dateStr(now);
+    const s = dateStr(ref);
     return { from: s, to: s };
   }
   if (zoom === "week") {
-    const d = new Date(now);
-    d.setDate(d.getDate() - 6);
-    return { from: dateStr(d), to: dateStr(now) };
+    // ISO calendar week: Monday → Sunday
+    const d = new Date(ref);
+    const dow = (d.getDay() + 6) % 7; // Monday = 0
+    const mon = new Date(d);
+    mon.setDate(d.getDate() - dow);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    return { from: dateStr(mon), to: dateStr(sun) };
   }
-  // month
-  const d = new Date(now.getFullYear(), now.getMonth(), 1);
-  return { from: dateStr(d), to: dateStr(now) };
+  // month: 1st → last day of the calendar month
+  const first = new Date(ref.getFullYear(), ref.getMonth(), 1);
+  const last = new Date(ref.getFullYear(), ref.getMonth() + 1, 0);
+  return { from: dateStr(first), to: dateStr(last) };
 }
 
 export default function DashboardPage() {
@@ -226,7 +233,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {loading && <div className="text-center py-12 text-gray-400">Chargement...</div>}
+      {loading && <DashboardSkeleton />}
 
       {!loading && data && (
         <>
@@ -281,6 +288,17 @@ export default function DashboardPage() {
 
 // ─── Sub-components ──────────────────────────────────────────
 
+const RATING_LABELS: Record<BenchmarkRating, { label: string; cls: string }> = {
+  world_class: { label: "Classe mondiale", cls: "bg-green-100 text-green-700" },
+  acceptable:  { label: "Acceptable",      cls: "bg-amber-100 text-amber-700" },
+  below:       { label: "En dessous",      cls: "bg-red-100 text-red-700" },
+};
+
+function BenchmarkBadge({ rating }: { rating: BenchmarkRating }) {
+  const { label, cls } = RATING_LABELS[rating];
+  return <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cls}`}>{label}</span>;
+}
+
 function KpiCard({ metrics, title, objective }: { metrics: TrsMetrics; title: string; objective?: number }) {
   if (metrics.lotCount === 0) {
     return (
@@ -289,33 +307,73 @@ function KpiCard({ metrics, title, objective }: { metrics: TrsMetrics; title: st
           <Gauge className="h-5 w-5 text-blue-600" />
           <h3 className="font-semibold">TRS Consolidé — {title}</h3>
         </div>
-        <div className="text-center text-gray-400 py-8">Aucune donnée pour cette période</div>
+        <div className="text-center text-gray-400 py-8">
+          <BarChart3 className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+          <p className="font-medium text-gray-500">Aucune donnée pour cette période</p>
+          <p className="text-sm mt-1">Ajustez les filtres ou sélectionnez une autre plage.</p>
+        </div>
       </div>
     );
   }
 
+  const bench = computeOeeBenchmark({ DO: metrics.DO, TP: metrics.TP, TQ: metrics.TQ, TRS: metrics.TRS }, "pharmaceutical");
+  const rel = metrics.reliability;
+
   return (
     <div className="bg-white rounded-xl border shadow-sm p-6 mb-4">
-      <div className="flex items-center gap-2 mb-4">
-        <Gauge className="h-5 w-5 text-blue-600" />
-        <h3 className="font-semibold">TRS Consolidé — {title}</h3>
+      <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Gauge className="h-5 w-5 text-blue-600" />
+          <h3 className="font-semibold">TRS Consolidé — {title}</h3>
+        </div>
+        <BenchmarkBadge rating={bench.ratings.TRS} />
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-center mb-4">
+      {/* Primary OEE grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-center mb-3">
         {([
-          { label: "TRS", value: metrics.TRS },
-          { label: "TRG", value: metrics.TRG },
-          { label: "DO", value: metrics.DO },
-          { label: "TP", value: metrics.TP },
-          { label: "TQ", value: metrics.TQ },
-        ]).map(item => (
+          { label: "TRS",  value: metrics.TRS,  rating: bench.ratings.TRS },
+          { label: "TRG",  value: metrics.TRG,  rating: null },
+          { label: "DO",   value: metrics.DO,   rating: bench.ratings.DO },
+          { label: "TP",   value: metrics.TP,   rating: bench.ratings.TP },
+          { label: "TQ",   value: metrics.TQ,   rating: bench.ratings.TQ },
+        ] as { label: string; value: number; rating: BenchmarkRating | null }[]).map(item => (
           <div key={item.label} className="bg-gray-50 rounded-xl p-3">
             <div className="text-xs text-gray-500 mb-1">{item.label}</div>
             <div className="text-2xl font-bold" style={{ color: ["TRS", "TRG"].includes(item.label) ? trsColor(item.value) : undefined }}>
               {fmtPct(item.value)}
             </div>
+            {item.rating && <div className="mt-1"><BenchmarkBadge rating={item.rating} /></div>}
           </div>
         ))}
+      </div>
+
+      {/* TEEP + Reliability row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-sm mb-3">
+        <div className="bg-blue-50 rounded-xl p-3">
+          <div className="text-xs text-blue-600 mb-1 font-medium">TEEP</div>
+          <div className="text-xl font-bold text-blue-700">{fmtPct(metrics.TEEP ?? 0)}</div>
+          <div className="text-[10px] text-blue-500 mt-0.5">vs calendrier 24/7</div>
+        </div>
+        <div className="bg-gray-50 rounded-xl p-3">
+          <div className="text-xs text-gray-500 mb-1">Utilisation</div>
+          <div className="text-xl font-bold">{fmtPct(metrics.utilisation ?? 0)}</div>
+          <div className="text-[10px] text-gray-400 mt-0.5">tO / 24h</div>
+        </div>
+        {rel && rel.mtbf != null && (
+          <div className="bg-gray-50 rounded-xl p-3">
+            <div className="text-xs text-gray-500 mb-1">MTBF</div>
+            <div className="text-xl font-bold">{Math.round(rel.mtbf)} min</div>
+            <div className="text-[10px] text-gray-400 mt-0.5">{rel.breakdownCount} panne{rel.breakdownCount > 1 ? "s" : ""}</div>
+          </div>
+        )}
+        {rel && rel.mttr != null && (
+          <div className="bg-gray-50 rounded-xl p-3">
+            <div className="text-xs text-gray-500 mb-1">MTTR</div>
+            <div className="text-xl font-bold">{Math.round(rel.mttr)} min</div>
+            <div className="text-[10px] text-gray-400 mt-0.5">durée moy. panne</div>
+          </div>
+        )}
       </div>
 
       {objective != null && (
@@ -324,6 +382,11 @@ function KpiCard({ metrics, title, objective }: { metrics: TrsMetrics; title: st
           Objectif: {objective}% — {metrics.TRS >= objective / 100 ? "Atteint ✓" : "Non atteint"}
         </div>
       )}
+
+      {/* Benchmark reference */}
+      <div className="mt-3 text-[11px] text-gray-400 border-t pt-2">
+        Référence pharma : TRS ≥ {(bench.thresholds.trs.worldClass * 100).toFixed(0)}% (classe mondiale) · DO ≥ {(bench.thresholds.DO.worldClass * 100).toFixed(0)}% · TP ≥ {(bench.thresholds.TP.worldClass * 100).toFixed(0)}% · TQ ≥ {(bench.thresholds.TQ.worldClass * 100).toFixed(1)}%
+      </div>
 
       <WarningsBanner warnings={metrics.warnings} audit={metrics.audit} />
     </div>

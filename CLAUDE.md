@@ -80,7 +80,7 @@ Key tables and their roles:
 
 All routes require JWT (set in `middleware.ts`). Role-based access: `operator`, `supervisor`, `admin`.
 
-> **Important:** role enum values in the DB are English (`operator`, `supervisor`, `admin`), not French. The credential table below uses French email prefixes but the role string is English.
+> **Important:** role enum values in the DB are English (`operator`, `supervisor`, `admin`), not French. The CLAUDE.md credential table uses French email prefixes but the role string is English.
 
 - `auth.ts` — POST `/api/auth/login`
 - `sessions.ts` — Session lifecycle (open/close) and event recording
@@ -135,7 +135,7 @@ All routes require JWT (set in `middleware.ts`). Role-based access: `operator`, 
   - **Important:** `api/handler.mjs` is committed to git. After any backend source change, rebuild it with `node scripts/build-api.mjs` and commit the result before merging to the production branch — otherwise the stale bundle will be served until Vercel's build step regenerates it.
 - **Docker**: Runs `tsx packages/api/src/server.ts` directly on Node 20-slim.
 - **CI**: `.github/workflows/db-backup.yml` runs daily `pg_dump` at 02:00 UTC.
-- **Production branch**: `devin/1779664896-initial-app` — this is what Vercel deploys. Merge feature branches here (there is no `main` branch).
+- **Production branch**: `devin/1779664896-initial-app` — this is what Vercel deploys. Merge feature branches here (not `main`; there is no `main`).
 
 ## Seeded Test Credentials
 

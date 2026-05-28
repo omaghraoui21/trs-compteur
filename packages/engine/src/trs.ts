@@ -86,6 +86,10 @@ export interface SessionTrsResult {
   TQ: number;
   TRS: number;
   TRG: number;
+  /** TEEP = tU / tT — efficiency vs. 24/7 calendar time (reveals schedule losses) */
+  TEEP?: number;
+  /** utilisation = tO / tT — fraction of calendar time the machine is scheduled */
+  utilisation?: number;
   lotCount: number;
   totalProduced: number;
   totalConforming: number;
@@ -135,11 +139,15 @@ export interface ProductTrsResult {
   tF: number;
   tN: number;
   tU: number;
+  /** Required time attributed to this product (allocated pro-rata to tF when periodTR given). */
+  tR: number;
   avgCadencePerMin: number;
   DO: number;
   TP: number;
   TQ: number;
   TRS: number;
+  /** true when DO/TRS use a tR allocated from the period (so Σ products reconciles with global). */
+  trAllocated: boolean;
 }
 
 // ─── Six Big Losses types ───────────────────────────────
@@ -272,6 +280,8 @@ export function computeSessionTrs(input: SessionTrsInput): SessionTrsResult {
   const TQ = totalProduced > 0 ? totalConforming / totalProduced : 1;
   const TRS = tR > 0 ? tU / tR : 0;
   const TRG = tO > 0 ? tU / tO : 0;
+  const TEEP = tT > 0 ? tU / tT : 0;
+  const utilisation = tT > 0 ? tO / tT : 0;
 
   // Cross-validations
   if (tAP > tO) {
@@ -311,7 +321,7 @@ export function computeSessionTrs(input: SessionTrsInput): SessionTrsResult {
   return {
     tT, tO, fermeture, tAP, tR, tF, tN, tU,
     nonQualiteMin, ecartCadenceMin, totalUnplannedMin,
-    DO, TP, TQ, TRS, TRG,
+    DO, TP, TQ, TRS, TRG, TEEP, utilisation,
     lotCount: input.lots.length,
     totalProduced, totalConforming, totalRebut,
     downtimeByFamille, downtimeByNorme, warnings, audit,
@@ -320,13 +330,17 @@ export function computeSessionTrs(input: SessionTrsInput): SessionTrsResult {
 
 // ─── Product-level TRS aggregation ──────────────────────
 
-export function computeProductTrs(lots: ProductLotInput[]): ProductTrsResult[] {
+export function computeProductTrs(lots: ProductLotInput[], periodTR?: number): ProductTrsResult[] {
   const byProduct = new Map<string, ProductLotInput[]>();
   for (const lot of lots) {
     const arr = byProduct.get(lot.productId) || [];
     arr.push(lot);
     byProduct.set(lot.productId, arr);
   }
+
+  // Total tF across all products — used to allocate the period's required time (tR) pro-rata.
+  const totalTF = lots.reduce((s, l) => s + l.tF, 0);
+  const allocate = periodTR != null && periodTR > 0 && totalTF > 0;
 
   const results: ProductTrsResult[] = [];
   for (const [productId, productLots] of byProduct) {
@@ -337,7 +351,9 @@ export function computeProductTrs(lots: ProductLotInput[]): ProductTrsResult[] {
     const tF = productLots.reduce((s, l) => s + l.tF, 0);
     const tN = productLots.reduce((s, l) => s + l.tN, 0);
     const tU = productLots.reduce((s, l) => s + l.tU, 0);
-    const tR = totalDurationMin; // At lot level, lot duration = required time for that lot
+    // Allocated tR keeps Σ tR_product = periodTR, so Σ tU_product / periodTR = TRS_global.
+    // Fallback (no period tR given): tR = Σ lot durations (legacy behaviour).
+    const tR = allocate ? periodTR! * (tF / totalTF) : totalDurationMin;
 
     const totalCadenceWeighted = productLots.reduce((s, l) => {
       const cpm = l.cadenceUnit === "u/min" ? l.cadence : l.cadence / 60;
@@ -357,11 +373,13 @@ export function computeProductTrs(lots: ProductLotInput[]): ProductTrsResult[] {
       tF,
       tN,
       tU,
+      tR,
       avgCadencePerMin,
       DO: tR > 0 ? tF / tR : 0,
       TP: tF > 0 ? tN / tF : 0,
       TQ: totalProduced > 0 ? totalConforming / totalProduced : 1,
       TRS: tR > 0 ? tU / tR : 0,
+      trAllocated: allocate,
     });
   }
 
@@ -419,7 +437,7 @@ export function computeZoomTrs(input: ZoomTrsInput): SessionTrsResult {
   const sessions = input.sessions;
   const emptyAudit: TrsAudit = { tF_norme: 0, tF_lots: 0, tF_delta: 0, formula: "" };
   if (sessions.length === 0) {
-    return { tT: 0, tO: 0, fermeture: 0, tAP: 0, tR: 0, tF: 0, tN: 0, tU: 0, nonQualiteMin: 0, ecartCadenceMin: 0, totalUnplannedMin: 0, DO: 0, TP: 0, TQ: 1, TRS: 0, TRG: 0, lotCount: 0, totalProduced: 0, totalConforming: 0, totalRebut: 0, downtimeByFamille: {}, downtimeByNorme: {}, warnings: [], audit: emptyAudit };
+    return { tT: 0, tO: 0, fermeture: 0, tAP: 0, tR: 0, tF: 0, tN: 0, tU: 0, nonQualiteMin: 0, ecartCadenceMin: 0, totalUnplannedMin: 0, DO: 0, TP: 0, TQ: 1, TRS: 0, TRG: 0, TEEP: 0, utilisation: 0, lotCount: 0, totalProduced: 0, totalConforming: 0, totalRebut: 0, downtimeByFamille: {}, downtimeByNorme: {}, warnings: [], audit: emptyAudit };
   }
 
   const warnings: TrsWarning[] = [];
@@ -468,6 +486,8 @@ export function computeZoomTrs(input: ZoomTrsInput): SessionTrsResult {
   const TQ = totalProduced > 0 ? totalConforming / totalProduced : 1;
   const TRS = tR > 0 ? tU / tR : 0;
   const TRG = tO > 0 ? tU / tO : 0;
+  const TEEP = tT > 0 ? tU / tT : 0;
+  const utilisation = tT > 0 ? tO / tT : 0;
 
   const tF_norme = sessions.reduce((s, x) => s + x.audit.tF_norme, 0);
   const tF_lots = sessions.reduce((s, x) => s + x.audit.tF_lots, 0);
@@ -478,5 +498,149 @@ export function computeZoomTrs(input: ZoomTrsInput): SessionTrsResult {
     formula: `tF = Σ(session.tF) = ${tF}`,
   };
 
-  return { tT, tO, fermeture, tAP, tR, tF, tN, tU, nonQualiteMin, ecartCadenceMin, totalUnplannedMin, DO, TP, TQ, TRS, TRG, lotCount, totalProduced, totalConforming, totalRebut, downtimeByFamille, downtimeByNorme, warnings, audit };
+  return { tT, tO, fermeture, tAP, tR, tF, tN, tU, nonQualiteMin, ecartCadenceMin, totalUnplannedMin, DO, TP, TQ, TRS, TRG, TEEP, utilisation, lotCount, totalProduced, totalConforming, totalRebut, downtimeByFamille, downtimeByNorme, warnings, audit };
+}
+
+// ─── Period grouping (day / week / month) ────────────────
+
+export type GroupBy = "day" | "week" | "month";
+
+export interface PeriodBucket extends SessionTrsResult {
+  /** "2026-05-28" (day) | "2026-W22" (ISO week) | "2026-05" (month) */
+  periodKey: string;
+  from: string;
+  to: string;
+}
+
+/** ISO-8601 week key (Monday-based), e.g. "2026-W22". */
+export function isoWeekKey(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  const day = (d.getUTCDay() + 6) % 7; // Monday = 0
+  // Shift to the Thursday of this week (ISO weeks belong to the year of their Thursday)
+  d.setUTCDate(d.getUTCDate() - day + 3);
+  const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((d.getTime() - firstThursday.getTime()) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+export function periodKey(dateStr: string, by: GroupBy): string {
+  if (by === "day") return dateStr;
+  if (by === "month") return dateStr.slice(0, 7); // "YYYY-MM"
+  return isoWeekKey(dateStr);
+}
+
+/**
+ * Group daily sessions into day/week/month buckets.
+ * Each bucket is re-aggregated with computeZoomTrs, i.e. TRS_bucket = Σ tU / Σ tR.
+ * Because summation is associative, computeZoomTrs over all sessions equals the
+ * sum of the buckets — day → week → month always reconcile.
+ */
+export function groupSessionsByPeriod(
+  sessions: (SessionTrsResult & { date: string })[],
+  by: GroupBy,
+): PeriodBucket[] {
+  const buckets = new Map<string, (SessionTrsResult & { date: string })[]>();
+  for (const s of sessions) {
+    const key = periodKey(s.date, by);
+    const arr = buckets.get(key) || [];
+    arr.push(s);
+    buckets.set(key, arr);
+  }
+
+  return [...buckets.entries()]
+    .map(([key, ss]) => {
+      const dates = ss.map(s => s.date).sort();
+      return {
+        periodKey: key,
+        from: dates[0],
+        to: dates[dates.length - 1],
+        ...computeZoomTrs({ sessions: ss }),
+      };
+    })
+    .sort((a, b) => a.from.localeCompare(b.from));
+}
+
+// ─── MTBF / MTTR ─────────────────────────────────────────
+
+export interface MtbfMttrResult {
+  breakdownCount: number;
+  totalBreakdownMin: number;
+  /** Mean time between failures (minutes of run time per failure). null when no failures. */
+  mtbf: number | null;
+  /** Mean time to repair (minutes per repair). null when no failures. */
+  mttr: number | null;
+  /** Availability = MTBF / (MTBF + MTTR). null when no failures. */
+  availability: number | null;
+}
+
+/**
+ * Compute MTBF/MTTR from a list of downtime events.
+ * Planned stops and micro-stops (< microStopThresholdMin) are excluded from the failure count.
+ * runTimeMin should be the net production time (tF) over the analysed period.
+ */
+export function computeMtbfMttr(
+  downtimes: { durationMinutes: number; isPlanned: boolean }[],
+  runTimeMin: number,
+  microStopThresholdMin = 5,
+): MtbfMttrResult {
+  const breakdowns = downtimes.filter(d => !d.isPlanned && d.durationMinutes >= microStopThresholdMin);
+  const breakdownCount = breakdowns.length;
+  const totalBreakdownMin = breakdowns.reduce((s, d) => s + d.durationMinutes, 0);
+
+  if (breakdownCount === 0) return { breakdownCount: 0, totalBreakdownMin: 0, mtbf: null, mttr: null, availability: null };
+
+  const mtbf = runTimeMin / breakdownCount;
+  const mttr = totalBreakdownMin / breakdownCount;
+  const availability = mtbf / (mtbf + mttr);
+  return { breakdownCount, totalBreakdownMin, mtbf, mttr, availability };
+}
+
+// ─── OEE Benchmarking ────────────────────────────────────
+
+export type OeeIndustry = "pharmaceutical" | "packaging" | "general";
+export type BenchmarkRating = "world_class" | "acceptable" | "below";
+
+export interface OeeThresholds {
+  trs: { worldClass: number; acceptable: number };
+  DO: { worldClass: number; acceptable: number };
+  TP: { worldClass: number; acceptable: number };
+  TQ: { worldClass: number; acceptable: number };
+}
+
+export interface OeeBenchmarkResult {
+  industry: OeeIndustry;
+  thresholds: OeeThresholds;
+  ratings: Record<"TRS" | "DO" | "TP" | "TQ", BenchmarkRating>;
+}
+
+const INDUSTRY_BENCHMARKS: Record<OeeIndustry, OeeThresholds> = {
+  // Tractian 2026: pharma world-class 60-70%, industry avg 40-60%
+  pharmaceutical: { trs: { worldClass: 0.65, acceptable: 0.50 }, DO: { worldClass: 0.85, acceptable: 0.70 }, TP: { worldClass: 0.85, acceptable: 0.75 }, TQ: { worldClass: 0.990, acceptable: 0.970 } },
+  // Tractian 2026: packaging world-class 80-85%, industry avg 60-75%
+  packaging:      { trs: { worldClass: 0.80, acceptable: 0.65 }, DO: { worldClass: 0.88, acceptable: 0.75 }, TP: { worldClass: 0.92, acceptable: 0.80 }, TQ: { worldClass: 0.995, acceptable: 0.985 } },
+  // Nakajima / ISO 22400: world-class 85%, 90% A × 95% P × 99.9% Q
+  general:        { trs: { worldClass: 0.85, acceptable: 0.65 }, DO: { worldClass: 0.90, acceptable: 0.75 }, TP: { worldClass: 0.95, acceptable: 0.80 }, TQ: { worldClass: 0.999, acceptable: 0.990 } },
+};
+
+function rate(value: number, t: { worldClass: number; acceptable: number }): BenchmarkRating {
+  if (value >= t.worldClass) return "world_class";
+  if (value >= t.acceptable) return "acceptable";
+  return "below";
+}
+
+export function computeOeeBenchmark(
+  metrics: { DO: number; TP: number; TQ: number; TRS: number },
+  industry: OeeIndustry = "pharmaceutical",
+): OeeBenchmarkResult {
+  const t = INDUSTRY_BENCHMARKS[industry];
+  return {
+    industry,
+    thresholds: t,
+    ratings: {
+      TRS: rate(metrics.TRS, t.trs),
+      DO: rate(metrics.DO, t.DO),
+      TP: rate(metrics.TP, t.TP),
+      TQ: rate(metrics.TQ, t.TQ),
+    },
+  };
 }

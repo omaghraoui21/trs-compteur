@@ -38,7 +38,10 @@ export default function ByProductChart({ byProduct }: Props) {
       <h3 className="font-semibold text-sm mb-1 flex items-center gap-2">
         <Package className="h-4 w-4 text-blue-600" /> TRS par produit
       </h3>
-      <p className="text-xs text-gray-500 mb-3">{byProduct.length} produit(s) — agrégation pondérée par temps</p>
+      <p className="text-xs text-gray-500 mb-3">
+        {byProduct.length} produit(s) — TRS = ΣtU / ΣtR
+        {byProduct[0]?.trAllocated && <span className="text-gray-400"> · DO réparti au prorata du temps de fonctionnement</span>}
+      </p>
 
       <ResponsiveContainer width="100%" height={260}>
         <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 5 }} layout="vertical">
@@ -68,7 +71,7 @@ export default function ByProductChart({ byProduct }: Props) {
               <th className="text-right py-1 px-2">NPR</th>
               <th className="text-right py-1 px-2">NPC</th>
               <th className="text-right py-1 px-2">Cad.</th>
-              <th className="text-right py-1 px-2">DO</th>
+              <th className="text-right py-1 px-2">{byProduct[0]?.trAllocated ? "DO*" : "DO"}</th>
               <th className="text-right py-1 px-2">TP</th>
               <th className="text-right py-1 px-2">TQ</th>
               <th className="text-right py-1 px-2 font-bold">TRS</th>

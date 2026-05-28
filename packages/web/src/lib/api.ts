@@ -133,7 +133,8 @@ export interface DowntimeEvent { id: string; lotEntryId: string; categoryId: str
 export interface SessionDetail { session: Session; events: SessionEvent[]; lots: LotEntry[]; downtimes: DowntimeEvent[] }
 export interface TrsWarning { code: string; level: "error" | "warning"; message: string; field: string; value?: number }
 export interface TrsAudit { tF_norme: number; tF_lots: number; tF_delta: number; formula: string }
-export interface TrsMetrics { tT: number; tO: number; fermeture: number; tAP: number; tR: number; tF: number; tN: number; tU: number; nonQualiteMin: number; ecartCadenceMin: number; totalUnplannedMin: number; DO: number; TP: number; TQ: number; TRS: number; TRG: number; lotCount: number; totalProduced: number; totalConforming: number; totalRebut: number; downtimeByFamille: Record<string, number>; downtimeByNorme?: Record<string, number>; warnings?: TrsWarning[]; audit?: TrsAudit }
+export interface ReliabilityMetrics { breakdownCount: number; totalBreakdownMin: number; mtbf: number | null; mttr: number | null; availability: number | null }
+export interface TrsMetrics { tT: number; tO: number; fermeture: number; tAP: number; tR: number; tF: number; tN: number; tU: number; nonQualiteMin: number; ecartCadenceMin: number; totalUnplannedMin: number; DO: number; TP: number; TQ: number; TRS: number; TRG: number; TEEP: number; utilisation: number; lotCount: number; totalProduced: number; totalConforming: number; totalRebut: number; downtimeByFamille: Record<string, number>; downtimeByNorme?: Record<string, number>; warnings?: TrsWarning[]; audit?: TrsAudit; reliability?: ReliabilityMetrics }
 export interface DailyTrs extends TrsMetrics { date: string; notes?: string; lots?: any[] }
 export interface SessionTrsResponse { session: TrsMetrics; lots: any[] }
 export interface DashboardTrsResponse { period: { from: string; to: string; equipmentId: string }; daily: DailyTrs[]; total: TrsMetrics }
@@ -155,8 +156,8 @@ export interface AdminDowntimeCategory { id: string; code: string; label: string
 export interface ProductEquipmentCadence { id: string; productId: string; equipmentId: string; cadenceValue: string; cadenceUnit: string; trsObjective: string | null }
 
 // W: By-Product aggregation
-export interface ProductTrs { productId: string; productName: string; lotCount: number; totalProduced: number; totalConforming: number; totalRebut: number; totalDurationMin: number; totalUnplannedMin: number; tF: number; tN: number; tU: number; avgCadencePerMin: number; DO: number; TP: number; TQ: number; TRS: number }
-export interface ByProductResponse { period: { from: string; to: string; equipmentId: string }; byProduct: ProductTrs[] }
+export interface ProductTrs { productId: string; productName: string; lotCount: number; totalProduced: number; totalConforming: number; totalRebut: number; totalDurationMin: number; totalUnplannedMin: number; tF: number; tN: number; tU: number; tR: number; avgCadencePerMin: number; DO: number; TP: number; TQ: number; TRS: number; trAllocated: boolean }
+export interface ByProductResponse { period: { from: string; to: string; equipmentId: string }; periodTR?: number; periodTRS?: number; byProduct: ProductTrs[] }
 
 // X: Six Big Losses
 export interface SixBigLoss { category: string; label: string; oeeComponent: string; minutes: number; pctOfTotal: number }

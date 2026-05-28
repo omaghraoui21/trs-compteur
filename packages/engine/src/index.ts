@@ -1,3 +1,3 @@
-export { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, familleToNorme } from "./trs";
-export type { DowntimeInput, LotTrsInput, LotTrsResult, SessionTrsInput, SessionTrsResult, ZoomTrsInput, TrsWarning, TrsAudit, ProductLotInput, ProductTrsResult, LossCategory, SixBigLoss, SixBigLossesResult } from "./trs";
+export { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, computeMtbfMttr, computeOeeBenchmark, groupSessionsByPeriod, isoWeekKey, periodKey, familleToNorme } from "./trs";
+export type { DowntimeInput, LotTrsInput, LotTrsResult, SessionTrsInput, SessionTrsResult, ZoomTrsInput, TrsWarning, TrsAudit, ProductLotInput, ProductTrsResult, LossCategory, SixBigLoss, SixBigLossesResult, MtbfMttrResult, OeeIndustry, BenchmarkRating, OeeThresholds, OeeBenchmarkResult, GroupBy, PeriodBucket } from "./trs";
 export { diffMinutes, toMinutes, fmtDuration, fmtPct, trsColor } from "./time";

@@ -83,7 +83,7 @@ export default function CompteurPage() {
 
   const handleCloseSession = async () => {
     if (!activeSession) return;
-    if (!confirm("Fermer le compteur ? Tous les lots actifs seront clotures.")) return;
+    if (!confirm("Fermer le compteur ? Tous les lots actifs seront clôturés.")) return;
     try {
       await api.closeSession(activeSession.id);
       setActiveSession(null);
@@ -252,8 +252,8 @@ export default function CompteurPage() {
                         ev.isPlanned ? "bg-amber-400" : "bg-gray-400"
                       }`} />
                       <span className="text-sm font-medium">
-                        {ev.eventType === "lot_start" ? `Lot ${lot?.batchNumber ?? "?"} demarre` :
-                         ev.eventType === "lot_end" ? `Lot ${lot?.batchNumber ?? "?"} cloture` :
+                        {ev.eventType === "lot_start" ? `Lot ${lot?.batchNumber ?? "?"} démarré` :
+                         ev.eventType === "lot_end" ? `Lot ${lot?.batchNumber ?? "?"} clôturé` :
                          ev.label || ev.eventType.replace("_", " ")}
                       </span>
                       {product && <span className="text-gray-400 ml-2">({product.name})</span>}
@@ -266,7 +266,7 @@ export default function CompteurPage() {
                 );
               })}
               {detail.events.length === 0 && (
-                <div className="px-4 py-6 text-center text-gray-400 text-sm">Aucun evenement enregistre</div>
+                <div className="px-4 py-6 text-center text-gray-400 text-sm">Aucun événement enregistré</div>
               )}
             </div>
           </div>
@@ -287,7 +287,7 @@ export default function CompteurPage() {
           {detail.lots.filter(l => l.status !== "active").length > 0 && (
             <div className="bg-white rounded-xl border shadow-sm mb-4">
               <div className="px-4 py-3 border-b">
-                <h3 className="font-semibold text-sm">Lots clotures</h3>
+                <h3 className="font-semibold text-sm">Lots clôturés</h3>
               </div>
               <div className="divide-y">
                 {detail.lots.filter(l => l.status !== "active").map(lot => {
@@ -570,7 +570,7 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
       {/* U4: Confirmation dialog */}
       {showConfirm && (
         <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 mb-3">
-          <p className="text-sm font-medium text-amber-800 mb-2">Attention — cloturer malgre les alertes ?</p>
+          <p className="text-sm font-medium text-amber-800 mb-2">Attention — clôturer malgré les alertes ?</p>
           {warnings.map((w, i) => <div key={i} className="text-xs text-amber-700">• {w.msg}</div>)}
           <div className="flex gap-2 mt-3">
             <button onClick={() => setShowConfirm(false)} className={`flex-1 border border-gray-300 text-gray-700 ${BTN_PRIMARY} hover:bg-gray-50`}>Annuler</button>
@@ -588,7 +588,7 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
         {!showConfirm && (
           <button onClick={handleClose} disabled={closing}
             className={`flex-1 bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700 disabled:opacity-50`}>
-            <Square className={BTN_ICON} /> Cloturer lot
+            <Square className={BTN_ICON} /> Clôturer lot
           </button>
         )}
       </div>
@@ -728,8 +728,8 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
         )}
 
         <button type="submit" disabled={loading}
-          className={`w-full bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700 disabled:opacity-50`}>
-          {loading ? "Demarrage..." : "Demarrer le lot"}
+          className={`w-full bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700 disabled:opacity-50 disabled:pointer-events-none`}>
+          {loading ? "Démarrage…" : "Démarrer le lot"}
         </button>
       </form>
     </div>
