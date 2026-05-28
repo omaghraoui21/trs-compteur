@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import { sessions, lotEntries, sessionEvents, downtimeEvents, downtimeCategories, equipments, products } from "@trs/db";
-import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses } from "@trs/engine";
+import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, computeMtbfMttr } from "@trs/engine";
 import type { ProductLotInput } from "@trs/engine";
 
 import { authenticate } from "../middleware";
@@ -22,6 +22,7 @@ async function buildSessionTrs(db: any, session: any) {
 
   const lotDetails: any[] = [];
   const lotResults: any[] = [];
+  const downtimeDetails: { durationMinutes: number; isPlanned: boolean }[] = [];
 
   for (const lot of lots) {
     const dts = await db.select({
@@ -54,6 +55,8 @@ async function buildSessionTrs(db: any, session: any) {
     // Get product info for this lot
     const [product] = await db.select().from(products).where(eq(products.id, lot.productId)).limit(1);
 
+    for (const d of dts) downtimeDetails.push({ durationMinutes: d.durationMinutes, isPlanned: d.isPlanned });
+
     if (lotTrs) {
       lotResults.push({ ...lotTrs, produced: lot.quantityProduced, conforming: lot.quantityConforming });
       lotDetails.push({
@@ -78,7 +81,7 @@ async function buildSessionTrs(db: any, session: any) {
     lots: lotResults,
   });
 
-  return { sessionTrs, lotDetails, plannedStopsMin };
+  return { sessionTrs, lotDetails, plannedStopsMin, downtimeDetails };
 }
 
 // ─── Zoom TRS: compute TRS for a date range ──────────────────
@@ -102,14 +105,17 @@ dashboardRouter.get("/trs", asyncHandler(async (req, res) => {
     .orderBy(sessions.sessionDate);
 
   const sessionResults: any[] = [];
+  const allDowntimes: { durationMinutes: number; isPlanned: boolean }[] = [];
 
   for (const session of closedSessions) {
-    const { sessionTrs, lotDetails } = await buildSessionTrs(db, session);
+    const { sessionTrs, lotDetails, downtimeDetails } = await buildSessionTrs(db, session);
+    allDowntimes.push(...downtimeDetails);
     sessionResults.push({
       date: session.sessionDate,
       notes: session.notes,
       ...sessionTrs,
       lots: lotDetails,
+      reliability: computeMtbfMttr(downtimeDetails, sessionTrs.tF),
     });
   }
 
@@ -118,7 +124,7 @@ dashboardRouter.get("/trs", asyncHandler(async (req, res) => {
   res.json({
     period: { from, to, equipmentId },
     daily: sessionResults,
-    total: zoom,
+    total: { ...zoom, reliability: computeMtbfMttr(allDowntimes, zoom.tF) },
   });
 }));
 
