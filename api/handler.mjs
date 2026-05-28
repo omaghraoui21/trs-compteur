@@ -42099,6 +42099,8 @@ function computeSessionTrs(input) {
   const TQ = totalProduced > 0 ? totalConforming / totalProduced : 1;
   const TRS = tR > 0 ? tU / tR : 0;
   const TRG = tO > 0 ? tU / tO : 0;
+  const TEEP = tT > 0 ? tU / tT : 0;
+  const utilisation = tT > 0 ? tO / tT : 0;
   if (tAP > tO) {
     warnings.push({ code: "TAP_GT_TO", level: "error", message: `Arr\xEAts planifi\xE9s (${tAP}min) > temps ouverture (${tO}min)`, field: "tAP", value: tAP });
   }
@@ -42144,6 +42146,8 @@ function computeSessionTrs(input) {
     TQ,
     TRS,
     TRG,
+    TEEP,
+    utilisation,
     lotCount: input.lots.length,
     totalProduced,
     totalConforming,
@@ -42154,13 +42158,15 @@ function computeSessionTrs(input) {
     audit
   };
 }
-function computeProductTrs(lots) {
+function computeProductTrs(lots, periodTR) {
   const byProduct = /* @__PURE__ */ new Map();
   for (const lot of lots) {
     const arr = byProduct.get(lot.productId) || [];
     arr.push(lot);
     byProduct.set(lot.productId, arr);
   }
+  const totalTF = lots.reduce((s, l) => s + l.tF, 0);
+  const allocate = periodTR != null && periodTR > 0 && totalTF > 0;
   const results = [];
   for (const [productId, productLots] of byProduct) {
     const totalProduced = productLots.reduce((s, l) => s + l.produced, 0);
@@ -42170,7 +42176,7 @@ function computeProductTrs(lots) {
     const tF = productLots.reduce((s, l) => s + l.tF, 0);
     const tN = productLots.reduce((s, l) => s + l.tN, 0);
     const tU = productLots.reduce((s, l) => s + l.tU, 0);
-    const tR = totalDurationMin;
+    const tR = allocate ? periodTR * (tF / totalTF) : totalDurationMin;
     const totalCadenceWeighted = productLots.reduce((s, l) => {
       const cpm = l.cadenceUnit === "u/min" ? l.cadence : l.cadence / 60;
       return s + cpm * l.lotDurationMin;
@@ -42188,11 +42194,13 @@ function computeProductTrs(lots) {
       tF,
       tN,
       tU,
+      tR,
       avgCadencePerMin,
       DO: tR > 0 ? tF / tR : 0,
       TP: tF > 0 ? tN / tF : 0,
       TQ: totalProduced > 0 ? totalConforming / totalProduced : 1,
-      TRS: tR > 0 ? tU / tR : 0
+      TRS: tR > 0 ? tU / tR : 0,
+      trAllocated: allocate
     });
   }
   return results.sort((a, b2) => b2.TRS - a.TRS);
@@ -42229,7 +42237,7 @@ function computeZoomTrs(input) {
   const sessions2 = input.sessions;
   const emptyAudit = { tF_norme: 0, tF_lots: 0, tF_delta: 0, formula: "" };
   if (sessions2.length === 0) {
-    return { tT: 0, tO: 0, fermeture: 0, tAP: 0, tR: 0, tF: 0, tN: 0, tU: 0, nonQualiteMin: 0, ecartCadenceMin: 0, totalUnplannedMin: 0, DO: 0, TP: 0, TQ: 1, TRS: 0, TRG: 0, lotCount: 0, totalProduced: 0, totalConforming: 0, totalRebut: 0, downtimeByFamille: {}, downtimeByNorme: {}, warnings: [], audit: emptyAudit };
+    return { tT: 0, tO: 0, fermeture: 0, tAP: 0, tR: 0, tF: 0, tN: 0, tU: 0, nonQualiteMin: 0, ecartCadenceMin: 0, totalUnplannedMin: 0, DO: 0, TP: 0, TQ: 1, TRS: 0, TRG: 0, TEEP: 0, utilisation: 0, lotCount: 0, totalProduced: 0, totalConforming: 0, totalRebut: 0, downtimeByFamille: {}, downtimeByNorme: {}, warnings: [], audit: emptyAudit };
   }
   const warnings = [];
   const tT = sessions2.reduce((s, x) => s + x.tT, 0);
@@ -42273,6 +42281,8 @@ function computeZoomTrs(input) {
   const TQ = totalProduced > 0 ? totalConforming / totalProduced : 1;
   const TRS = tR > 0 ? tU / tR : 0;
   const TRG = tO > 0 ? tU / tO : 0;
+  const TEEP = tT > 0 ? tU / tT : 0;
+  const utilisation = tT > 0 ? tO / tT : 0;
   const tF_norme = sessions2.reduce((s, x) => s + x.audit.tF_norme, 0);
   const tF_lots = sessions2.reduce((s, x) => s + x.audit.tF_lots, 0);
   const audit = {
@@ -42281,7 +42291,17 @@ function computeZoomTrs(input) {
     tF_delta: tF_norme - tF_lots,
     formula: `tF = \u03A3(session.tF) = ${tF}`
   };
-  return { tT, tO, fermeture, tAP, tR, tF, tN, tU, nonQualiteMin, ecartCadenceMin, totalUnplannedMin, DO, TP, TQ, TRS, TRG, lotCount, totalProduced, totalConforming, totalRebut, downtimeByFamille, downtimeByNorme, warnings, audit };
+  return { tT, tO, fermeture, tAP, tR, tF, tN, tU, nonQualiteMin, ecartCadenceMin, totalUnplannedMin, DO, TP, TQ, TRS, TRG, TEEP, utilisation, lotCount, totalProduced, totalConforming, totalRebut, downtimeByFamille, downtimeByNorme, warnings, audit };
+}
+function computeMtbfMttr(downtimes, runTimeMin, microStopThresholdMin = 5) {
+  const breakdowns = downtimes.filter((d) => !d.isPlanned && d.durationMinutes >= microStopThresholdMin);
+  const breakdownCount = breakdowns.length;
+  const totalBreakdownMin = breakdowns.reduce((s, d) => s + d.durationMinutes, 0);
+  if (breakdownCount === 0) return { breakdownCount: 0, totalBreakdownMin: 0, mtbf: null, mttr: null, availability: null };
+  const mtbf = runTimeMin / breakdownCount;
+  const mttr = totalBreakdownMin / breakdownCount;
+  const availability = mtbf / (mtbf + mttr);
+  return { breakdownCount, totalBreakdownMin, mtbf, mttr, availability };
 }
 
 // packages/api/src/routes/sessions.ts
@@ -42597,6 +42617,8 @@ async function buildSessionTrs(db2, session) {
   const lots = await db2.select().from(lotEntries).where(eq(lotEntries.sessionId, session.id));
   const lotDetails = [];
   const lotResults = [];
+  const productLots = [];
+  const downtimeDetails = [];
   for (const lot of lots) {
     const dts = await db2.select({
       id: downtimeEvents.id,
@@ -42622,6 +42644,7 @@ async function buildSessionTrs(db2, session) {
       }))
     });
     const [product] = await db2.select().from(products).where(eq(products.id, lot.productId)).limit(1);
+    for (const d of dts) downtimeDetails.push({ durationMinutes: d.durationMinutes, isPlanned: d.isPlanned });
     if (lotTrs) {
       lotResults.push({ ...lotTrs, produced: lot.quantityProduced, conforming: lot.quantityConforming });
       lotDetails.push({
@@ -42636,6 +42659,19 @@ async function buildSessionTrs(db2, session) {
         quantityRejected: lot.quantityRejected,
         ...lotTrs
       });
+      productLots.push({
+        productId: lot.productId,
+        productName: product?.name ?? "",
+        cadence: Number(lot.cadenceUsed),
+        cadenceUnit: lot.cadenceUnit,
+        produced: lot.quantityProduced,
+        conforming: lot.quantityConforming,
+        lotDurationMin: lotTrs.lotDurationMin,
+        unplannedMin: lotTrs.unplannedMin,
+        tF: lotTrs.tF,
+        tN: lotTrs.tN,
+        tU: lotTrs.tU
+      });
     }
   }
   const sessionTrs = computeSessionTrs({
@@ -42644,7 +42680,7 @@ async function buildSessionTrs(db2, session) {
     plannedStopsMin,
     lots: lotResults
   });
-  return { sessionTrs, lotDetails, plannedStopsMin };
+  return { sessionTrs, lotDetails, productLots, plannedStopsMin, downtimeDetails };
 }
 dashboardRouter.get("/trs", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
@@ -42653,6 +42689,8 @@ dashboardRouter.get("/trs", asyncHandler(async (req, res) => {
     res.status(400).json({ error: "equipmentId, from, to requis" });
     return;
   }
+  const [equipment] = await db2.select().from(equipments).where(eq(equipments.id, equipmentId)).limit(1);
+  const microStopThreshold = equipment?.microStopThresholdMin != null ? Number(equipment.microStopThresholdMin) : 5;
   const closedSessions = await db2.select().from(sessions).where(and(
     eq(sessions.equipmentId, equipmentId),
     eq(sessions.status, "closed"),
@@ -42660,20 +42698,23 @@ dashboardRouter.get("/trs", asyncHandler(async (req, res) => {
     lte(sessions.sessionDate, to)
   )).orderBy(sessions.sessionDate);
   const sessionResults = [];
+  const allDowntimes = [];
   for (const session of closedSessions) {
-    const { sessionTrs, lotDetails } = await buildSessionTrs(db2, session);
+    const { sessionTrs, lotDetails, downtimeDetails } = await buildSessionTrs(db2, session);
+    allDowntimes.push(...downtimeDetails);
     sessionResults.push({
       date: session.sessionDate,
       notes: session.notes,
       ...sessionTrs,
-      lots: lotDetails
+      lots: lotDetails,
+      reliability: computeMtbfMttr(downtimeDetails, sessionTrs.tF, microStopThreshold)
     });
   }
   const zoom = computeZoomTrs({ sessions: sessionResults });
   res.json({
     period: { from, to, equipmentId },
     daily: sessionResults,
-    total: zoom
+    total: { ...zoom, reliability: computeMtbfMttr(allDowntimes, zoom.tF, microStopThreshold) }
   });
 }));
 dashboardRouter.get("/pareto", asyncHandler(async (req, res) => {
@@ -42804,42 +42845,15 @@ dashboardRouter.get("/by-product", asyncHandler(async (req, res) => {
     lte(sessions.sessionDate, to)
   ));
   const productLots = [];
+  const sessionResults = [];
   for (const session of closedSessions) {
-    const lots = await db2.select().from(lotEntries).where(eq(lotEntries.sessionId, session.id));
-    for (const lot of lots) {
-      if (!lot.endedAt) continue;
-      const [product] = await db2.select().from(products).where(eq(products.id, lot.productId)).limit(1);
-      const dts = await db2.select({
-        durationMinutes: downtimeEvents.durationMinutes,
-        isPlanned: downtimeCategories.isPlanned,
-        famille: downtimeCategories.famille
-      }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(eq(downtimeEvents.lotEntryId, lot.id));
-      const cadence = Number(lot.cadenceUsed);
-      const cadenceUnit2 = lot.cadenceUnit;
-      const cadencePerMin = cadenceUnit2 === "u/min" ? cadence : cadence / 60;
-      const plannedMin = dts.filter((d) => d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0);
-      const unplannedMin = dts.filter((d) => !d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0);
-      const lotDurationMin = Math.round((new Date(lot.endedAt).getTime() - new Date(lot.startedAt).getTime()) / 6e4);
-      const tF = Math.max(0, lotDurationMin - plannedMin - unplannedMin);
-      const tN = cadencePerMin > 0 ? lot.quantityProduced / cadencePerMin : 0;
-      const tU = cadencePerMin > 0 ? lot.quantityConforming / cadencePerMin : 0;
-      productLots.push({
-        productId: lot.productId,
-        productName: product?.name ?? "",
-        cadence,
-        cadenceUnit: cadenceUnit2,
-        produced: lot.quantityProduced,
-        conforming: lot.quantityConforming,
-        lotDurationMin,
-        unplannedMin,
-        tF,
-        tN,
-        tU
-      });
-    }
+    const { sessionTrs, productLots: sessionProductLots } = await buildSessionTrs(db2, session);
+    sessionResults.push(sessionTrs);
+    productLots.push(...sessionProductLots);
   }
-  const byProduct = computeProductTrs(productLots);
-  res.json({ period: { from, to, equipmentId }, byProduct });
+  const zoom = computeZoomTrs({ sessions: sessionResults });
+  const byProduct = computeProductTrs(productLots, zoom.tR);
+  res.json({ period: { from, to, equipmentId }, periodTR: zoom.tR, periodTRS: zoom.TRS, byProduct });
 }));
 dashboardRouter.get("/six-losses", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
