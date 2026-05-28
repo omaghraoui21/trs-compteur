@@ -8,6 +8,8 @@ import { lotsRouter } from "./routes/lots";
 import { refRouter } from "./routes/ref";
 import { dashboardRouter } from "./routes/dashboard";
 import { adminRouter } from "./routes/admin";
+import { HttpError } from "./lib/http";
+import type { Request, Response, NextFunction } from "express";
 
 const app = express();
 app.use(cors());
@@ -30,6 +32,16 @@ app.use("/api/admin", adminRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", version: "1.0.0" });
+});
+
+// Terminal error handler — keeps failed requests from hanging and returns JSON.
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof HttpError) {
+    res.status(err.status).json({ error: err.message });
+    return;
+  }
+  console.error("Unhandled error:", err);
+  res.status(500).json({ error: "Erreur serveur" });
 });
 
 export { app };

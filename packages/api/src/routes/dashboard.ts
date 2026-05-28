@@ -5,6 +5,7 @@ import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, co
 import type { ProductLotInput } from "@trs/engine";
 
 import { authenticate } from "../middleware";
+import { asyncHandler } from "../lib/http";
 
 export const dashboardRouter = Router();
 dashboardRouter.use(authenticate);
@@ -82,7 +83,7 @@ async function buildSessionTrs(db: any, session: any) {
 
 // ─── Zoom TRS: compute TRS for a date range ──────────────────
 
-dashboardRouter.get("/trs", async (req, res) => {
+dashboardRouter.get("/trs", asyncHandler(async (req, res) => {
   const { db } = req;
   const { equipmentId, from, to } = req.query;
 
@@ -119,11 +120,11 @@ dashboardRouter.get("/trs", async (req, res) => {
     daily: sessionResults,
     total: zoom,
   });
-});
+}));
 
 // ─── Pareto: downtime aggregated by category ──────────────────
 
-dashboardRouter.get("/pareto", async (req, res) => {
+dashboardRouter.get("/pareto", asyncHandler(async (req, res) => {
   const { db } = req;
   const { equipmentId, from, to } = req.query;
 
@@ -218,11 +219,11 @@ dashboardRouter.get("/pareto", async (req, res) => {
   }
 
   res.json({ pareto, totalMin });
-});
+}));
 
 // ─── Comparison: both equipments side by side ─────────────────
 
-dashboardRouter.get("/comparison", async (req, res) => {
+dashboardRouter.get("/comparison", asyncHandler(async (req, res) => {
   const { db } = req;
   const { from, to } = req.query;
 
@@ -264,11 +265,11 @@ dashboardRouter.get("/comparison", async (req, res) => {
   }
 
   res.json({ period: { from, to }, equipments: results });
-});
+}));
 
 // ─── By-Product aggregation (W) ───────────────────────────────
 
-dashboardRouter.get("/by-product", async (req, res) => {
+dashboardRouter.get("/by-product", asyncHandler(async (req, res) => {
   const { db } = req;
   const { equipmentId, from, to } = req.query;
 
@@ -332,11 +333,11 @@ dashboardRouter.get("/by-product", async (req, res) => {
 
   const byProduct = computeProductTrs(productLots);
   res.json({ period: { from, to, equipmentId }, byProduct });
-});
+}));
 
 // ─── Six Big Losses (X) ───────────────────────────────────────
 
-dashboardRouter.get("/six-losses", async (req, res) => {
+dashboardRouter.get("/six-losses", asyncHandler(async (req, res) => {
   const { db } = req;
   const { equipmentId, from, to } = req.query;
 
@@ -407,11 +408,11 @@ dashboardRouter.get("/six-losses", async (req, res) => {
   }
 
   res.json({ period: { from, to, equipmentId }, total: sixLosses, daily: dailyLosses });
-});
+}));
 
 // ─── Heatmap TRS (Y) ──────────────────────────────────────────
 
-dashboardRouter.get("/heatmap", async (req, res) => {
+dashboardRouter.get("/heatmap", asyncHandler(async (req, res) => {
   const { db } = req;
   const { equipmentId, from, to } = req.query;
 
@@ -444,14 +445,14 @@ dashboardRouter.get("/heatmap", async (req, res) => {
   }
 
   res.json({ period: { from, to, equipmentId }, heatmap: heatmapData });
-});
+}));
 
 // ─── Pending lots for supervisor validation ───────────────────
 
-dashboardRouter.get("/pending-lots", async (req, res) => {
+dashboardRouter.get("/pending-lots", asyncHandler(async (req, res) => {
   const { db } = req;
   const lots = await db.select().from(lotEntries)
     .where(eq(lotEntries.status, "closed"))
     .orderBy(desc(lotEntries.endedAt));
   res.json(lots);
-});
+}));

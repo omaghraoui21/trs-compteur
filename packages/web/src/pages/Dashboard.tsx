@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
 import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ComparisonResponse, type TrsMetrics, type DailyTrs, type ByProductResponse, type SixLossesResponse, type HeatmapResponse } from "@/lib/api";
 import { fmtPct, fmtDuration, trsColor, familleToNorme } from "@trs/engine";
+import { useToast } from "@/components/Toast";
 import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, ChevronUp, AlertTriangle, Info, FileText } from "lucide-react";
 // PDF is lazy-loaded on demand to reduce bundle size
 import TrsChart from "@/components/dashboard/TrsChart";
@@ -47,12 +48,13 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     api.equipments().then(list => {
       setEquipmentsList(list);
       if (list.length > 0) setSelectedEquipment(list[0].id);
-    });
+    }).catch((err) => toast.error(err.message || "Chargement des équipements échoué"));
   }, []);
 
   const { from, to } = useMemo(() => {
@@ -85,7 +87,8 @@ export default function DashboardPage() {
           setComparisonData(null);
         }
       }
-    } catch {
+    } catch (err: any) {
+      toast.error(err.message || "Chargement du tableau de bord échoué");
       setData(null);
       setParetoData(null);
       setByProductData(null);

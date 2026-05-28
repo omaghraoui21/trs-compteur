@@ -2,21 +2,20 @@ import { Router } from "express";
 import { eq, and } from "drizzle-orm";
 import { lotEntries, downtimeEvents, sessionEvents } from "@trs/db";
 import { diffMinutes } from "@trs/engine";
-import { authenticate } from "../middleware";
+import { authenticate, requireRole } from "../middleware";
+import { asyncHandler, validate } from "../lib/http";
+import { startLotSchema, closeLotSchema, updateLotSchema, addDowntimeSchema, validateLotSchema } from "../schemas";
 
 export const lotsRouter = Router();
 lotsRouter.use(authenticate);
 
 // ─── Start a lot within a session ─────────────────────────────
 
-lotsRouter.post("/", async (req, res) => {
+lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => {
   const { db, userId } = req;
   const { sessionId, productId, batchNumber, cadenceUsed, cadenceUnit } = req.body;
 
-  if (!sessionId || !productId || !batchNumber || !cadenceUsed || !userId) {
-    res.status(400).json({ error: "sessionId, productId, batchNumber, cadenceUsed requis" });
-    return;
-  }
+  if (!userId) { res.status(401).json({ error: "Non authentifié" }); return; }
 
   // Check no active lot in this session
   const [activeLot] = await db.select().from(lotEntries)
@@ -62,11 +61,11 @@ lotsRouter.post("/", async (req, res) => {
   });
 
   res.status(201).json(lot);
-});
+}));
 
 // ─── Close a lot (update quantities) ──────────────────────────
 
-lotsRouter.post("/:id/close", async (req, res) => {
+lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req, res) => {
   const { db } = req;
   const { quantityProduced, quantityConforming, quantityRejected } = req.body;
 
@@ -99,11 +98,11 @@ lotsRouter.post("/:id/close", async (req, res) => {
   });
 
   res.json(lot);
-});
+}));
 
 // ─── Update lot quantities (while active) ─────────────────────
 
-lotsRouter.patch("/:id", async (req, res) => {
+lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res) => {
   const { db } = req;
   const updates: Record<string, any> = {};
   if (req.body.quantityProduced !== undefined) updates.quantityProduced = req.body.quantityProduced;
@@ -121,18 +120,13 @@ lotsRouter.patch("/:id", async (req, res) => {
     .where(eq(lotEntries.id, String(req.params.id))).returning();
   if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
   res.json(lot);
-});
+}));
 
 // ─── Add downtime to a lot ────────────────────────────────────
 
-lotsRouter.post("/:id/downtimes", async (req, res) => {
+lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
   const { db, userId } = req;
   const { categoryId, durationMinutes, comment } = req.body;
-
-  if (!categoryId || !durationMinutes) {
-    res.status(400).json({ error: "categoryId et durationMinutes requis" });
-    return;
-  }
 
   const now = new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 60_000);
@@ -149,20 +143,20 @@ lotsRouter.post("/:id/downtimes", async (req, res) => {
   }).returning();
 
   res.status(201).json(dt);
-});
+}));
 
 // ─── Get lot downtimes ────────────────────────────────────────
 
-lotsRouter.get("/:id/downtimes", async (req, res) => {
+lotsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
   const { db } = req;
   const data = await db.select().from(downtimeEvents)
     .where(eq(downtimeEvents.lotEntryId, String(req.params.id)));
   res.json(data);
-});
+}));
 
 // ─── Supervisor validate/reject lot ───────────────────────────
 
-lotsRouter.post("/:id/validate", authenticate, async (req, res) => {
+lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(validateLotSchema), asyncHandler(async (req, res) => {
   const { db, userId } = req;
   const { action, comment } = req.body; // action: "validate" | "reject"
   const status = action === "reject" ? "rejected" : "validated";
@@ -176,4 +170,4 @@ lotsRouter.post("/:id/validate", authenticate, async (req, res) => {
 
   if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
   res.json(lot);
-});
+}));

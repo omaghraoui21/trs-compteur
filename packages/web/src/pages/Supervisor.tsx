@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { api, type LotEntry, type Product } from "@/lib/api";
 import { fmtPct, trsColor } from "@trs/engine";
+import { useToast } from "@/components/Toast";
 import { ClipboardCheck, Check, X, ChevronDown, ChevronUp } from "lucide-react";
 
 export default function SupervisorPage() {
@@ -9,18 +10,25 @@ export default function SupervisorPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(true);
+  const toast = useToast();
 
   useEffect(() => {
     Promise.all([api.pendingLots(), api.products()])
       .then(([l, p]) => { setLots(l); setProducts(p); })
+      .catch((err) => toast.error(err.message || "Chargement des lots échoué"))
       .finally(() => setLoading(false));
   }, []);
 
   const handleAction = async (lotId: string, action: "validate" | "reject") => {
-    await api.validateLot(lotId, action, comment || undefined);
-    setLots(prev => prev.filter(l => l.id !== lotId));
-    setExpanded(null);
-    setComment("");
+    try {
+      await api.validateLot(lotId, action, comment || undefined);
+      setLots(prev => prev.filter(l => l.id !== lotId));
+      setExpanded(null);
+      setComment("");
+      toast.success(action === "validate" ? "Lot validé" : "Lot rejeté");
+    } catch (err: any) {
+      toast.error(err.message || "Échec de la validation du lot");
+    }
   };
 
   const getProduct = (id: string) => products.find(p => p.id === id);
