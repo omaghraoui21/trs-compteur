@@ -66,8 +66,16 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
 // ─── Close a lot (update quantities) ──────────────────────────
 
 lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req, res) => {
-  const { db } = req;
+  const { db, userId, userRole } = req;
   const { quantityProduced, quantityConforming, quantityRejected } = req.body;
+
+  // H2: Operators may only close their own lots
+  if (userRole === "operator") {
+    const [existing] = await db.select({ operatorId: lotEntries.operatorId })
+      .from(lotEntries).where(eq(lotEntries.id, String(req.params.id))).limit(1);
+    if (!existing) { res.status(404).json({ error: "Lot introuvable" }); return; }
+    if (existing.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
+  }
 
   const now = new Date();
 

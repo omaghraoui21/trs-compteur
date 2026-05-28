@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import { sql } from "drizzle-orm";
 import { createDb } from "@trs/db";
 import { authRouter } from "./routes/auth";
 import { sessionsRouter } from "./routes/sessions";
@@ -8,11 +9,15 @@ import { lotsRouter } from "./routes/lots";
 import { refRouter } from "./routes/ref";
 import { dashboardRouter } from "./routes/dashboard";
 import { adminRouter } from "./routes/admin";
-import { HttpError } from "./lib/http";
+import { HttpError, asyncHandler } from "./lib/http";
 import type { Request, Response, NextFunction } from "express";
 
 const app = express();
-app.use(cors());
+
+// C3: Restrict CORS to the declared frontend origin in production
+const allowedOrigin = process.env.ALLOWED_ORIGIN;
+app.use(cors({ origin: allowedOrigin || "*" }));
+
 app.use(express.json());
 
 const db = createDb();
@@ -30,9 +35,16 @@ app.use("/api/ref", refRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/admin", adminRouter);
 
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", version: "1.0.0" });
-});
+// C2: Real health check — actually pings the DB so monitors see real status
+app.get("/api/health", asyncHandler(async (_req, res) => {
+  try {
+    await db.execute(sql`SELECT 1`);
+    res.json({ status: "ok", version: "1.0.0", db: "connected" });
+  } catch (err) {
+    console.error("Health check DB failure:", err);
+    res.status(503).json({ status: "error", version: "1.0.0", db: "disconnected" });
+  }
+}));
 
 // Terminal error handler — keeps failed requests from hanging and returns JSON.
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
