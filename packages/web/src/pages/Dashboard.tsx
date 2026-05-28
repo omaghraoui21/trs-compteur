@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
 import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ComparisonResponse, type TrsMetrics, type DailyTrs, type ByProductResponse, type SixLossesResponse, type HeatmapResponse } from "@/lib/api";
 import { fmtPct, fmtDuration, trsColor, familleToNorme } from "@trs/engine";
 import { useToast } from "@/components/Toast";
+import { DashboardSkeleton } from "@/components/Skeleton";
 import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, ChevronUp, AlertTriangle, Info, FileText } from "lucide-react";
 // PDF is lazy-loaded on demand to reduce bundle size
 import TrsChart from "@/components/dashboard/TrsChart";
@@ -226,7 +227,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {loading && <div className="text-center py-12 text-gray-400">Chargement...</div>}
+      {loading && <DashboardSkeleton />}
 
       {!loading && data && (
         <>
@@ -289,7 +290,11 @@ function KpiCard({ metrics, title, objective }: { metrics: TrsMetrics; title: st
           <Gauge className="h-5 w-5 text-blue-600" />
           <h3 className="font-semibold">TRS Consolidé — {title}</h3>
         </div>
-        <div className="text-center text-gray-400 py-8">Aucune donnée pour cette période</div>
+        <div className="text-center text-gray-400 py-8">
+          <BarChart3 className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+          <p className="font-medium text-gray-500">Aucune donnée pour cette période</p>
+          <p className="text-sm mt-1">Ajustez les filtres ou sélectionnez une autre plage.</p>
+        </div>
       </div>
     );
   }

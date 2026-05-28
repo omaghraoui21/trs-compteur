@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { api, type LotEntry, type Product } from "@/lib/api";
 import { fmtPct, trsColor } from "@trs/engine";
 import { useToast } from "@/components/Toast";
+import { ListSkeleton } from "@/components/Skeleton";
 import { ClipboardCheck, Check, X, ChevronDown, ChevronUp } from "lucide-react";
 
 export default function SupervisorPage() {
@@ -10,6 +11,7 @@ export default function SupervisorPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -20,6 +22,7 @@ export default function SupervisorPage() {
   }, []);
 
   const handleAction = async (lotId: string, action: "validate" | "reject") => {
+    setSubmitting(true);
     try {
       await api.validateLot(lotId, action, comment || undefined);
       setLots(prev => prev.filter(l => l.id !== lotId));
@@ -28,22 +31,26 @@ export default function SupervisorPage() {
       toast.success(action === "validate" ? "Lot validé" : "Lot rejeté");
     } catch (err: any) {
       toast.error(err.message || "Échec de la validation du lot");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const getProduct = (id: string) => products.find(p => p.id === id);
 
-  if (loading) return <div className="text-center py-12 text-gray-400">Chargement...</div>;
-
   return (
     <div className="max-w-2xl mx-auto">
       <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-        <ClipboardCheck className="h-5 w-5" /> Lots a valider
+        <ClipboardCheck className="h-5 w-5" /> Lots à valider
       </h2>
 
-      {lots.length === 0 && (
+      {loading && <ListSkeleton />}
+
+      {!loading && lots.length === 0 && (
         <div className="bg-white rounded-xl border p-8 text-center text-gray-400">
-          Aucun lot en attente de validation
+          <ClipboardCheck className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+          <p className="font-medium text-gray-500">Aucun lot en attente</p>
+          <p className="text-sm mt-1">Tous les lots ont été traités.</p>
         </div>
       )}
 
@@ -60,7 +67,7 @@ export default function SupervisorPage() {
           if (lot.quantityConforming > lot.quantityProduced) errors.push("Conforme > Produit");
           if (lot.quantityProduced === 0) errors.push("Production nulle");
           if (Number(lot.cadenceUsed) <= 0) errors.push("Cadence absente");
-          if (rejectRate > 0.05) warnings.push(`Taux rebut eleve: ${(rejectRate * 100).toFixed(1)}%`);
+          if (rejectRate > 0.05) warnings.push(`Taux rebut élevé: ${(rejectRate * 100).toFixed(1)}%`);
 
           return (
             <div key={lot.id} className="bg-white rounded-xl border shadow-sm overflow-hidden">
@@ -120,12 +127,12 @@ export default function SupervisorPage() {
                   </div>
 
                   <div className="flex gap-2">
-                    <button onClick={() => handleAction(lot.id, "validate")}
-                      className="flex-1 bg-green-600 text-white rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-1 hover:bg-green-700">
+                    <button onClick={() => handleAction(lot.id, "validate")} disabled={submitting}
+                      className="flex-1 bg-green-600 text-white rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-1 hover:bg-green-700 transition disabled:opacity-50 disabled:pointer-events-none">
                       <Check className="h-4 w-4" /> Valider
                     </button>
-                    <button onClick={() => handleAction(lot.id, "reject")}
-                      className="flex-1 bg-red-100 text-red-700 rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-1 hover:bg-red-200">
+                    <button onClick={() => handleAction(lot.id, "reject")} disabled={submitting}
+                      className="flex-1 bg-red-100 text-red-700 rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-1 hover:bg-red-200 transition disabled:opacity-50 disabled:pointer-events-none">
                       <X className="h-4 w-4" /> Rejeter
                     </button>
                   </div>

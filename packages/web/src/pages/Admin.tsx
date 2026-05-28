@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type ProductEquipmentCadence } from "@/lib/api";
 import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge } from "lucide-react";
+import { TableSkeleton } from "@/components/Skeleton";
 
 type Tab = "rooms" | "equipments" | "products" | "downtimes" | "cadences";
 
@@ -657,7 +658,7 @@ function DowntimesPanel() {
 // ─── Shared UI Components ──────────────────────────────────
 
 function Spinner() {
-  return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>;
+  return <div className="py-4"><TableSkeleton /></div>;
 }
 
 function StatusBadge({ active }: { active: boolean }) {
