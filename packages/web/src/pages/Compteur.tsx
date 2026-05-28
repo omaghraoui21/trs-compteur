@@ -444,7 +444,7 @@ function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs:
       <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
         <Gauge className="h-4 w-4" /> TRS Consolide Session
       </h3>
-      <div className="grid grid-cols-5 gap-2 text-center">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-center">
         {[
           { label: "TRS", value: sessionTrs.TRS },
           { label: "TRG", value: sessionTrs.TRG },
