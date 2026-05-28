@@ -1,6 +1,8 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { sql } from "drizzle-orm";
 import { createDb } from "@trs/db";
 import { authRouter } from "./routes/auth";
@@ -14,11 +16,23 @@ import type { Request, Response, NextFunction } from "express";
 
 const app = express();
 
+// H5: Security headers
+app.use(helmet());
+
 // C3: Restrict CORS to the declared frontend origin in production
 const allowedOrigin = process.env.ALLOWED_ORIGIN;
 app.use(cors({ origin: allowedOrigin || "*" }));
 
 app.use(express.json());
+
+// H3: Brute-force protection on auth (10 attempts / 15 min per IP)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Trop de tentatives, réessayez dans 15 minutes" },
+});
 
 const db = createDb();
 
@@ -28,7 +42,7 @@ app.use((req, _res, next) => {
   next();
 });
 
-app.use("/api/auth", authRouter);
+app.use("/api/auth", authLimiter, authRouter);
 app.use("/api/sessions", sessionsRouter);
 app.use("/api/lots", lotsRouter);
 app.use("/api/ref", refRouter);
