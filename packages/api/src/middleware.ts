@@ -2,7 +2,19 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import type { Db } from "@trs/db";
 
-const JWT_SECRET = process.env.JWT_SECRET || "trs-compteur-dev-secret";
+// C1: Refuse to start with a public default secret in production
+const JWT_SECRET = (() => {
+  const s = process.env.JWT_SECRET;
+  if (!s) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("FATAL: JWT_SECRET environment variable must be set in production");
+      process.exit(1);
+    }
+    console.warn("WARNING: JWT_SECRET not set — using insecure dev default");
+    return "trs-compteur-dev-secret";
+  }
+  return s;
+})();
 
 // Extend Express Request globally
 declare global {

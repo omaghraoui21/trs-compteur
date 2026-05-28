@@ -83,8 +83,16 @@ sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (re
 // ─── Close a session ──────────────────────────────────────────
 
 sessionsRouter.post("/:id/close", asyncHandler(async (req, res) => {
-  const { db } = req;
+  const { db, userId, userRole } = req;
   const now = new Date();
+
+  // H1: Operators may only close their own sessions
+  if (userRole === "operator") {
+    const [session] = await db.select({ operatorId: sessions.operatorId })
+      .from(sessions).where(eq(sessions.id, String(req.params.id))).limit(1);
+    if (!session) { res.status(404).json({ error: "Session introuvable" }); return; }
+    if (session.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
+  }
 
   // Close any active lots first
   await db.update(lotEntries)
