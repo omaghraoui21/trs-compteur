@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback, useState, type ReactNode } from "react";
+import { createContext, useContext, useCallback, useState, useRef, type ReactNode } from "react";
 import { CheckCircle, AlertCircle, X } from "lucide-react";
 
 type ToastVariant = "success" | "error";
@@ -18,6 +18,54 @@ export function useToast(): ToastApi {
 }
 
 let nextId = 1;
+
+function ToastItem({ t, onRemove }: { t: Toast; onRemove: () => void }) {
+  const touchStartX = useRef<number | null>(null);
+  const [offsetX, setOffsetX] = useState(0);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    setOffsetX(e.touches[0].clientX - touchStartX.current);
+  };
+  const onTouchEnd = () => {
+    if (Math.abs(offsetX) > 80) {
+      onRemove();
+    } else {
+      setOffsetX(0);
+    }
+    touchStartX.current = null;
+  };
+
+  return (
+    <div
+      role="alert"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      style={{
+        transform: offsetX !== 0 ? `translateX(${offsetX}px)` : undefined,
+        opacity: offsetX !== 0 ? Math.max(0.2, 1 - Math.abs(offsetX) / 150) : undefined,
+        transition: offsetX === 0 ? "transform 0.2s, opacity 0.2s" : undefined,
+      }}
+      className={`flex items-start gap-3 rounded-xl px-4 py-3 shadow-lg text-sm font-medium text-white cursor-grab active:cursor-grabbing ${
+        t.variant === "error" ? "bg-red-600" : "bg-green-600"
+      }`}
+    >
+      {t.variant === "error" ? (
+        <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+      ) : (
+        <CheckCircle className="h-5 w-5 shrink-0 mt-0.5" />
+      )}
+      <span className="flex-1">{t.message}</span>
+      <button onClick={onRemove} className="shrink-0 opacity-80 hover:opacity-100">
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -42,23 +90,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="fixed bottom-20 left-4 right-4 lg:bottom-4 lg:left-auto lg:right-4 lg:max-w-sm z-[60] flex flex-col gap-2">
         {toasts.map((t) => (
-          <div
-            key={t.id}
-            role="alert"
-            className={`flex items-start gap-3 rounded-xl px-4 py-3 shadow-lg text-sm font-medium text-white ${
-              t.variant === "error" ? "bg-red-600" : "bg-green-600"
-            }`}
-          >
-            {t.variant === "error" ? (
-              <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
-            ) : (
-              <CheckCircle className="h-5 w-5 shrink-0 mt-0.5" />
-            )}
-            <span className="flex-1">{t.message}</span>
-            <button onClick={() => remove(t.id)} className="shrink-0 opacity-80 hover:opacity-100">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+          <ToastItem key={t.id} t={t} onRemove={() => remove(t.id)} />
         ))}
       </div>
     </ToastContext.Provider>
