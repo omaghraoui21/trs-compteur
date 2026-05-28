@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type ProductEquipmentCadence } from "@/lib/api";
+import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type ProductEquipmentCadence, type SessionTrsResponse } from "@/lib/api";
 import { fmtDuration, fmtPct, trsColor } from "@trs/engine";
+import { useToast } from "@/components/Toast";
 import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle } from "lucide-react";
 
 type View = "pick-room" | "pick-equip" | "timeline" | "new-lot" | "add-phase" | "add-downtime";
@@ -20,13 +21,14 @@ export default function CompteurPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<DowntimeCategory[]>([]);
   const [cadences, setCadences] = useState<ProductEquipmentCadence[]>([]);
-  const [trsData, setTrsData] = useState<any>(null);
+  const [trsData, setTrsData] = useState<SessionTrsResponse | null>(null);
   const [error, setError] = useState("");
   const [elapsed, setElapsed] = useState(0);
+  const toast = useToast();
 
   // Load rooms on mount
-  useEffect(() => { api.rooms().then(setRooms).catch(() => {}); }, []);
-  useEffect(() => { api.products().then(setProducts).catch(() => {}); }, []);
+  useEffect(() => { api.rooms().then(setRooms).catch((err) => toast.error(err.message || "Chargement des salles échoué")); }, []);
+  useEffect(() => { api.products().then(setProducts).catch((err) => toast.error(err.message || "Chargement des produits échoué")); }, []);
 
   // Timer for active session
   useEffect(() => {
@@ -47,22 +49,24 @@ export default function CompteurPage() {
   // Check for active session on equipment select
   const handleEquipmentSelect = async (eq: Equipment) => {
     setSelectedEquipment(eq);
-    const [cats, cads] = await Promise.all([
-      api.downtimeCategories(eq.equipmentType ?? undefined),
-      api.cadences(eq.id),
-    ]);
-    setCategories(cats);
-    setCadences(cads);
+    try {
+      const [cats, cads] = await Promise.all([
+        api.downtimeCategories(eq.equipmentType ?? undefined),
+        api.cadences(eq.id),
+      ]);
+      setCategories(cats);
+      setCadences(cads);
 
-    // Check for existing active session
-    const allSessions = await api.sessions({ equipmentId: eq.id });
-    const active = allSessions.find(s => s.status === "active");
-    if (active) {
-      setActiveSession(active);
-      await loadDetail(active.id);
+      // Check for existing active session
+      const allSessions = await api.sessions({ equipmentId: eq.id });
+      const active = allSessions.find(s => s.status === "active");
+      if (active) {
+        setActiveSession(active);
+        await loadDetail(active.id);
+      }
       setView("timeline");
-    } else {
-      setView("timeline");
+    } catch (err: any) {
+      toast.error(err.message || "Chargement de l'équipement échoué");
     }
   };
 
@@ -80,11 +84,15 @@ export default function CompteurPage() {
   const handleCloseSession = async () => {
     if (!activeSession) return;
     if (!confirm("Fermer le compteur ? Tous les lots actifs seront clotures.")) return;
-    await api.closeSession(activeSession.id);
-    setActiveSession(null);
-    setDetail(null);
-    setTrsData(null);
-    setView("pick-room");
+    try {
+      await api.closeSession(activeSession.id);
+      setActiveSession(null);
+      setDetail(null);
+      setTrsData(null);
+      setView("pick-room");
+    } catch (err: any) {
+      toast.error(err.message || "Fermeture du compteur échouée");
+    }
   };
 
   const fmtElapsed = (s: number) => {
@@ -412,6 +420,7 @@ function SessionTimelineBar({ detail, session }: { detail: SessionDetail; sessio
 
 function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs: any; equipmentId: string; trsObjective: number }) {
   const [avg30, setAvg30] = useState<number | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     if (!equipmentId) return;
@@ -424,7 +433,7 @@ function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs:
       .then(data => {
         if (data.total && data.total.TRS > 0) setAvg30(data.total.TRS);
       })
-      .catch(() => {});
+      .catch((err) => toast.error(err.message || "Chargement de la moyenne 30j échoué"));
   }, [equipmentId]);
 
   const currentTRS = sessionTrs.TRS;
@@ -435,7 +444,7 @@ function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs:
       <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
         <Gauge className="h-4 w-4" /> TRS Consolide Session
       </h3>
-      <div className="grid grid-cols-5 gap-2 text-center">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-center">
         {[
           { label: "TRS", value: sessionTrs.TRS },
           { label: "TRG", value: sessionTrs.TRG },
@@ -483,6 +492,7 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
   const [conforming, setConforming] = useState(String(lot.quantityConforming));
   const [closing, setClosing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const toast = useToast();
 
   // U4: Real-time validation warnings
   const warnings = useMemo(() => {
@@ -514,7 +524,9 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
         quantityRejected: Math.max(0, Number(produced) - Number(conforming)),
       });
       onUpdate();
-    } catch { }
+    } catch (err: any) {
+      toast.error(err.message || "Échec de la clôture du lot");
+    }
     setClosing(false);
     setShowConfirm(false);
   };
@@ -744,6 +756,7 @@ function AddPhaseForm({ sessionId, onAdded, onBack }: {
   const [duration, setDuration] = useState("");
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -758,7 +771,9 @@ function AddPhaseForm({ sessionId, onAdded, onBack }: {
         comment: comment || undefined,
       });
       onAdded();
-    } catch {}
+    } catch (err: any) {
+      toast.error(err.message || "Échec de l'ajout de la phase");
+    }
     setLoading(false);
   };
 
@@ -811,6 +826,7 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
   lotId: string; categories: DowntimeCategory[]; onAdded: () => void; onBack: () => void;
 }) {
   const [catId, setCatId] = useState("");
+  const toast = useToast();
   const [mode, setMode] = useState<"manual" | "timer">("manual");
   const [duration, setDuration] = useState("");
   const [comment, setComment] = useState("");
@@ -860,7 +876,9 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
         comment: comment || undefined,
       });
       onAdded();
-    } catch {}
+    } catch (err: any) {
+      toast.error(err.message || "Échec de l'ajout de l'arrêt");
+    }
     setLoading(false);
   };
 

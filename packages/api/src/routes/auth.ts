@@ -3,15 +3,13 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { users } from "@trs/db";
 import { signToken, authenticate } from "../middleware";
+import { asyncHandler, validate } from "../lib/http";
+import { loginSchema } from "../schemas";
 
 export const authRouter = Router();
 
-authRouter.post("/login", async (req, res) => {
+authRouter.post("/login", validate(loginSchema), asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) {
-    res.status(400).json({ error: "Email et mot de passe requis" });
-    return;
-  }
   const { db } = req;
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   if (!user || !user.isActive) {
@@ -28,12 +26,12 @@ authRouter.post("/login", async (req, res) => {
     token,
     user: { id: user.id, email: user.email, displayName: user.displayName, role: user.role },
   });
-});
+}));
 
-authRouter.get("/me", authenticate, async (req, res) => {
+authRouter.get("/me", authenticate, asyncHandler(async (req, res) => {
   const { db, userId } = req;
   if (!userId) { res.status(401).json({ error: "Non authentifié" }); return; }
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) { res.status(404).json({ error: "Utilisateur introuvable" }); return; }
   res.json({ id: user.id, email: user.email, displayName: user.displayName, role: user.role });
-});
+}));

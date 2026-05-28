@@ -3,13 +3,15 @@ import { eq, and, desc } from "drizzle-orm";
 import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, diffMinutes } from "@trs/engine";
 import { authenticate } from "../middleware";
+import { asyncHandler, validate } from "../lib/http";
+import { openSessionSchema, addEventSchema } from "../schemas";
 
 export const sessionsRouter = Router();
 sessionsRouter.use(authenticate);
 
 // ─── List sessions (with optional date/equipment filter) ─────
 
-sessionsRouter.get("/", async (req, res) => {
+sessionsRouter.get("/", asyncHandler(async (req, res) => {
   const { db } = req;
   const { date, equipmentId } = req.query;
   let conditions = [];
@@ -19,11 +21,11 @@ sessionsRouter.get("/", async (req, res) => {
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(sessions.openedAt));
   res.json(data);
-});
+}));
 
 // ─── Get single session with full timeline ────────────────────
 
-sessionsRouter.get("/:id", async (req, res) => {
+sessionsRouter.get("/:id", asyncHandler(async (req, res) => {
   const { db } = req;
   const [session] = await db.select().from(sessions).where(eq(sessions.id, String(req.params.id))).limit(1);
   if (!session) { res.status(404).json({ error: "Session introuvable" }); return; }
@@ -45,17 +47,14 @@ sessionsRouter.get("/:id", async (req, res) => {
   }
 
   res.json({ session, events, lots, downtimes: allDowntimes });
-});
+}));
 
 // ─── Open a new session (compteur) ────────────────────────────
 
-sessionsRouter.post("/open", async (req, res) => {
+sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (req, res) => {
   const { db, userId } = req;
   const { equipmentId, roomId } = req.body;
-  if (!equipmentId || !roomId || !userId) {
-    res.status(400).json({ error: "equipmentId, roomId requis" });
-    return;
-  }
+  if (!userId) { res.status(401).json({ error: "Non authentifié" }); return; }
 
   // Check no active session for this equipment
   const [existing] = await db.select().from(sessions)
@@ -79,11 +78,11 @@ sessionsRouter.post("/open", async (req, res) => {
   }).returning();
 
   res.status(201).json(session);
-});
+}));
 
 // ─── Close a session ──────────────────────────────────────────
 
-sessionsRouter.post("/:id/close", async (req, res) => {
+sessionsRouter.post("/:id/close", asyncHandler(async (req, res) => {
   const { db } = req;
   const now = new Date();
 
@@ -108,11 +107,11 @@ sessionsRouter.post("/:id/close", async (req, res) => {
     .returning();
 
   res.json(session);
-});
+}));
 
 // ─── Add session event (phase) ────────────────────────────────
 
-sessionsRouter.post("/:id/events", async (req, res) => {
+sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async (req, res) => {
   const { db } = req;
   const { eventType, label, durationMinutes, isPlanned, comment } = req.body;
 
@@ -137,11 +136,11 @@ sessionsRouter.post("/:id/events", async (req, res) => {
   }).returning();
 
   res.status(201).json(event);
-});
+}));
 
 // ─── Get session TRS (computed) ───────────────────────────────
 
-sessionsRouter.get("/:id/trs", async (req, res) => {
+sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
   const { db } = req;
   const [session] = await db.select().from(sessions).where(eq(sessions.id, String(req.params.id))).limit(1);
   if (!session) { res.status(404).json({ error: "Session introuvable" }); return; }
@@ -193,4 +192,4 @@ sessionsRouter.get("/:id/trs", async (req, res) => {
   });
 
   res.json({ session: sessionTrs, lots: lotResults });
-});
+}));

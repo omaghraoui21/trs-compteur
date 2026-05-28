@@ -30,12 +30,12 @@ export default function AdminPage() {
         <h1 className="text-2xl font-bold text-gray-800">Configuration</h1>
       </div>
 
-      <div className="flex border-b mb-6">
+      <div className="flex overflow-x-auto border-b mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
         {TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition ${
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition ${
               activeTab === tab.key
                 ? "border-blue-600 text-blue-700"
                 : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -117,26 +117,28 @@ function RoomsPanel() {
         </FormCard>
       )}
 
-      <table className="w-full text-sm">
-        <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Nom</th><th className="py-2 px-3">Description</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
-        <tbody>
-          {rooms.map((r) => (
-            <tr key={r.id} className={`border-b hover:bg-gray-50 ${!r.isActive ? "opacity-50" : ""}`}>
-              <td className="py-2 px-3 font-mono text-xs">{r.code}</td>
-              <td className="py-2 px-3 font-medium">{r.name}</td>
-              <td className="py-2 px-3 text-gray-500">{r.description || "—"}</td>
-              <td className="py-2 px-3"><StatusBadge active={r.isActive} /></td>
-              <td className="py-2 px-3">
-                <div className="flex gap-1">
-                  <IconBtn icon={Pencil} onClick={() => startEdit(r)} title="Modifier" />
-                  {r.isActive && <IconBtn icon={Trash2} onClick={() => remove(r.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                  {!r.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateRoom(r.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="overflow-x-auto">
+        <table className="rtable w-full text-sm">
+          <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Nom</th><th className="py-2 px-3">Description</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
+          <tbody>
+            {rooms.map((r) => (
+              <tr key={r.id} className={`border-b hover:bg-gray-50 ${!r.isActive ? "opacity-50" : ""}`}>
+                <td data-label="Code" className="py-2 px-3 font-mono text-xs">{r.code}</td>
+                <td data-label="Nom" className="py-2 px-3 font-medium">{r.name}</td>
+                <td data-label="Description" className="py-2 px-3 text-gray-500">{r.description || "—"}</td>
+                <td data-label="Statut" className="py-2 px-3"><StatusBadge active={r.isActive} /></td>
+                <td data-label="Actions" className="py-2 px-3">
+                  <div className="flex gap-1">
+                    <IconBtn icon={Pencil} onClick={() => startEdit(r)} title="Modifier" />
+                    {r.isActive && <IconBtn icon={Trash2} onClick={() => remove(r.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
+                    {!r.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateRoom(r.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -231,29 +233,31 @@ function EquipmentsPanel() {
         </FormCard>
       )}
 
-      <table className="w-full text-sm">
-        <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Nom</th><th className="py-2 px-3">Local</th><th className="py-2 px-3">Type</th><th className="py-2 px-3">Obj. TRS</th><th className="py-2 px-3">Micro-arrêt</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
-        <tbody>
-          {items.map((e) => (
-            <tr key={e.id} className={`border-b hover:bg-gray-50 ${!e.isActive ? "opacity-50" : ""}`}>
-              <td className="py-2 px-3 font-mono text-xs">{e.code}</td>
-              <td className="py-2 px-3 font-medium">{e.name}</td>
-              <td className="py-2 px-3">{roomName(e.roomId)}</td>
-              <td className="py-2 px-3 capitalize">{e.equipmentType || "—"}</td>
-              <td className="py-2 px-3">{e.trsObjective}%</td>
-              <td className="py-2 px-3">{e.microStopThresholdMin ?? 5} min</td>
-              <td className="py-2 px-3"><StatusBadge active={e.isActive} /></td>
-              <td className="py-2 px-3">
-                <div className="flex gap-1">
-                  <IconBtn icon={Pencil} onClick={() => startEdit(e)} title="Modifier" />
-                  {e.isActive && <IconBtn icon={Trash2} onClick={() => remove(e.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                  {!e.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateEquipment(e.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="overflow-x-auto">
+        <table className="rtable w-full text-sm">
+          <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Nom</th><th className="py-2 px-3">Local</th><th className="py-2 px-3">Type</th><th className="py-2 px-3">Obj. TRS</th><th className="py-2 px-3">Micro-arrêt</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
+          <tbody>
+            {items.map((e) => (
+              <tr key={e.id} className={`border-b hover:bg-gray-50 ${!e.isActive ? "opacity-50" : ""}`}>
+                <td data-label="Code" className="py-2 px-3 font-mono text-xs">{e.code}</td>
+                <td data-label="Nom" className="py-2 px-3 font-medium">{e.name}</td>
+                <td data-label="Local" className="py-2 px-3">{roomName(e.roomId)}</td>
+                <td data-label="Type" className="py-2 px-3 capitalize">{e.equipmentType || "—"}</td>
+                <td data-label="Obj. TRS" className="py-2 px-3">{e.trsObjective}%</td>
+                <td data-label="Micro-arrêt" className="py-2 px-3">{e.microStopThresholdMin ?? 5} min</td>
+                <td data-label="Statut" className="py-2 px-3"><StatusBadge active={e.isActive} /></td>
+                <td data-label="Actions" className="py-2 px-3">
+                  <div className="flex gap-1">
+                    <IconBtn icon={Pencil} onClick={() => startEdit(e)} title="Modifier" />
+                    {e.isActive && <IconBtn icon={Trash2} onClick={() => remove(e.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
+                    {!e.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateEquipment(e.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -327,27 +331,29 @@ function ProductsPanel() {
         </FormCard>
       )}
 
-      <table className="w-full text-sm">
-        <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Nom</th><th className="py-2 px-3">Cadence</th><th className="py-2 px-3">Unité</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
-        <tbody>
-          {items.map((p) => (
-            <tr key={p.id} className={`border-b hover:bg-gray-50 ${!p.isActive ? "opacity-50" : ""}`}>
-              <td className="py-2 px-3 font-mono text-xs">{p.code}</td>
-              <td className="py-2 px-3 font-medium">{p.name}</td>
-              <td className="py-2 px-3">{p.defaultCadence ? `${p.defaultCadence} ${p.cadenceUnit}` : "—"}</td>
-              <td className="py-2 px-3">{p.unit}</td>
-              <td className="py-2 px-3"><StatusBadge active={p.isActive} /></td>
-              <td className="py-2 px-3">
-                <div className="flex gap-1">
-                  <IconBtn icon={Pencil} onClick={() => startEdit(p)} title="Modifier" />
-                  {p.isActive && <IconBtn icon={Trash2} onClick={() => remove(p.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                  {!p.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateProduct(p.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="overflow-x-auto">
+        <table className="rtable w-full text-sm">
+          <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Nom</th><th className="py-2 px-3">Cadence</th><th className="py-2 px-3">Unité</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
+          <tbody>
+            {items.map((p) => (
+              <tr key={p.id} className={`border-b hover:bg-gray-50 ${!p.isActive ? "opacity-50" : ""}`}>
+                <td data-label="Code" className="py-2 px-3 font-mono text-xs">{p.code}</td>
+                <td data-label="Nom" className="py-2 px-3 font-medium">{p.name}</td>
+                <td data-label="Cadence" className="py-2 px-3">{p.defaultCadence ? `${p.defaultCadence} ${p.cadenceUnit}` : "—"}</td>
+                <td data-label="Unité" className="py-2 px-3">{p.unit}</td>
+                <td data-label="Statut" className="py-2 px-3"><StatusBadge active={p.isActive} /></td>
+                <td data-label="Actions" className="py-2 px-3">
+                  <div className="flex gap-1">
+                    <IconBtn icon={Pencil} onClick={() => startEdit(p)} title="Modifier" />
+                    {p.isActive && <IconBtn icon={Trash2} onClick={() => remove(p.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
+                    {!p.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateProduct(p.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -448,22 +454,24 @@ function CadencesPanel() {
             <Cpu className="h-4 w-4" /> {eqName}
             <span className="text-xs font-normal text-gray-400">({items.length} produits)</span>
           </h3>
-          <table className="w-full text-sm">
-            <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Produit</th><th className="py-2 px-3">Cadence</th><th className="py-2 px-3">Unité</th><th className="py-2 px-3">Obj. TRS</th><th className="py-2 px-3 w-16">Action</th></tr></thead>
-            <tbody>
-              {items.map(c => (
-                <tr key={c.id} className="border-b hover:bg-gray-50">
-                  <td className="py-2 px-3 font-medium">{productName(c.productId)}</td>
-                  <td className="py-2 px-3">{c.cadenceValue}</td>
-                  <td className="py-2 px-3">{c.cadenceUnit}</td>
-                  <td className="py-2 px-3">{c.trsObjective ? `${c.trsObjective}%` : "—"}</td>
-                  <td className="py-2 px-3">
-                    <IconBtn icon={Trash2} onClick={() => remove(c.id)} title="Supprimer" className="text-red-500 hover:bg-red-50" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="rtable w-full text-sm">
+              <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Produit</th><th className="py-2 px-3">Cadence</th><th className="py-2 px-3">Unité</th><th className="py-2 px-3">Obj. TRS</th><th className="py-2 px-3 w-16">Action</th></tr></thead>
+              <tbody>
+                {items.map(c => (
+                  <tr key={c.id} className="border-b hover:bg-gray-50">
+                    <td data-label="Produit" className="py-2 px-3 font-medium">{productName(c.productId)}</td>
+                    <td data-label="Cadence" className="py-2 px-3">{c.cadenceValue}</td>
+                    <td data-label="Unité" className="py-2 px-3">{c.cadenceUnit}</td>
+                    <td data-label="Obj. TRS" className="py-2 px-3">{c.trsObjective ? `${c.trsObjective}%` : "—"}</td>
+                    <td data-label="Action" className="py-2 px-3">
+                      <IconBtn icon={Trash2} onClick={() => remove(c.id)} title="Supprimer" className="text-red-500 hover:bg-red-50" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ))}
 
@@ -535,15 +543,19 @@ function DowntimesPanel() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
         <div>
           <p className="text-sm text-gray-500">{items.length} catégories d'arrêts</p>
-          <p className="text-xs text-gray-400 mt-1">
-            <span className="inline-block w-3 h-3 rounded bg-amber-100 border border-amber-300 mr-1 align-middle" /> Planifié (affecte tAP)
-            <span className="inline-block w-3 h-3 rounded bg-red-100 border border-red-300 ml-3 mr-1 align-middle" /> Non planifié (affecte tF)
-          </p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400 mt-1">
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded bg-amber-100 border border-amber-300" /> Planifié (affecte tAP)
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded bg-red-100 border border-red-300" /> Non planifié (affecte tF)
+            </span>
+          </div>
         </div>
-        <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Ajouter</button>
+        <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary shrink-0"><Plus className="h-4 w-4" /> Ajouter</button>
       </div>
 
       {error && <ErrorBanner msg={error} onClose={() => setError("")} />}
@@ -581,15 +593,16 @@ function DowntimesPanel() {
             {famille}
             <span className="text-xs font-normal text-gray-400">({cats.length})</span>
           </h3>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="rtable w-full text-sm">
             <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Label</th><th className="py-2 px-3">Équipement</th><th className="py-2 px-3 text-center">Planifié</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
             <tbody>
               {cats.map((c) => (
                 <tr key={c.id} className={`border-b hover:bg-gray-50 ${!c.isActive ? "opacity-50" : ""}`}>
-                  <td className="py-2 px-3 font-mono text-xs">{c.code}</td>
-                  <td className="py-2 px-3 font-medium">{c.label}</td>
-                  <td className="py-2 px-3 capitalize">{c.appliesToEquipmentType || "Tous"}</td>
-                  <td className="py-2 px-3 text-center">
+                  <td data-label="Code" className="py-2 px-3 font-mono text-xs">{c.code}</td>
+                  <td data-label="Label" className="py-2 px-3 font-medium">{c.label}</td>
+                  <td data-label="Équipement" className="py-2 px-3 capitalize">{c.appliesToEquipmentType || "Tous"}</td>
+                  <td data-label="Planifié" className="py-2 px-3 text-center">
                     <button onClick={() => togglePlanned(c)} className="inline-flex items-center gap-1" title={c.isPlanned ? "Planifié → cliquez pour changer" : "Non planifié → cliquez pour changer"}>
                       {c.isPlanned ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
@@ -602,8 +615,8 @@ function DowntimesPanel() {
                       )}
                     </button>
                   </td>
-                  <td className="py-2 px-3"><StatusBadge active={c.isActive} /></td>
-                  <td className="py-2 px-3">
+                  <td data-label="Statut" className="py-2 px-3"><StatusBadge active={c.isActive} /></td>
+                  <td data-label="Actions" className="py-2 px-3">
                     <div className="flex gap-1">
                       <IconBtn icon={Pencil} onClick={() => startEdit(c)} title="Modifier" />
                       {c.isActive && <IconBtn icon={Trash2} onClick={() => remove(c.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
@@ -614,12 +627,13 @@ function DowntimesPanel() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       ))}
 
       <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <h4 className="text-sm font-semibold text-blue-800 mb-2">Règles de calcul TRS (NF E 60-182)</h4>
-        <div className="grid grid-cols-2 gap-4 text-xs text-blue-700">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-blue-700">
           <div>
             <p className="font-medium mb-1">Arrêts planifiés :</p>
             <p>Soustraits du temps d'ouverture (tO) pour obtenir le temps requis (tR).</p>
@@ -669,7 +683,7 @@ function FormCard({ title, children, onCancel, onSave }: { title: string; childr
   return (
     <div className="mb-6 p-4 bg-white border rounded-lg shadow-sm">
       <h3 className="text-sm font-semibold text-gray-700 mb-3">{title}</h3>
-      <div className="grid grid-cols-2 gap-4 mb-4">{children}</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">{children}</div>
       <div className="flex gap-2 justify-end">
         <button onClick={onCancel} className="px-3 py-1.5 text-sm text-gray-600 border rounded hover:bg-gray-50">Annuler</button>
         <button onClick={onSave} className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700">Enregistrer</button>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
 import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ComparisonResponse, type TrsMetrics, type DailyTrs, type ByProductResponse, type SixLossesResponse, type HeatmapResponse } from "@/lib/api";
 import { fmtPct, fmtDuration, trsColor, familleToNorme } from "@trs/engine";
+import { useToast } from "@/components/Toast";
 import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, ChevronUp, AlertTriangle, Info, FileText } from "lucide-react";
 // PDF is lazy-loaded on demand to reduce bundle size
 import TrsChart from "@/components/dashboard/TrsChart";
@@ -47,12 +48,13 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     api.equipments().then(list => {
       setEquipmentsList(list);
       if (list.length > 0) setSelectedEquipment(list[0].id);
-    });
+    }).catch((err) => toast.error(err.message || "Chargement des équipements échoué"));
   }, []);
 
   const { from, to } = useMemo(() => {
@@ -85,7 +87,8 @@ export default function DashboardPage() {
           setComparisonData(null);
         }
       }
-    } catch {
+    } catch (err: any) {
+      toast.error(err.message || "Chargement du tableau de bord échoué");
       setData(null);
       setParetoData(null);
       setByProductData(null);
@@ -176,11 +179,11 @@ export default function DashboardPage() {
       </h2>
 
       {/* ─── Filters ────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl border p-4 mb-4 flex items-center gap-4 flex-wrap">
+      <div className="bg-white rounded-xl border p-4 mb-4 flex flex-col sm:flex-row sm:items-end gap-3 flex-wrap">
         <div>
           <label className="block text-xs text-gray-500 mb-1">Équipement</label>
           <select value={selectedEquipment} onChange={e => setSelectedEquipment(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm">
+            className="w-full sm:w-auto border rounded-lg px-3 py-2 text-sm">
             {equipmentsList.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
         </div>
@@ -191,14 +194,14 @@ export default function DashboardPage() {
             {(["day", "week", "month", "custom"] as ZoomLevel[]).map(z => (
               <button key={z} onClick={() => setZoom(z)}
                 className={`px-3 py-2 text-sm ${zoom === z ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
-                {z === "day" ? "Jour" : z === "week" ? "Semaine" : z === "month" ? "Mois" : "Libre"}
+                {z === "day" ? "Jour" : z === "week" ? "Sem." : z === "month" ? "Mois" : "Libre"}
               </button>
             ))}
           </div>
         </div>
 
         {zoom === "custom" && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
               className="border rounded-lg px-2 py-2 text-sm" />
             <span className="text-gray-400">→</span>
@@ -207,7 +210,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
           <button onClick={() => setShowComparison(!showComparison)}
             className={`flex items-center gap-1 px-3 py-2 text-sm rounded-lg border ${showComparison ? "bg-blue-50 border-blue-300 text-blue-700" : "text-gray-600 hover:bg-gray-50"}`}>
             <ArrowLeftRight className="h-4 w-4" /> Comparer
@@ -298,7 +301,7 @@ function KpiCard({ metrics, title, objective }: { metrics: TrsMetrics; title: st
         <h3 className="font-semibold">TRS Consolidé — {title}</h3>
       </div>
 
-      <div className="grid grid-cols-5 gap-3 text-center mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-center mb-4">
         {([
           { label: "TRS", value: metrics.TRS },
           { label: "TRG", value: metrics.TRG },
