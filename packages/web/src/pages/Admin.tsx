@@ -697,7 +697,14 @@ function Field({ label, value, onChange, placeholder, type = "text" }: { label: 
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="input-field" />
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="input-field"
+        inputMode={type === "number" ? "numeric" : undefined}
+      />
     </div>
   );
 }

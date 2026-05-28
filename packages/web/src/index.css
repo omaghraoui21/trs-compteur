@@ -48,3 +48,14 @@
     display: none;
   }
 }
+
+/* Sticky table headers on desktop (mirrors rtable breakpoint) */
+@media (min-width: 768px) {
+  .rtable thead th {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+    box-shadow: 0 1px 0 #e5e7eb;
+  }
+}

@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { api, type LotEntry, type Product } from "@/lib/api";
 import { fmtPct, trsColor } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
-import { ClipboardCheck, Check, X, ChevronDown, ChevronUp } from "lucide-react";
+import { ClipboardCheck, Check, X, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+
+const PULL_THRESHOLD = 60;
 
 export default function SupervisorPage() {
   const [lots, setLots] = useState<LotEntry[]>([]);
@@ -12,14 +14,49 @@ export default function SupervisorPage() {
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const touchStartY = useRef(0);
   const toast = useToast();
 
-  useEffect(() => {
-    Promise.all([api.pendingLots(), api.products()])
-      .then(([l, p]) => { setLots(l); setProducts(p); })
-      .catch((err) => toast.error(err.message || "Chargement des lots échoué"))
-      .finally(() => setLoading(false));
-  }, []);
+  const loadData = useCallback(async (showLoader = false) => {
+    if (showLoader) setLoading(true);
+    try {
+      const [l, p] = await Promise.all([api.pendingLots(), api.products()]);
+      setLots(l);
+      setProducts(p);
+    } catch (err: any) {
+      toast.error(err.message || "Chargement des lots échoué");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { loadData(true); }, [loadData]);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      touchStartY.current = e.touches[0].clientY;
+    }
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    const delta = e.touches[0].clientY - touchStartY.current;
+    if (delta > 0 && window.scrollY === 0) {
+      setPullDistance(Math.min(delta, 80));
+    }
+  };
+
+  const onTouchEnd = async () => {
+    if (pullDistance >= PULL_THRESHOLD) {
+      setRefreshing(true);
+      setPullDistance(0);
+      await loadData();
+    } else {
+      setPullDistance(0);
+    }
+  };
 
   const handleAction = async (lotId: string, action: "validate" | "reject") => {
     setSubmitting(true);
@@ -39,7 +76,27 @@ export default function SupervisorPage() {
   const getProduct = (id: string) => products.find(p => p.id === id);
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div
+      className="max-w-2xl mx-auto"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* Pull-to-refresh indicator */}
+      {(pullDistance > 0 || refreshing) && (
+        <div
+          className="flex items-center justify-center overflow-hidden transition-all"
+          style={{ height: refreshing ? 40 : pullDistance }}
+        >
+          <RefreshCw
+            className={`h-5 w-5 transition-colors ${
+              pullDistance >= PULL_THRESHOLD || refreshing ? "text-blue-600" : "text-blue-300"
+            } ${refreshing ? "animate-spin" : ""}`}
+            style={{ transform: `rotate(${(pullDistance / PULL_THRESHOLD) * 180}deg)` }}
+          />
+        </div>
+      )}
+
       <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
         <ClipboardCheck className="h-5 w-5" /> Lots à valider
       </h2>
