@@ -156,8 +156,8 @@ export interface AdminDowntimeCategory { id: string; code: string; label: string
 export interface ProductEquipmentCadence { id: string; productId: string; equipmentId: string; cadenceValue: string; cadenceUnit: string; trsObjective: string | null }
 
 // W: By-Product aggregation
-export interface ProductTrs { productId: string; productName: string; lotCount: number; totalProduced: number; totalConforming: number; totalRebut: number; totalDurationMin: number; totalUnplannedMin: number; tF: number; tN: number; tU: number; avgCadencePerMin: number; DO: number; TP: number; TQ: number; TRS: number }
-export interface ByProductResponse { period: { from: string; to: string; equipmentId: string }; byProduct: ProductTrs[] }
+export interface ProductTrs { productId: string; productName: string; lotCount: number; totalProduced: number; totalConforming: number; totalRebut: number; totalDurationMin: number; totalUnplannedMin: number; tF: number; tN: number; tU: number; tR: number; avgCadencePerMin: number; DO: number; TP: number; TQ: number; TRS: number; trAllocated: boolean }
+export interface ByProductResponse { period: { from: string; to: string; equipmentId: string }; periodTR?: number; periodTRS?: number; byProduct: ProductTrs[] }
 
 // X: Six Big Losses
 export interface SixBigLoss { category: string; label: string; oeeComponent: string; minutes: number; pctOfTotal: number }

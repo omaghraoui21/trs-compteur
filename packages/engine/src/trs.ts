@@ -139,11 +139,15 @@ export interface ProductTrsResult {
   tF: number;
   tN: number;
   tU: number;
+  /** Required time attributed to this product (allocated pro-rata to tF when periodTR given). */
+  tR: number;
   avgCadencePerMin: number;
   DO: number;
   TP: number;
   TQ: number;
   TRS: number;
+  /** true when DO/TRS use a tR allocated from the period (so Σ products reconciles with global). */
+  trAllocated: boolean;
 }
 
 // ─── Six Big Losses types ───────────────────────────────
@@ -326,13 +330,17 @@ export function computeSessionTrs(input: SessionTrsInput): SessionTrsResult {
 
 // ─── Product-level TRS aggregation ──────────────────────
 
-export function computeProductTrs(lots: ProductLotInput[]): ProductTrsResult[] {
+export function computeProductTrs(lots: ProductLotInput[], periodTR?: number): ProductTrsResult[] {
   const byProduct = new Map<string, ProductLotInput[]>();
   for (const lot of lots) {
     const arr = byProduct.get(lot.productId) || [];
     arr.push(lot);
     byProduct.set(lot.productId, arr);
   }
+
+  // Total tF across all products — used to allocate the period's required time (tR) pro-rata.
+  const totalTF = lots.reduce((s, l) => s + l.tF, 0);
+  const allocate = periodTR != null && periodTR > 0 && totalTF > 0;
 
   const results: ProductTrsResult[] = [];
   for (const [productId, productLots] of byProduct) {
@@ -343,7 +351,9 @@ export function computeProductTrs(lots: ProductLotInput[]): ProductTrsResult[] {
     const tF = productLots.reduce((s, l) => s + l.tF, 0);
     const tN = productLots.reduce((s, l) => s + l.tN, 0);
     const tU = productLots.reduce((s, l) => s + l.tU, 0);
-    const tR = totalDurationMin; // At lot level, lot duration = required time for that lot
+    // Allocated tR keeps Σ tR_product = periodTR, so Σ tU_product / periodTR = TRS_global.
+    // Fallback (no period tR given): tR = Σ lot durations (legacy behaviour).
+    const tR = allocate ? periodTR! * (tF / totalTF) : totalDurationMin;
 
     const totalCadenceWeighted = productLots.reduce((s, l) => {
       const cpm = l.cadenceUnit === "u/min" ? l.cadence : l.cadence / 60;
@@ -363,11 +373,13 @@ export function computeProductTrs(lots: ProductLotInput[]): ProductTrsResult[] {
       tF,
       tN,
       tU,
+      tR,
       avgCadencePerMin,
       DO: tR > 0 ? tF / tR : 0,
       TP: tF > 0 ? tN / tF : 0,
       TQ: totalProduced > 0 ? totalConforming / totalProduced : 1,
       TRS: tR > 0 ? tU / tR : 0,
+      trAllocated: allocate,
     });
   }
 
@@ -487,6 +499,65 @@ export function computeZoomTrs(input: ZoomTrsInput): SessionTrsResult {
   };
 
   return { tT, tO, fermeture, tAP, tR, tF, tN, tU, nonQualiteMin, ecartCadenceMin, totalUnplannedMin, DO, TP, TQ, TRS, TRG, TEEP, utilisation, lotCount, totalProduced, totalConforming, totalRebut, downtimeByFamille, downtimeByNorme, warnings, audit };
+}
+
+// ─── Period grouping (day / week / month) ────────────────
+
+export type GroupBy = "day" | "week" | "month";
+
+export interface PeriodBucket extends SessionTrsResult {
+  /** "2026-05-28" (day) | "2026-W22" (ISO week) | "2026-05" (month) */
+  periodKey: string;
+  from: string;
+  to: string;
+}
+
+/** ISO-8601 week key (Monday-based), e.g. "2026-W22". */
+export function isoWeekKey(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  const day = (d.getUTCDay() + 6) % 7; // Monday = 0
+  // Shift to the Thursday of this week (ISO weeks belong to the year of their Thursday)
+  d.setUTCDate(d.getUTCDate() - day + 3);
+  const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((d.getTime() - firstThursday.getTime()) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+export function periodKey(dateStr: string, by: GroupBy): string {
+  if (by === "day") return dateStr;
+  if (by === "month") return dateStr.slice(0, 7); // "YYYY-MM"
+  return isoWeekKey(dateStr);
+}
+
+/**
+ * Group daily sessions into day/week/month buckets.
+ * Each bucket is re-aggregated with computeZoomTrs, i.e. TRS_bucket = Σ tU / Σ tR.
+ * Because summation is associative, computeZoomTrs over all sessions equals the
+ * sum of the buckets — day → week → month always reconcile.
+ */
+export function groupSessionsByPeriod(
+  sessions: (SessionTrsResult & { date: string })[],
+  by: GroupBy,
+): PeriodBucket[] {
+  const buckets = new Map<string, (SessionTrsResult & { date: string })[]>();
+  for (const s of sessions) {
+    const key = periodKey(s.date, by);
+    const arr = buckets.get(key) || [];
+    arr.push(s);
+    buckets.set(key, arr);
+  }
+
+  return [...buckets.entries()]
+    .map(([key, ss]) => {
+      const dates = ss.map(s => s.date).sort();
+      return {
+        periodKey: key,
+        from: dates[0],
+        to: dates[dates.length - 1],
+        ...computeZoomTrs({ sessions: ss }),
+      };
+    })
+    .sort((a, b) => a.from.localeCompare(b.from));
 }
 
 // ─── MTBF / MTTR ─────────────────────────────────────────

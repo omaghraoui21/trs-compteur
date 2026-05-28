@@ -19,20 +19,25 @@ function dateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-function getPresetDates(zoom: ZoomLevel): { from: string; to: string } {
-  const now = new Date();
+function getPresetDates(zoom: ZoomLevel, ref = new Date()): { from: string; to: string } {
   if (zoom === "day") {
-    const s = dateStr(now);
+    const s = dateStr(ref);
     return { from: s, to: s };
   }
   if (zoom === "week") {
-    const d = new Date(now);
-    d.setDate(d.getDate() - 6);
-    return { from: dateStr(d), to: dateStr(now) };
+    // ISO calendar week: Monday → Sunday
+    const d = new Date(ref);
+    const dow = (d.getDay() + 6) % 7; // Monday = 0
+    const mon = new Date(d);
+    mon.setDate(d.getDate() - dow);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    return { from: dateStr(mon), to: dateStr(sun) };
   }
-  // month
-  const d = new Date(now.getFullYear(), now.getMonth(), 1);
-  return { from: dateStr(d), to: dateStr(now) };
+  // month: 1st → last day of the calendar month
+  const first = new Date(ref.getFullYear(), ref.getMonth(), 1);
+  const last = new Date(ref.getFullYear(), ref.getMonth() + 1, 0);
+  return { from: dateStr(first), to: dateStr(last) };
 }
 
 export default function DashboardPage() {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, familleToNorme } from "./trs";
+import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, groupSessionsByPeriod, isoWeekKey, periodKey, familleToNorme } from "./trs";
 
 describe("familleToNorme", () => {
   it("maps app families to NF E 60-182 codes", () => {
@@ -792,5 +792,99 @@ describe("computeSixBigLosses (X)", () => {
 
     const result = computeSixBigLosses(sessionTrs, []);
     expect(result.losses.every(l => l.minutes === 0)).toBe(true);
+  });
+});
+
+// ─── Period grouping (day / week / month) ───────────────────
+
+describe("isoWeekKey / periodKey", () => {
+  it("computes ISO week keys (Monday-based)", () => {
+    expect(isoWeekKey("2026-05-28")).toBe("2026-W22"); // Thursday
+    expect(isoWeekKey("2026-05-25")).toBe("2026-W22"); // Monday same week
+    expect(isoWeekKey("2026-05-31")).toBe("2026-W22"); // Sunday same week
+    expect(isoWeekKey("2026-06-01")).toBe("2026-W23"); // next Monday
+  });
+
+  it("derives day / week / month keys", () => {
+    expect(periodKey("2026-05-28", "day")).toBe("2026-05-28");
+    expect(periodKey("2026-05-28", "month")).toBe("2026-05");
+    expect(periodKey("2026-05-28", "week")).toBe("2026-W22");
+  });
+});
+
+describe("groupSessionsByPeriod", () => {
+  const mk = (date: string, tR: number, tU: number) => ({
+    date,
+    tT: 1440, tO: tR, fermeture: 0, tAP: 0, tR, tF: tR, tN: tU, tU,
+    nonQualiteMin: 0, ecartCadenceMin: 0, totalUnplannedMin: 0,
+    DO: 1, TP: tR > 0 ? tU / tR : 0, TQ: 1, TRS: tR > 0 ? tU / tR : 0, TRG: 0,
+    lotCount: 1, totalProduced: tU, totalConforming: tU, totalRebut: 0,
+    downtimeByFamille: {}, downtimeByNorme: {}, warnings: [],
+    audit: { tF_norme: tR, tF_lots: tR, tF_delta: 0, formula: "" },
+  });
+
+  const sessions = [
+    mk("2026-05-25", 400, 300), // W22
+    mk("2026-05-26", 400, 360), // W22
+    mk("2026-06-01", 400, 200), // W23 / June
+  ];
+
+  it("buckets by week and re-aggregates as Σtu/Σtr", () => {
+    const weeks = groupSessionsByPeriod(sessions, "week");
+    expect(weeks).toHaveLength(2);
+    const w22 = weeks.find(w => w.periodKey === "2026-W22")!;
+    expect(w22.tR).toBe(800);
+    expect(w22.tU).toBe(660);
+    expect(w22.TRS).toBeCloseTo(660 / 800, 6);
+  });
+
+  it("month total equals the sum of its days (day -> month reconciles)", () => {
+    const mayOnly = sessions.filter(s => s.date.startsWith("2026-05"));
+    const may = groupSessionsByPeriod(mayOnly, "month");
+    const days = groupSessionsByPeriod(mayOnly, "day");
+    const sumDayTU = days.reduce((s, d) => s + d.tU, 0);
+    const sumDayTR = days.reduce((s, d) => s + d.tR, 0);
+    expect(may).toHaveLength(1);
+    expect(may[0].tU).toBe(sumDayTU);
+    expect(may[0].tR).toBe(sumDayTR);
+    expect(may[0].TRS).toBeCloseTo(sumDayTU / sumDayTR, 6);
+  });
+
+  it("grouped buckets reconcile with the global zoom", () => {
+    const zoom = computeZoomTrs({ sessions });
+    const weeks = groupSessionsByPeriod(sessions, "week");
+    const sumTU = weeks.reduce((s, w) => s + w.tU, 0);
+    const sumTR = weeks.reduce((s, w) => s + w.tR, 0);
+    expect(sumTU).toBe(zoom.tU);
+    expect(sumTR).toBe(zoom.tR);
+    expect(sumTU / sumTR).toBeCloseTo(zoom.TRS, 6);
+  });
+});
+
+describe("computeProductTrs reconciliation", () => {
+  it("Sum allocated tR equals periodTR and reconciles with global TRS", () => {
+    const lots = [
+      { productId: "p1", productName: "A", cadence: 120, cadenceUnit: "u/min" as const,
+        produced: 34000, conforming: 33800, lotDurationMin: 300, unplannedMin: 20, tF: 280, tN: 283.33, tU: 281.67 },
+      { productId: "p2", productName: "B", cadence: 100, cadenceUnit: "u/min" as const,
+        produced: 15000, conforming: 14900, lotDurationMin: 180, unplannedMin: 15, tF: 165, tN: 150, tU: 149 },
+    ];
+    const periodTR = 700;
+    const results = computeProductTrs(lots, periodTR);
+    const sumTR = results.reduce((s, r) => s + r.tR, 0);
+    const sumTU = results.reduce((s, r) => s + r.tU, 0);
+    expect(sumTR).toBeCloseTo(periodTR, 5);
+    expect(results.every(r => r.trAllocated)).toBe(true);
+    expect(sumTU / periodTR).toBeCloseTo((281.67 + 149) / 700, 6);
+  });
+
+  it("falls back to lot durations without periodTR", () => {
+    const lots = [
+      { productId: "p1", productName: "A", cadence: 120, cadenceUnit: "u/min" as const,
+        produced: 34000, conforming: 33800, lotDurationMin: 300, unplannedMin: 20, tF: 280, tN: 283.33, tU: 281.67 },
+    ];
+    const results = computeProductTrs(lots);
+    expect(results[0].trAllocated).toBe(false);
+    expect(results[0].tR).toBe(300);
   });
 });

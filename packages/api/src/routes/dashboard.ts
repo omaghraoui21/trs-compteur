@@ -293,8 +293,13 @@ dashboardRouter.get("/by-product", asyncHandler(async (req, res) => {
     ));
 
   const productLots: ProductLotInput[] = [];
+  const sessionResults: any[] = [];
 
   for (const session of closedSessions) {
+    // Period tR comes from the same engine used everywhere else (tR = tO − tAP).
+    const { sessionTrs } = await buildSessionTrs(db, session);
+    sessionResults.push(sessionTrs);
+
     const lots = await db.select().from(lotEntries)
       .where(eq(lotEntries.sessionId, session.id));
 
@@ -337,8 +342,10 @@ dashboardRouter.get("/by-product", asyncHandler(async (req, res) => {
     }
   }
 
-  const byProduct = computeProductTrs(productLots);
-  res.json({ period: { from, to, equipmentId }, byProduct });
+  // Allocate the period's required time across products so Σ products ≡ global TRS (ΣtU/ΣtR).
+  const zoom = computeZoomTrs({ sessions: sessionResults });
+  const byProduct = computeProductTrs(productLots, zoom.tR);
+  res.json({ period: { from, to, equipmentId }, periodTR: zoom.tR, periodTRS: zoom.TRS, byProduct });
 }));
 
 // ─── Six Big Losses (X) ───────────────────────────────────────
