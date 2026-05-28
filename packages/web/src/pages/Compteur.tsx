@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type ProductEquipmentCadence, type SessionTrsResponse } from "@/lib/api";
 import { fmtDuration, fmtPct, trsColor } from "@trs/engine";
 import { useToast } from "@/components/Toast";
-import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle } from "lucide-react";
+import { Onboarding } from "@/components/Onboarding";
+import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle, Zap } from "lucide-react";
 
 type View = "pick-room" | "pick-equip" | "timeline" | "new-lot" | "add-phase" | "add-downtime";
 
@@ -24,6 +25,7 @@ export default function CompteurPage() {
   const [trsData, setTrsData] = useState<SessionTrsResponse | null>(null);
   const [error, setError] = useState("");
   const [elapsed, setElapsed] = useState(0);
+  const [prefillProductId, setPrefillProductId] = useState("");
   const toast = useToast();
 
   // Load rooms on mount
@@ -107,6 +109,7 @@ export default function CompteurPage() {
   if (view === "pick-room") {
     return (
       <div className="max-w-lg mx-auto">
+        <Onboarding />
         <h2 className="text-xl font-bold mb-4">Choisir le local</h2>
         <div className="grid gap-3">
           {rooms.map(r => (
@@ -167,8 +170,9 @@ export default function CompteurPage() {
       equipmentId={selectedEquipment?.id || ""}
       defaultCadenceUnit={selectedEquipment?.defaultCadenceUnit || "u/min"}
       previousLots={detail?.lots || []}
-      onCreated={() => { loadDetail(activeSession.id); setView("timeline"); }}
-      onBack={() => setView("timeline")}
+      prefillProductId={prefillProductId}
+      onCreated={() => { setPrefillProductId(""); loadDetail(activeSession.id); setView("timeline"); }}
+      onBack={() => { setPrefillProductId(""); setView("timeline"); }}
     />;
   }
 
@@ -328,12 +332,23 @@ export default function CompteurPage() {
               className={`flex-1 bg-blue-50 text-blue-700 ${BTN_PRIMARY} hover:bg-blue-100`}>
               <Plus className={BTN_ICON} /> Phase
             </button>
-            {!activeLot && (
-              <button onClick={() => setView("new-lot")}
-                className={`flex-1 bg-green-50 text-green-700 ${BTN_PRIMARY} hover:bg-green-100`}>
-                <Package className={BTN_ICON} /> Nouveau lot
-              </button>
-            )}
+            {!activeLot && (() => {
+              const closedLots = detail.lots.filter(l => l.status !== "active");
+              const lastLot = closedLots[closedLots.length - 1];
+              return lastLot ? (
+                <button
+                  onClick={() => { setPrefillProductId(lastLot.productId); setView("new-lot"); }}
+                  className={`flex-1 bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700`}
+                >
+                  <Zap className={BTN_ICON} /> Lot suivant
+                </button>
+              ) : (
+                <button onClick={() => setView("new-lot")}
+                  className={`flex-1 bg-green-50 text-green-700 ${BTN_PRIMARY} hover:bg-green-100`}>
+                  <Package className={BTN_ICON} /> Nouveau lot
+                </button>
+              );
+            })()}
             <button onClick={handleCloseSession}
               className={`flex-1 bg-red-50 text-red-700 ${BTN_PRIMARY} hover:bg-red-100`}>
               <Square className={BTN_ICON} /> Fermer
@@ -598,9 +613,10 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
 
 // ─── New Lot Form (U3: prefill, U5: cadence from ref) ───
 
-function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUnit, previousLots, onCreated, onBack }: {
+function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUnit, previousLots, prefillProductId, onCreated, onBack }: {
   session: Session; products: Product[]; cadences: ProductEquipmentCadence[];
   equipmentId: string; defaultCadenceUnit: string; previousLots: any[];
+  prefillProductId?: string;
   onCreated: () => void; onBack: () => void;
 }) {
   // U3: Auto-suggest batch number from previous lots
@@ -612,7 +628,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
     return "";
   }, [previousLots]);
 
-  const [productId, setProductId] = useState("");
+  const [productId, setProductId] = useState(prefillProductId ?? "");
   const [batch, setBatch] = useState(suggestedBatch);
   const [cadence, setCadence] = useState("");
   const [cadenceUnit, setCadenceUnit] = useState(defaultCadenceUnit);
