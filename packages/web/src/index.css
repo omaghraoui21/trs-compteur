@@ -59,3 +59,12 @@
     box-shadow: 0 1px 0 #e5e7eb;
   }
 }
+
+/* Micro-feedback: success ring flash on key action buttons */
+@keyframes btn-flash {
+  0%, 100% { box-shadow: none; }
+  30%       { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.5); }
+}
+.btn-flash {
+  animation: btn-flash 0.45s ease-out;
+}

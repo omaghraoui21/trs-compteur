@@ -11,6 +11,19 @@ type View = "pick-room" | "pick-equip" | "timeline" | "new-lot" | "add-phase" | 
 const BTN_PRIMARY = "min-h-[48px] text-base font-semibold rounded-xl px-4 py-3 flex items-center justify-center gap-2 transition active:scale-95";
 const BTN_ICON = "h-6 w-6";
 
+function useFlash(): [boolean, () => void] {
+  const [flashing, setFlashing] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const trigger = useCallback(() => {
+    navigator.vibrate?.([30]);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setFlashing(true);
+    timerRef.current = setTimeout(() => setFlashing(false), 500);
+  }, []);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+  return [flashing, trigger];
+}
+
 export default function CompteurPage() {
   const [view, setView] = useState<View>("pick-room");
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -26,6 +39,7 @@ export default function CompteurPage() {
   const [error, setError] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [prefillProductId, setPrefillProductId] = useState("");
+  const [showCloseModal, setShowCloseModal] = useState(false);
   const toast = useToast();
 
   // Load rooms on mount
@@ -41,6 +55,18 @@ export default function CompteurPage() {
     const iv = setInterval(tick, 1000);
     return () => clearInterval(iv);
   }, [activeSession]);
+
+  // Live TRS poll — 30 s while a lot is active
+  useEffect(() => {
+    if (!activeSession || activeSession.status !== "active") return;
+    const hasActiveLot = detail?.lots.some(l => l.status === "active") ?? false;
+    if (!hasActiveLot) return;
+    const poll = async () => {
+      try { setTrsData(await api.sessionTrs(activeSession.id)); } catch { /* silent */ }
+    };
+    const iv = setInterval(poll, 30_000);
+    return () => clearInterval(iv);
+  }, [activeSession, detail]);
 
   const loadDetail = useCallback(async (sessionId: string) => {
     const [d, t] = await Promise.all([api.session(sessionId), api.sessionTrs(sessionId)]);
@@ -83,9 +109,14 @@ export default function CompteurPage() {
     }
   };
 
-  const handleCloseSession = async () => {
+  const handleCloseSession = () => {
     if (!activeSession) return;
-    if (!confirm("Fermer le compteur ? Tous les lots actifs seront clôturés.")) return;
+    setShowCloseModal(true);
+  };
+
+  const handleConfirmClose = async () => {
+    if (!activeSession) return;
+    setShowCloseModal(false);
     try {
       await api.closeSession(activeSession.id);
       setActiveSession(null);
@@ -219,6 +250,15 @@ export default function CompteurPage() {
           <div className="text-right">
             <div className="text-3xl font-mono font-bold text-green-700">{fmtElapsed(elapsed)}</div>
             <div className="text-xs text-gray-400">Session ouverte</div>
+            {trsData && trsData.session.lotCount > 0 && (
+              <div className="mt-1">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: trsColor(trsData.session.TRS) + "22", color: trsColor(trsData.session.TRS) }}>
+                  TRS {fmtPct(trsData.session.TRS)}
+                </span>
+                <div className="text-xs text-gray-400">en direct</div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -355,6 +395,15 @@ export default function CompteurPage() {
             </button>
           </div>
         </>
+      )}
+      {showCloseModal && activeSession && (
+        <EndOfShiftModal
+          trsData={trsData}
+          hasActiveLot={!!activeLot}
+          trsObjective={Number(selectedEquipment?.trsObjective || 75)}
+          onConfirm={handleConfirmClose}
+          onCancel={() => setShowCloseModal(false)}
+        />
       )}
     </div>
   );
@@ -507,6 +556,7 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
   const [conforming, setConforming] = useState(String(lot.quantityConforming));
   const [closing, setClosing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [flashClose, triggerFlashClose] = useFlash();
   const toast = useToast();
 
   // U4: Real-time validation warnings
@@ -531,6 +581,7 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
       setShowConfirm(true);
       return;
     }
+    triggerFlashClose();
     setClosing(true);
     try {
       await api.closeLot(lot.id, {
@@ -602,7 +653,7 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
         </button>
         {!showConfirm && (
           <button onClick={handleClose} disabled={closing}
-            className={`flex-1 bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700 disabled:opacity-50`}>
+            className={`flex-1 bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700 disabled:opacity-50 ${flashClose ? "btn-flash" : ""}`}>
             <Square className={BTN_ICON} /> Clôturer lot
           </button>
         )}
@@ -635,6 +686,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
   const [refCadence, setRefCadence] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [flashStart, triggerFlashStart] = useFlash();
 
   // U5: Auto-fill cadence from product×equipment reference
   useEffect(() => {
@@ -669,6 +721,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productId || !batch || !cadence) return;
+    triggerFlashStart();
     setLoading(true);
     setError("");
     try {
@@ -744,7 +797,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
         )}
 
         <button type="submit" disabled={loading}
-          className={`w-full bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700 disabled:opacity-50 disabled:pointer-events-none`}>
+          className={`w-full bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700 disabled:opacity-50 disabled:pointer-events-none ${flashStart ? "btn-flash" : ""}`}>
           {loading ? "Démarrage…" : "Démarrer le lot"}
         </button>
       </form>
@@ -842,6 +895,7 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
   lotId: string; categories: DowntimeCategory[]; onAdded: () => void; onBack: () => void;
 }) {
   const [catId, setCatId] = useState("");
+  const [flashDowntime, triggerFlashDowntime] = useFlash();
   const toast = useToast();
   const [mode, setMode] = useState<"manual" | "timer">("manual");
   const [duration, setDuration] = useState("");
@@ -884,6 +938,7 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!catId || !duration) return;
+    triggerFlashDowntime();
     setLoading(true);
     try {
       await api.addDowntime(lotId, {
@@ -974,10 +1029,85 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
             className="w-full border rounded-lg px-3 py-3 text-base" />
         </div>
         <button type="submit" disabled={loading || !catId || !duration}
-          className={`w-full bg-orange-500 text-white ${BTN_PRIMARY} hover:bg-orange-600 disabled:opacity-50`}>
+          className={`w-full bg-orange-500 text-white ${BTN_PRIMARY} hover:bg-orange-600 disabled:opacity-50 ${flashDowntime ? "btn-flash" : ""}`}>
           Enregistrer l'arret
         </button>
       </form>
+    </div>
+  );
+}
+
+// ─── End-of-Shift Summary Modal ──────────────────────────
+
+function EndOfShiftModal({ trsData, hasActiveLot, trsObjective, onConfirm, onCancel }: {
+  trsData: SessionTrsResponse | null;
+  hasActiveLot: boolean;
+  trsObjective: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const s = trsData?.session;
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg p-6 shadow-xl">
+        <h2 className="text-lg font-bold mb-1">Fermer le compteur ?</h2>
+        <p className="text-sm text-gray-500 mb-4">Résumé de la session en cours</p>
+
+        {hasActiveLot && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+            <span className="text-sm text-amber-700">Un lot est en cours — il sera clôturé automatiquement.</span>
+          </div>
+        )}
+
+        {s && s.lotCount > 0 ? (
+          <>
+            <div className="grid grid-cols-3 gap-2 text-center mb-4">
+              {([
+                { label: "TRS", value: s.TRS, colored: true },
+                { label: "DO", value: s.DO, colored: false },
+                { label: "TP", value: s.TP, colored: false },
+                { label: "TQ", value: s.TQ, colored: false },
+                { label: "Lots", raw: String(s.lotCount) },
+                { label: "Durée", raw: fmtDuration(s.tO) },
+              ] as { label: string; value?: number; raw?: string; colored?: boolean }[]).map(item => (
+                <div key={item.label} className="bg-gray-50 rounded-lg p-2">
+                  <div className="text-xs text-gray-500">{item.label}</div>
+                  <div className="text-base font-bold"
+                    style={{ color: item.colored ? trsColor(item.value!) : undefined }}>
+                    {item.value != null ? fmtPct(item.value) : item.raw}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mb-4">
+              <div className="flex justify-between text-xs text-gray-500 mb-1">
+                <span>TRS vs objectif ({trsObjective}%)</span>
+                <span style={{ color: trsColor(s.TRS) }}>{fmtPct(s.TRS)}</span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full rounded-full"
+                  style={{ width: `${Math.min(s.TRS * 100, 100)}%`, backgroundColor: trsColor(s.TRS) }} />
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="bg-gray-50 rounded-lg p-4 mb-4 text-center text-sm text-gray-500">
+            Aucune donnée TRS — session sans lots
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <button onClick={onCancel}
+            className={`flex-1 border border-gray-300 text-gray-700 ${BTN_PRIMARY} hover:bg-gray-50`}>
+            Annuler
+          </button>
+          <button onClick={onConfirm}
+            className={`flex-1 bg-red-600 text-white ${BTN_PRIMARY} hover:bg-red-700`}>
+            <Square className="h-4 w-4" /> Fermer
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
