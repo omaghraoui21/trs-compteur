@@ -21,6 +21,10 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Mot de passe requis"),
 });
 
+export const refreshSchema = z.object({
+  refreshToken: z.string().min(1, "refreshToken requis"),
+});
+
 export const openSessionSchema = z.object({
   equipmentId: z.string().uuid("equipmentId invalide"),
   roomId: z.string().uuid("roomId invalide"),
@@ -77,6 +81,7 @@ export const updateLotSchema = z
 export const addDowntimeSchema = z.object({
   categoryId: z.string().uuid("categoryId invalide"),
   durationMinutes: z.number().positive("Durée doit être positive"),
+  isShortStop: z.boolean().optional(),
   comment: z.string().optional(),
 });
 

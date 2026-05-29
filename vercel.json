@@ -10,5 +10,8 @@
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" }
+  ],
+  "crons": [
+    { "path": "/api/maintenance/cleanup-tokens", "schedule": "0 3 * * *" }
   ]
 }

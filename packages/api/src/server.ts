@@ -11,6 +11,7 @@ import { lotsRouter } from "./routes/lots";
 import { refRouter } from "./routes/ref";
 import { dashboardRouter } from "./routes/dashboard";
 import { adminRouter } from "./routes/admin";
+import { maintenanceRouter } from "./routes/maintenance";
 import { HttpError, asyncHandler } from "./lib/http";
 import type { Request, Response, NextFunction } from "express";
 
@@ -42,12 +43,16 @@ app.use((req, _res, next) => {
   next();
 });
 
-app.use("/api/auth", authLimiter, authRouter);
+// Brute-force protection guards the password endpoint only; /refresh and /logout
+// present high-entropy tokens and must not be throttled (busy shop floor shares one IP).
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth", authRouter);
 app.use("/api/sessions", sessionsRouter);
 app.use("/api/lots", lotsRouter);
 app.use("/api/ref", refRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/maintenance", maintenanceRouter);
 
 // C2: Real health check — actually pings the DB so monitors see real status
 app.get("/api/health", asyncHandler(async (_req, res) => {

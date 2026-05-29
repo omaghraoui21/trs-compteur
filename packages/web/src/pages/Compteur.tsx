@@ -900,6 +900,7 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
   const [mode, setMode] = useState<"manual" | "timer">("manual");
   const [duration, setDuration] = useState("");
   const [comment, setComment] = useState("");
+  const [shortStop, setShortStop] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // U1: Timer state
@@ -944,6 +945,7 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
       await api.addDowntime(lotId, {
         categoryId: catId,
         durationMinutes: Number(duration),
+        isShortStop: shortStop ? true : undefined,
         comment: comment || undefined,
       });
       onAdded();
@@ -1022,6 +1024,17 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
             )}
           </div>
         )}
+
+        {/* Micro-arrêt override: forces this stop into the Performance bucket (TP)
+            regardless of duration, per the TPM six-big-losses classification. */}
+        <label className="flex items-center gap-3 border rounded-lg px-3 py-3 cursor-pointer min-h-[48px]">
+          <input type="checkbox" checked={shortStop} onChange={e => setShortStop(e.target.checked)}
+            className="h-5 w-5 accent-orange-500" />
+          <span className="text-sm">
+            <span className="font-medium">Micro-arrêt</span>
+            <span className="text-gray-500"> — perte de performance (TP)</span>
+          </span>
+        </label>
 
         <div>
           <label className="block text-sm font-medium mb-1">Commentaire</label>

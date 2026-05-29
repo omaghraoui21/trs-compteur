@@ -4,6 +4,7 @@ import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories
 import { computeLotTrs, computeSessionTrs, diffMinutes } from "@trs/engine";
 import { authenticate } from "../middleware";
 import { asyncHandler, validate } from "../lib/http";
+import { audit } from "../lib/audit";
 import { openSessionSchema, addEventSchema } from "../schemas";
 
 export const sessionsRouter = Router();
@@ -75,6 +76,7 @@ sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (re
     status: "active",
   }).returning();
 
+  await audit(db, req, "OPEN_SESSION", "session", session.id, { equipmentId, roomId });
   res.status(201).json(session);
 }));
 
@@ -112,6 +114,7 @@ sessionsRouter.post("/:id/close", asyncHandler(async (req, res) => {
     .where(eq(sessions.id, String(req.params.id)))
     .returning();
 
+  if (session) await audit(db, req, "CLOSE_SESSION", "session", session.id, {});
   res.json(session);
 }));
 

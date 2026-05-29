@@ -94,6 +94,25 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ─── Refresh Tokens (M2: rotation + reuse detection) ───
+// Opaque refresh tokens stored hashed (sha256). Each login starts a token
+// "family"; rotation issues a new token in the same family and revokes the
+// old one. Presenting an already-revoked token (reuse) revokes the family.
+
+export const refreshTokens = pgTable("refresh_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  familyId: uuid("family_id").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_refresh_tokens_hash").on(t.tokenHash),
+  index("idx_refresh_tokens_family").on(t.familyId),
+  index("idx_refresh_tokens_user").on(t.userId),
+]);
+
 // ─── Downtime Categories ───────────────────────────────
 
 export const downtimeCategories = pgTable("downtime_categories", {
@@ -195,6 +214,8 @@ export const downtimeEvents = pgTable("downtime_events", {
   endedAt: timestamp("ended_at", { withTimezone: true }),
   durationMinutes: integer("duration_minutes").notNull(),
   status: downtimeStatusEnum("status").notNull().default("closed"),
+  // null = classify by microStopThreshold; true/false = explicit operator/supervisor override
+  isShortStop: boolean("is_short_stop"),
   comment: text("comment"),
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -236,6 +257,27 @@ export const dailySummaries = pgTable("daily_summaries", {
   unique("uq_daily_summary_equip_date").on(t.equipmentId, t.summaryDate),
   index("idx_daily_summaries_date").on(t.summaryDate),
   index("idx_daily_summaries_equipment").on(t.equipmentId),
+]);
+
+// ─── Audit Log (pharma traceability) ──────────────────
+// Append-only. actorEmail is denormalised so the record survives user deletion.
+// payload stores a compact JSON snapshot of the changed entity.
+
+export const auditLog = pgTable("audit_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  actorId: uuid("actor_id").references(() => users.id),
+  actorEmail: text("actor_email").notNull(),
+  action: text("action").notNull(),       // e.g. START_LOT | CLOSE_LOT | VALIDATE_LOT | REJECT_LOT | OPEN_SESSION | CLOSE_SESSION
+  entityType: text("entity_type").notNull(), // lot | session | downtime | user | equipment
+  entityId: uuid("entity_id"),
+  payload: text("payload"),               // JSON snapshot (after-state or delta)
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_audit_log_actor").on(t.actorId),
+  index("idx_audit_log_entity").on(t.entityType, t.entityId),
+  index("idx_audit_log_created").on(t.createdAt),
+  index("idx_audit_log_action").on(t.action),
 ]);
 
 // ─── Product × Equipment Cadences ──────────────────────
