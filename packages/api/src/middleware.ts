@@ -43,8 +43,9 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+// M2: short-lived access token — longevity is provided by the refresh-token flow
 export function signToken(userId: string, role: string): string {
-  return jwt.sign({ sub: userId, role }, JWT_SECRET, { expiresIn: "12h" });
+  return jwt.sign({ sub: userId, role }, JWT_SECRET, { expiresIn: "15m" });
 }
 
 export function requireRole(...roles: string[]) {

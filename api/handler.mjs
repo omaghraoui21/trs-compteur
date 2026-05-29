@@ -109,7 +109,7 @@ var require_main = __commonJS({
     var fs2 = __require("fs");
     var path = __require("path");
     var os2 = __require("os");
-    var crypto2 = __require("crypto");
+    var crypto3 = __require("crypto");
     var packageJson = require_package();
     var version2 = packageJson.version;
     var LINE = /(?:^|^)\s*(?:export\s+)?([\w.-]+)(?:\s*=\s*?|:\s+?)(\s*'(?:\\'|[^'])*'|\s*"(?:\\"|[^"])*"|\s*`(?:\\`|[^`])*`|[^#\r\n]+)?\s*(?:#.*)?(?:$|$)/mg;
@@ -328,7 +328,7 @@ var require_main = __commonJS({
       const authTag = ciphertext.subarray(-16);
       ciphertext = ciphertext.subarray(12, -16);
       try {
-        const aesgcm = crypto2.createDecipheriv("aes-256-gcm", key, nonce);
+        const aesgcm = crypto3.createDecipheriv("aes-256-gcm", key, nonce);
         aesgcm.setAuthTag(authTag);
         return `${aesgcm.update(ciphertext)}${aesgcm.final()}`;
       } catch (error) {
@@ -19136,14 +19136,14 @@ var require_etag = __commonJS({
   "node_modules/.pnpm/etag@1.8.1/node_modules/etag/index.js"(exports, module) {
     "use strict";
     module.exports = etag;
-    var crypto2 = __require("crypto");
+    var crypto3 = __require("crypto");
     var Stats = __require("fs").Stats;
     var toString = Object.prototype.toString;
     function entitytag(entity) {
       if (entity.length === 0) {
         return '"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk"';
       }
-      var hash = crypto2.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
+      var hash = crypto3.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
       var len = typeof entity === "string" ? Buffer.byteLength(entity, "utf8") : entity.length;
       return '"' + len.toString(16) + "-" + hash + '"';
     }
@@ -22036,11 +22036,11 @@ var require_request = __commonJS({
 // node_modules/.pnpm/cookie-signature@1.0.7/node_modules/cookie-signature/index.js
 var require_cookie_signature = __commonJS({
   "node_modules/.pnpm/cookie-signature@1.0.7/node_modules/cookie-signature/index.js"(exports) {
-    var crypto2 = __require("crypto");
+    var crypto3 = __require("crypto");
     exports.sign = function(val, secret) {
       if ("string" !== typeof val) throw new TypeError("Cookie value must be provided as a string.");
       if (null == secret) throw new TypeError("Secret key must be provided.");
-      return val + "." + crypto2.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
+      return val + "." + crypto3.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
     };
     exports.unsign = function(val, secret) {
       if ("string" !== typeof val) throw new TypeError("Signed cookie string must be provided.");
@@ -22049,7 +22049,7 @@ var require_cookie_signature = __commonJS({
       return sha1(mac) == sha1(val) ? str : false;
     };
     function sha1(str) {
-      return crypto2.createHash("sha1").update(str).digest("hex");
+      return crypto3.createHash("sha1").update(str).digest("hex");
     }
   }
 });
@@ -27281,14 +27281,14 @@ var require_buffer_equal_constant_time = __commonJS({
 var require_jwa = __commonJS({
   "node_modules/.pnpm/jwa@2.0.1/node_modules/jwa/index.js"(exports, module) {
     var Buffer3 = require_safe_buffer().Buffer;
-    var crypto2 = __require("crypto");
+    var crypto3 = __require("crypto");
     var formatEcdsa = require_ecdsa_sig_formatter();
     var util2 = __require("util");
     var MSG_INVALID_ALGORITHM = '"%s" is not a valid algorithm.\n  Supported algorithms are:\n  "HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512" and "none".';
     var MSG_INVALID_SECRET = "secret must be a string or buffer";
     var MSG_INVALID_VERIFIER_KEY = "key must be a string or a buffer";
     var MSG_INVALID_SIGNER_KEY = "key must be a string, a buffer or an object";
-    var supportsKeyObjects = typeof crypto2.createPublicKey === "function";
+    var supportsKeyObjects = typeof crypto3.createPublicKey === "function";
     if (supportsKeyObjects) {
       MSG_INVALID_VERIFIER_KEY += " or a KeyObject";
       MSG_INVALID_SECRET += "or a KeyObject";
@@ -27378,17 +27378,17 @@ var require_jwa = __commonJS({
       return function sign(thing, secret) {
         checkIsSecretKey(secret);
         thing = normalizeInput(thing);
-        var hmac2 = crypto2.createHmac("sha" + bits, secret);
+        var hmac2 = crypto3.createHmac("sha" + bits, secret);
         var sig = (hmac2.update(thing), hmac2.digest("base64"));
         return fromBase64(sig);
       };
     }
     var bufferEqual;
-    var timingSafeEqual = "timingSafeEqual" in crypto2 ? function timingSafeEqual2(a, b2) {
+    var timingSafeEqual = "timingSafeEqual" in crypto3 ? function timingSafeEqual2(a, b2) {
       if (a.byteLength !== b2.byteLength) {
         return false;
       }
-      return crypto2.timingSafeEqual(a, b2);
+      return crypto3.timingSafeEqual(a, b2);
     } : function timingSafeEqual2(a, b2) {
       if (!bufferEqual) {
         bufferEqual = require_buffer_equal_constant_time();
@@ -27405,7 +27405,7 @@ var require_jwa = __commonJS({
       return function sign(thing, privateKey) {
         checkIsPrivateKey(privateKey);
         thing = normalizeInput(thing);
-        var signer = crypto2.createSign("RSA-SHA" + bits);
+        var signer = crypto3.createSign("RSA-SHA" + bits);
         var sig = (signer.update(thing), signer.sign(privateKey, "base64"));
         return fromBase64(sig);
       };
@@ -27415,7 +27415,7 @@ var require_jwa = __commonJS({
         checkIsPublicKey(publicKey);
         thing = normalizeInput(thing);
         signature = toBase64(signature);
-        var verifier = crypto2.createVerify("RSA-SHA" + bits);
+        var verifier = crypto3.createVerify("RSA-SHA" + bits);
         verifier.update(thing);
         return verifier.verify(publicKey, signature, "base64");
       };
@@ -27424,11 +27424,11 @@ var require_jwa = __commonJS({
       return function sign(thing, privateKey) {
         checkIsPrivateKey(privateKey);
         thing = normalizeInput(thing);
-        var signer = crypto2.createSign("RSA-SHA" + bits);
+        var signer = crypto3.createSign("RSA-SHA" + bits);
         var sig = (signer.update(thing), signer.sign({
           key: privateKey,
-          padding: crypto2.constants.RSA_PKCS1_PSS_PADDING,
-          saltLength: crypto2.constants.RSA_PSS_SALTLEN_DIGEST
+          padding: crypto3.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto3.constants.RSA_PSS_SALTLEN_DIGEST
         }, "base64"));
         return fromBase64(sig);
       };
@@ -27438,12 +27438,12 @@ var require_jwa = __commonJS({
         checkIsPublicKey(publicKey);
         thing = normalizeInput(thing);
         signature = toBase64(signature);
-        var verifier = crypto2.createVerify("RSA-SHA" + bits);
+        var verifier = crypto3.createVerify("RSA-SHA" + bits);
         verifier.update(thing);
         return verifier.verify({
           key: publicKey,
-          padding: crypto2.constants.RSA_PKCS1_PSS_PADDING,
-          saltLength: crypto2.constants.RSA_PSS_SALTLEN_DIGEST
+          padding: crypto3.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto3.constants.RSA_PSS_SALTLEN_DIGEST
         }, signature, "base64");
       };
     }
@@ -40976,6 +40976,7 @@ __export(schema_exports, {
   lotStatusEnum: () => lotStatusEnum,
   productEquipmentCadences: () => productEquipmentCadences,
   products: () => products,
+  refreshTokens: () => refreshTokens,
   rooms: () => rooms,
   sessionEvents: () => sessionEvents,
   sessionStatusEnum: () => sessionStatusEnum,
@@ -41054,6 +41055,19 @@ var users = pgTable("users", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
+var refreshTokens = pgTable("refresh_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  familyId: uuid("family_id").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (t) => [
+  index("idx_refresh_tokens_hash").on(t.tokenHash),
+  index("idx_refresh_tokens_family").on(t.familyId),
+  index("idx_refresh_tokens_user").on(t.userId)
+]);
 var downtimeCategories = pgTable("downtime_categories", {
   id: uuid("id").primaryKey().defaultRandom(),
   code: text("code").notNull().unique(),
@@ -41143,6 +41157,8 @@ var downtimeEvents = pgTable("downtime_events", {
   endedAt: timestamp("ended_at", { withTimezone: true }),
   durationMinutes: integer("duration_minutes").notNull(),
   status: downtimeStatusEnum("status").notNull().default("closed"),
+  // null = classify by microStopThreshold; true/false = explicit operator/supervisor override
+  isShortStop: boolean("is_short_stop"),
   comment: text("comment"),
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
@@ -41208,6 +41224,7 @@ function createDb(url = connectionString) {
 // packages/api/src/routes/auth.ts
 var import_express = __toESM(require_express2(), 1);
 var import_bcryptjs = __toESM(require_bcryptjs(), 1);
+import crypto2 from "crypto";
 
 // packages/api/src/middleware.ts
 var import_jsonwebtoken = __toESM(require_jsonwebtoken(), 1);
@@ -41239,7 +41256,7 @@ function authenticate(req, res, next) {
   }
 }
 function signToken(userId, role) {
-  return import_jsonwebtoken.default.sign({ sub: userId, role }, JWT_SECRET, { expiresIn: "12h" });
+  return import_jsonwebtoken.default.sign({ sub: userId, role }, JWT_SECRET, { expiresIn: "15m" });
 }
 function requireRole(...roles) {
   return (req, res, next) => {
@@ -45339,6 +45356,9 @@ var loginSchema = external_exports.object({
   email: external_exports.string().email("Email invalide"),
   password: external_exports.string().min(1, "Mot de passe requis")
 });
+var refreshSchema = external_exports.object({
+  refreshToken: external_exports.string().min(1, "refreshToken requis")
+});
 var openSessionSchema = external_exports.object({
   equipmentId: external_exports.string().uuid("equipmentId invalide"),
   roomId: external_exports.string().uuid("roomId invalide")
@@ -45382,6 +45402,7 @@ var updateLotSchema = external_exports.object({
 var addDowntimeSchema = external_exports.object({
   categoryId: external_exports.string().uuid("categoryId invalide"),
   durationMinutes: external_exports.number().positive("Dur\xE9e doit \xEAtre positive"),
+  isShortStop: external_exports.boolean().optional(),
   comment: external_exports.string().optional()
 });
 var validateLotSchema = external_exports.object({
@@ -45439,6 +45460,18 @@ var createCadenceSchema = external_exports.object({
 
 // packages/api/src/routes/auth.ts
 var authRouter = (0, import_express.Router)();
+var REFRESH_TTL_DAYS = 30;
+var REUSE_GRACE_MS = 1e4;
+function generateRefreshToken() {
+  return crypto2.randomBytes(32).toString("hex");
+}
+function hashToken(token) {
+  return crypto2.createHash("sha256").update(token).digest("hex");
+}
+function refreshExpiry() {
+  return new Date(Date.now() + REFRESH_TTL_DAYS * 864e5);
+}
+var publicUser = (u) => ({ id: u.id, email: u.email, displayName: u.displayName, role: u.role });
 authRouter.post("/login", validate(loginSchema), asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   const { db: db2 } = req;
@@ -45452,11 +45485,59 @@ authRouter.post("/login", validate(loginSchema), asyncHandler(async (req, res) =
     res.status(401).json({ error: "Identifiants invalides" });
     return;
   }
-  const token = signToken(user.id, user.role);
-  res.json({
-    token,
-    user: { id: user.id, email: user.email, displayName: user.displayName, role: user.role }
+  const refreshToken = generateRefreshToken();
+  await db2.insert(refreshTokens).values({
+    userId: user.id,
+    tokenHash: hashToken(refreshToken),
+    familyId: crypto2.randomUUID(),
+    expiresAt: refreshExpiry()
   });
+  const token = signToken(user.id, user.role);
+  res.json({ token, refreshToken, user: publicUser(user) });
+}));
+authRouter.post("/refresh", validate(refreshSchema), asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+  const { db: db2 } = req;
+  const hash = hashToken(refreshToken);
+  const [row] = await db2.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, hash)).limit(1);
+  if (!row) {
+    res.status(401).json({ error: "Refresh token invalide" });
+    return;
+  }
+  if (row.revokedAt && Date.now() - row.revokedAt.getTime() > REUSE_GRACE_MS) {
+    await db2.update(refreshTokens).set({ revokedAt: /* @__PURE__ */ new Date() }).where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt)));
+    res.status(401).json({ error: "R\xE9utilisation d\xE9tect\xE9e \u2014 session r\xE9voqu\xE9e" });
+    return;
+  }
+  if (row.expiresAt.getTime() < Date.now()) {
+    res.status(401).json({ error: "Refresh token expir\xE9" });
+    return;
+  }
+  const [user] = await db2.select().from(users).where(eq(users.id, row.userId)).limit(1);
+  if (!user || !user.isActive) {
+    res.status(401).json({ error: "Utilisateur inactif" });
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  await db2.update(refreshTokens).set({ revokedAt: now }).where(eq(refreshTokens.id, row.id));
+  const newRefresh = generateRefreshToken();
+  await db2.insert(refreshTokens).values({
+    userId: user.id,
+    tokenHash: hashToken(newRefresh),
+    familyId: row.familyId,
+    expiresAt: refreshExpiry()
+  });
+  const token = signToken(user.id, user.role);
+  res.json({ token, refreshToken: newRefresh, user: publicUser(user) });
+}));
+authRouter.post("/logout", validate(refreshSchema), asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+  const { db: db2 } = req;
+  const [row] = await db2.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, hashToken(refreshToken))).limit(1);
+  if (row) {
+    await db2.update(refreshTokens).set({ revokedAt: /* @__PURE__ */ new Date() }).where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt)));
+  }
+  res.json({ ok: true });
 }));
 authRouter.get("/me", authenticate, asyncHandler(async (req, res) => {
   const { db: db2, userId } = req;
@@ -45469,7 +45550,7 @@ authRouter.get("/me", authenticate, asyncHandler(async (req, res) => {
     res.status(404).json({ error: "Utilisateur introuvable" });
     return;
   }
-  res.json({ id: user.id, email: user.email, displayName: user.displayName, role: user.role });
+  res.json(publicUser(user));
 }));
 
 // packages/api/src/routes/sessions.ts
@@ -45688,7 +45769,10 @@ function computeSixBigLosses(sessionTrs, downtimeDetails, microStopThresholdMin 
   for (const dt of downtimeDetails) {
     if (dt.isPlanned) {
       setupMin += dt.durationMinutes;
-    } else if (dt.durationMinutes < microStopThresholdMin) {
+      continue;
+    }
+    const isMicro = dt.isShortStop ?? dt.durationMinutes < microStopThresholdMin;
+    if (isMicro) {
       microStopMin += dt.durationMinutes;
     } else {
       breakdownMin += dt.durationMinutes;
@@ -46027,7 +46111,7 @@ lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res
 }));
 lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
   const { db: db2, userId } = req;
-  const { categoryId, durationMinutes, comment } = req.body;
+  const { categoryId, durationMinutes, isShortStop, comment } = req.body;
   const now = /* @__PURE__ */ new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 6e4);
   const [dt] = await db2.insert(downtimeEvents).values({
@@ -46037,6 +46121,7 @@ lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(asyn
     endedAt,
     durationMinutes,
     status: "closed",
+    isShortStop: isShortStop ?? null,
     comment,
     createdBy: userId
   }).returning();
@@ -46380,7 +46465,8 @@ dashboardRouter.get("/six-losses", asyncHandler(async (req, res) => {
       const dts = await db2.select({
         durationMinutes: downtimeEvents.durationMinutes,
         famille: downtimeCategories.famille,
-        isPlanned: downtimeCategories.isPlanned
+        isPlanned: downtimeCategories.isPlanned,
+        isShortStop: downtimeEvents.isShortStop
       }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(eq(downtimeEvents.lotEntryId, lot.id));
       allDowntimeDetails.push(...dts);
     }
@@ -46397,7 +46483,8 @@ dashboardRouter.get("/six-losses", asyncHandler(async (req, res) => {
       const dts = await db2.select({
         durationMinutes: downtimeEvents.durationMinutes,
         famille: downtimeCategories.famille,
-        isPlanned: downtimeCategories.isPlanned
+        isPlanned: downtimeCategories.isPlanned,
+        isShortStop: downtimeEvents.isShortStop
       }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(eq(downtimeEvents.lotEntryId, lot.id));
       sessionDts.push(...dts);
     }
@@ -46661,7 +46748,8 @@ app.use((req, _res, next) => {
   req.db = db;
   next();
 });
-app.use("/api/auth", authLimiter, authRouter);
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth", authRouter);
 app.use("/api/sessions", sessionsRouter);
 app.use("/api/lots", lotsRouter);
 app.use("/api/ref", refRouter);

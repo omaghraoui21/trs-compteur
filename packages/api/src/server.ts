@@ -42,7 +42,10 @@ app.use((req, _res, next) => {
   next();
 });
 
-app.use("/api/auth", authLimiter, authRouter);
+// Brute-force protection guards the password endpoint only; /refresh and /logout
+// present high-entropy tokens and must not be throttled (busy shop floor shares one IP).
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth", authRouter);
 app.use("/api/sessions", sessionsRouter);
 app.use("/api/lots", lotsRouter);
 app.use("/api/ref", refRouter);

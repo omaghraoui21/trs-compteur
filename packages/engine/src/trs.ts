@@ -390,7 +390,7 @@ export function computeProductTrs(lots: ProductLotInput[], periodTR?: number): P
 
 export function computeSixBigLosses(
   sessionTrs: SessionTrsResult,
-  downtimeDetails: { durationMinutes: number; famille: string; isPlanned: boolean }[],
+  downtimeDetails: { durationMinutes: number; famille: string; isPlanned: boolean; isShortStop?: boolean | null }[],
   microStopThresholdMin: number = 5,
 ): SixBigLossesResult {
   const { tT, tF, ecartCadenceMin, nonQualiteMin, fermeture, tAP } = sessionTrs;
@@ -403,7 +403,11 @@ export function computeSixBigLosses(
     if (dt.isPlanned) {
       // Planned stops: setup/changeover type
       setupMin += dt.durationMinutes;
-    } else if (dt.durationMinutes < microStopThresholdMin) {
+      continue;
+    }
+    // An explicit isShortStop override (operator/supervisor) wins over the duration heuristic.
+    const isMicro = dt.isShortStop ?? (dt.durationMinutes < microStopThresholdMin);
+    if (isMicro) {
       microStopMin += dt.durationMinutes;
     } else {
       breakdownMin += dt.durationMinutes;

@@ -1,5 +1,10 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import { api, type User } from "./api";
+import { api, type User, ACCESS_KEY, REFRESH_KEY } from "./api";
+
+function clearTokens() {
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+}
 
 interface AuthCtx {
   user: User | null;
@@ -15,19 +20,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("trs_token");
-    if (!token) { setLoading(false); return; }
-    api.me().then(setUser).catch(() => localStorage.removeItem("trs_token")).finally(() => setLoading(false));
+    // api.me() transparently refreshes an expired access token, so we only need
+    // a refresh token (or a still-valid access token) to attempt session restore.
+    if (!localStorage.getItem(ACCESS_KEY) && !localStorage.getItem(REFRESH_KEY)) {
+      setLoading(false);
+      return;
+    }
+    api.me().then(setUser).catch(clearTokens).finally(() => setLoading(false));
   }, []);
 
   const login = async (email: string, password: string) => {
-    const { token, user } = await api.login(email, password);
-    localStorage.setItem("trs_token", token);
+    const { token, refreshToken, user } = await api.login(email, password);
+    localStorage.setItem(ACCESS_KEY, token);
+    localStorage.setItem(REFRESH_KEY, refreshToken);
     setUser(user);
   };
 
   const logout = () => {
-    localStorage.removeItem("trs_token");
+    const refreshToken = localStorage.getItem(REFRESH_KEY);
+    if (refreshToken) api.logout(refreshToken).catch(() => {}); // best-effort server-side revoke
+    clearTokens();
     setUser(null);
   };
 

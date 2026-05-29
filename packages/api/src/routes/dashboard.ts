@@ -351,7 +351,7 @@ dashboardRouter.get("/six-losses", asyncHandler(async (req, res) => {
     .orderBy(sessions.sessionDate);
 
   const sessionResults: any[] = [];
-  const allDowntimeDetails: { durationMinutes: number; famille: string; isPlanned: boolean }[] = [];
+  const allDowntimeDetails: { durationMinutes: number; famille: string; isPlanned: boolean; isShortStop: boolean | null }[] = [];
 
   for (const session of closedSessions) {
     const { sessionTrs } = await buildSessionTrs(db, session);
@@ -364,6 +364,7 @@ dashboardRouter.get("/six-losses", asyncHandler(async (req, res) => {
         durationMinutes: downtimeEvents.durationMinutes,
         famille: downtimeCategories.famille,
         isPlanned: downtimeCategories.isPlanned,
+        isShortStop: downtimeEvents.isShortStop,
       }).from(downtimeEvents)
         .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
         .where(eq(downtimeEvents.lotEntryId, lot.id));
@@ -382,12 +383,13 @@ dashboardRouter.get("/six-losses", asyncHandler(async (req, res) => {
 
     // Get downtimes for this session
     const lots = await db.select().from(lotEntries).where(eq(lotEntries.sessionId, session.id));
-    const sessionDts: { durationMinutes: number; famille: string; isPlanned: boolean }[] = [];
+    const sessionDts: { durationMinutes: number; famille: string; isPlanned: boolean; isShortStop: boolean | null }[] = [];
     for (const lot of lots) {
       const dts = await db.select({
         durationMinutes: downtimeEvents.durationMinutes,
         famille: downtimeCategories.famille,
         isPlanned: downtimeCategories.isPlanned,
+        isShortStop: downtimeEvents.isShortStop,
       }).from(downtimeEvents)
         .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
         .where(eq(downtimeEvents.lotEntryId, lot.id));

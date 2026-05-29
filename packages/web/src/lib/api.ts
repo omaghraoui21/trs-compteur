@@ -1,11 +1,52 @@
 const BASE = "/api";
 
-async function request<T>(path: string, opts?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("trs_token");
+export const ACCESS_KEY = "trs_token";
+export const REFRESH_KEY = "trs_refresh";
+
+// M2: a single shared refresh promise so concurrent 401s collapse into one
+// rotation call — otherwise the second request would replay an already-rotated
+// token and trip server-side reuse detection, nuking the whole session.
+let refreshPromise: Promise<boolean> | null = null;
+
+async function doRefresh(): Promise<boolean> {
+  const refreshToken = localStorage.getItem(REFRESH_KEY);
+  if (!refreshToken) return false;
+  try {
+    const res = await fetch(`${BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    localStorage.setItem(ACCESS_KEY, data.token);
+    localStorage.setItem(REFRESH_KEY, data.refreshToken);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function request<T>(path: string, opts?: RequestInit, retried = false): Promise<T> {
+  const token = localStorage.getItem(ACCESS_KEY);
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const res = await fetch(`${BASE}${path}`, { ...opts, headers: { ...headers, ...opts?.headers } });
+
+  // Access token expired → try one transparent refresh + retry
+  const isAuthCall = path === "/auth/login" || path === "/auth/refresh" || path === "/auth/logout";
+  if (res.status === 401 && !retried && !isAuthCall && localStorage.getItem(REFRESH_KEY)) {
+    if (!refreshPromise) {
+      refreshPromise = doRefresh().finally(() => { refreshPromise = null; });
+    }
+    const ok = await refreshPromise;
+    if (ok) return request<T>(path, opts, true);
+    // Refresh failed (expired/revoked) → drop tokens; callers see the 401 below
+    localStorage.removeItem(ACCESS_KEY);
+    localStorage.removeItem(REFRESH_KEY);
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `HTTP ${res.status}`);
@@ -16,7 +57,9 @@ async function request<T>(path: string, opts?: RequestInit): Promise<T> {
 export const api = {
   // Auth
   login: (email: string, password: string) =>
-    request<{ token: string; user: User }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+    request<{ token: string; refreshToken: string; user: User }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+  logout: (refreshToken: string) =>
+    request<{ ok: boolean }>("/auth/logout", { method: "POST", body: JSON.stringify({ refreshToken }) }),
   me: () => request<User>("/auth/me"),
 
   // Ref data
@@ -146,7 +189,7 @@ export interface ComparisonResponse { period: { from: string; to: string }; equi
 export interface AddEventInput { eventType: string; label?: string; durationMinutes?: number; isPlanned?: boolean; comment?: string }
 export interface StartLotInput { sessionId: string; productId: string; batchNumber: string; cadenceUsed: number; cadenceUnit?: string }
 export interface CloseLotInput { quantityProduced: number; quantityConforming: number; quantityRejected?: number }
-export interface AddDowntimeInput { categoryId: string; durationMinutes: number; comment?: string }
+export interface AddDowntimeInput { categoryId: string; durationMinutes: number; isShortStop?: boolean; comment?: string }
 
 // Admin types (include all fields, not just active)
 export interface AdminRoom { id: string; code: string; name: string; description: string | null; isActive: boolean; createdAt: string }

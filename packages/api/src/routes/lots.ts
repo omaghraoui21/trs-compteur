@@ -134,7 +134,7 @@ lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res
 
 lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
   const { db, userId } = req;
-  const { categoryId, durationMinutes, comment } = req.body;
+  const { categoryId, durationMinutes, isShortStop, comment } = req.body;
 
   const now = new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 60_000);
@@ -146,6 +146,7 @@ lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(asyn
     endedAt,
     durationMinutes,
     status: "closed",
+    isShortStop: isShortStop ?? null,
     comment,
     createdBy: userId,
   }).returning();
