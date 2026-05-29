@@ -4,6 +4,7 @@ import { lotEntries, downtimeEvents, sessionEvents } from "@trs/db";
 import { diffMinutes } from "@trs/engine";
 import { authenticate, requireRole } from "../middleware";
 import { asyncHandler, validate } from "../lib/http";
+import { audit } from "../lib/audit";
 import { startLotSchema, closeLotSchema, updateLotSchema, addDowntimeSchema, validateLotSchema } from "../schemas";
 
 export const lotsRouter = Router();
@@ -60,6 +61,7 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
     sortOrder: maxOrder + 1,
   });
 
+  await audit(db, req, "START_LOT", "lot", lot.id, { batchNumber, sessionId, productId });
   res.status(201).json(lot);
 }));
 
@@ -88,6 +90,7 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
   }).where(eq(lotEntries.id, String(req.params.id))).returning();
 
   if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
+  await audit(db, req, "CLOSE_LOT", "lot", lot.id, { quantityProduced, quantityConforming, quantityRejected });
 
   // Add lot_end event
   const existingEvents = await db.select().from(sessionEvents)
@@ -178,5 +181,6 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
   }).where(eq(lotEntries.id, String(req.params.id))).returning();
 
   if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
+  await audit(db, req, action === "reject" ? "REJECT_LOT" : "VALIDATE_LOT", "lot", lot.id, { action, comment });
   res.json(lot);
 }));

@@ -21020,7 +21020,7 @@ var require_application = __commonJS({
   "node_modules/.pnpm/express@4.22.2/node_modules/express/lib/application.js"(exports, module) {
     "use strict";
     var finalhandler = require_finalhandler();
-    var Router7 = require_router();
+    var Router8 = require_router();
     var methods = require_methods();
     var middleware = require_init();
     var query = require_query();
@@ -21085,7 +21085,7 @@ var require_application = __commonJS({
     };
     app2.lazyrouter = function lazyrouter() {
       if (!this._router) {
-        this._router = new Router7({
+        this._router = new Router8({
           caseSensitive: this.enabled("case sensitive routing"),
           strict: this.enabled("strict routing")
         });
@@ -22949,7 +22949,7 @@ var require_express = __commonJS({
     var mixin = require_merge_descriptors();
     var proto = require_application();
     var Route = require_route();
-    var Router7 = require_router();
+    var Router8 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -22972,7 +22972,7 @@ var require_express = __commonJS({
     exports.request = req;
     exports.response = res;
     exports.Route = Route;
-    exports.Router = Router7;
+    exports.Router = Router8;
     exports.json = bodyParser.json;
     exports.query = require_query();
     exports.raw = bodyParser.raw;
@@ -30780,7 +30780,7 @@ var require_jsonwebtoken = __commonJS({
 })();
 
 // packages/api/src/server.ts
-var import_express7 = __toESM(require_express2(), 1);
+var import_express8 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // node_modules/.pnpm/helmet@8.2.0/node_modules/helmet/index.mjs
@@ -40966,6 +40966,7 @@ function drizzle(...params) {
 // packages/db/src/schema.ts
 var schema_exports = {};
 __export(schema_exports, {
+  auditLog: () => auditLog,
   dailySummaries: () => dailySummaries,
   downtimeCategories: () => downtimeCategories,
   downtimeEvents: () => downtimeEvents,
@@ -41197,6 +41198,25 @@ var dailySummaries = pgTable("daily_summaries", {
   index("idx_daily_summaries_date").on(t.summaryDate),
   index("idx_daily_summaries_equipment").on(t.equipmentId)
 ]);
+var auditLog = pgTable("audit_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  actorId: uuid("actor_id").references(() => users.id),
+  actorEmail: text("actor_email").notNull(),
+  action: text("action").notNull(),
+  // e.g. START_LOT | CLOSE_LOT | VALIDATE_LOT | REJECT_LOT | OPEN_SESSION | CLOSE_SESSION
+  entityType: text("entity_type").notNull(),
+  // lot | session | downtime | user | equipment
+  entityId: uuid("entity_id"),
+  payload: text("payload"),
+  // JSON snapshot (after-state or delta)
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (t) => [
+  index("idx_audit_log_actor").on(t.actorId),
+  index("idx_audit_log_entity").on(t.entityType, t.entityId),
+  index("idx_audit_log_created").on(t.createdAt),
+  index("idx_audit_log_action").on(t.action)
+]);
 var productEquipmentCadences = pgTable("product_equipment_cadences", {
   id: uuid("id").primaryKey().defaultRandom(),
   productId: uuid("product_id").notNull().references(() => products.id),
@@ -41250,13 +41270,14 @@ function authenticate(req, res, next) {
     const payload = import_jsonwebtoken.default.verify(header.slice(7), JWT_SECRET);
     req.userId = payload.sub;
     req.userRole = payload.role;
+    req.userEmail = payload.email;
     next();
   } catch {
     res.status(401).json({ error: "Token invalide" });
   }
 }
-function signToken(userId, role) {
-  return import_jsonwebtoken.default.sign({ sub: userId, role }, JWT_SECRET, { expiresIn: "15m" });
+function signToken(userId, role, email) {
+  return import_jsonwebtoken.default.sign({ sub: userId, role, email }, JWT_SECRET, { expiresIn: "15m" });
 }
 function requireRole(...roles) {
   return (req, res, next) => {
@@ -45492,7 +45513,7 @@ authRouter.post("/login", validate(loginSchema), asyncHandler(async (req, res) =
     familyId: crypto2.randomUUID(),
     expiresAt: refreshExpiry()
   });
-  const token = signToken(user.id, user.role);
+  const token = signToken(user.id, user.role, user.email);
   res.json({ token, refreshToken, user: publicUser(user) });
 }));
 authRouter.post("/refresh", validate(refreshSchema), asyncHandler(async (req, res) => {
@@ -45527,7 +45548,7 @@ authRouter.post("/refresh", validate(refreshSchema), asyncHandler(async (req, re
     familyId: row.familyId,
     expiresAt: refreshExpiry()
   });
-  const token = signToken(user.id, user.role);
+  const token = signToken(user.id, user.role, user.email);
   res.json({ token, refreshToken: newRefresh, user: publicUser(user) });
 }));
 authRouter.post("/logout", validate(refreshSchema), asyncHandler(async (req, res) => {
@@ -45679,7 +45700,7 @@ function computeSessionTrs(input) {
   if (TRS > 0 && Math.abs(trsCheck - TRS) > 1e-3) {
     warnings.push({ code: "TRS_PRODUCT_MISMATCH", level: "warning", message: `DO\xD7TP\xD7TQ (${(trsCheck * 100).toFixed(1)}%) \u2260 TRS (${(TRS * 100).toFixed(1)}%)`, field: "TRS", value: trsCheck });
   }
-  const audit = {
+  const audit2 = {
     tF_norme: tF,
     tF_lots,
     tF_delta,
@@ -45711,7 +45732,7 @@ function computeSessionTrs(input) {
     downtimeByFamille,
     downtimeByNorme,
     warnings,
-    audit
+    audit: audit2
   };
 }
 function computeProductTrs(lots, periodTR) {
@@ -45844,13 +45865,13 @@ function computeZoomTrs(input) {
   const utilisation = tT > 0 ? tO / tT : 0;
   const tF_norme = sessions2.reduce((s, x) => s + x.audit.tF_norme, 0);
   const tF_lots = sessions2.reduce((s, x) => s + x.audit.tF_lots, 0);
-  const audit = {
+  const audit2 = {
     tF_norme,
     tF_lots,
     tF_delta: tF_norme - tF_lots,
     formula: `tF = \u03A3(session.tF) = ${tF}`
   };
-  return { tT, tO, fermeture, tAP, tR, tF, tN, tU, nonQualiteMin, ecartCadenceMin, totalUnplannedMin, DO, TP, TQ, TRS, TRG, TEEP, utilisation, lotCount, totalProduced, totalConforming, totalRebut, downtimeByFamille, downtimeByNorme, warnings, audit };
+  return { tT, tO, fermeture, tAP, tR, tF, tN, tU, nonQualiteMin, ecartCadenceMin, totalUnplannedMin, DO, TP, TQ, TRS, TRG, TEEP, utilisation, lotCount, totalProduced, totalConforming, totalRebut, downtimeByFamille, downtimeByNorme, warnings, audit: audit2 };
 }
 function computeMtbfMttr(downtimes, runTimeMin, microStopThresholdMin = 5) {
   const breakdowns = downtimes.filter((d) => !d.isPlanned && d.durationMinutes >= microStopThresholdMin);
@@ -45861,6 +45882,24 @@ function computeMtbfMttr(downtimes, runTimeMin, microStopThresholdMin = 5) {
   const mttr = totalBreakdownMin / breakdownCount;
   const availability = mtbf / (mtbf + mttr);
   return { breakdownCount, totalBreakdownMin, mtbf, mttr, availability };
+}
+
+// packages/api/src/lib/audit.ts
+async function audit(db2, req, action, entityType, entityId, payload) {
+  const actor = req;
+  try {
+    await db2.insert(auditLog).values({
+      actorId: actor.userId ?? null,
+      actorEmail: actor.userEmail ?? "unknown",
+      action,
+      entityType,
+      entityId: entityId ?? null,
+      payload: payload ? JSON.stringify(payload) : null,
+      ipAddress: req.ip ?? null
+    });
+  } catch {
+    console.error("audit write failed", { action, entityType, entityId });
+  }
 }
 
 // packages/api/src/routes/sessions.ts
@@ -45910,6 +45949,7 @@ sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (re
     openedAt: now,
     status: "active"
   }).returning();
+  await audit(db2, req, "OPEN_SESSION", "session", session.id, { equipmentId, roomId });
   res.status(201).json(session);
 }));
 sessionsRouter.post("/:id/close", asyncHandler(async (req, res) => {
@@ -45935,6 +45975,7 @@ sessionsRouter.post("/:id/close", asyncHandler(async (req, res) => {
     }
   }
   const [session] = await db2.update(sessions).set({ status: "closed", closedAt: now }).where(eq(sessions.id, String(req.params.id))).returning();
+  if (session) await audit(db2, req, "CLOSE_SESSION", "session", session.id, {});
   res.json(session);
 }));
 sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async (req, res) => {
@@ -46048,6 +46089,7 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
     lotEntryId: lot.id,
     sortOrder: maxOrder + 1
   });
+  await audit(db2, req, "START_LOT", "lot", lot.id, { batchNumber, sessionId, productId });
   res.status(201).json(lot);
 }));
 lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req, res) => {
@@ -46076,6 +46118,7 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
     res.status(404).json({ error: "Lot introuvable" });
     return;
   }
+  await audit(db2, req, "CLOSE_LOT", "lot", lot.id, { quantityProduced, quantityConforming, quantityRejected });
   const existingEvents = await db2.select().from(sessionEvents).where(eq(sessionEvents.sessionId, lot.sessionId));
   const maxOrder = existingEvents.reduce((max, e) => Math.max(max, e.sortOrder), 0);
   await db2.insert(sessionEvents).values({
@@ -46146,6 +46189,7 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
     res.status(404).json({ error: "Lot introuvable" });
     return;
   }
+  await audit(db2, req, action === "reject" ? "REJECT_LOT" : "VALIDATE_LOT", "lot", lot.id, { action, comment });
   res.json(lot);
 }));
 
@@ -46730,12 +46774,43 @@ adminRouter.delete("/cadences/:id", asyncHandler(async (req, res) => {
   res.json(row);
 }));
 
+// packages/api/src/routes/maintenance.ts
+var import_express7 = __toESM(require_express2(), 1);
+var maintenanceRouter = (0, import_express7.Router)();
+function isAuthorized(req) {
+  const cron = process.env.CRON_SECRET;
+  if (cron && req.headers.authorization === `Bearer ${cron}`) return true;
+  const manual = process.env.MAINTENANCE_SECRET;
+  if (manual && req.headers["x-maintenance-secret"] === manual) return true;
+  return false;
+}
+var cleanupHandler = asyncHandler(async (req, res) => {
+  if (!isAuthorized(req)) {
+    res.status(401).json({ error: "Non autoris\xE9" });
+    return;
+  }
+  const { db: db2 } = req;
+  const now = /* @__PURE__ */ new Date();
+  const oneDayAgo = new Date(now.getTime() - 864e5);
+  const result = await db2.delete(refreshTokens).where(
+    or(
+      lt(refreshTokens.expiresAt, now),
+      and(isNotNull(refreshTokens.revokedAt), lt(refreshTokens.revokedAt, oneDayAgo))
+    )
+  );
+  const deleted = result.rowCount ?? 0;
+  console.log(`[maintenance] cleanup-tokens: deleted ${deleted} rows`);
+  res.json({ ok: true, deleted });
+});
+maintenanceRouter.get("/cleanup-tokens", cleanupHandler);
+maintenanceRouter.post("/cleanup-tokens", cleanupHandler);
+
 // packages/api/src/server.ts
-var app = (0, import_express7.default)();
+var app = (0, import_express8.default)();
 app.use(helmet());
 var allowedOrigin = process.env.ALLOWED_ORIGIN;
 app.use((0, import_cors.default)({ origin: allowedOrigin || "*" }));
-app.use(import_express7.default.json());
+app.use(import_express8.default.json());
 var authLimiter = rate_limit_default({
   windowMs: 15 * 60 * 1e3,
   max: 10,
@@ -46755,6 +46830,7 @@ app.use("/api/lots", lotsRouter);
 app.use("/api/ref", refRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/maintenance", maintenanceRouter);
 app.get("/api/health", asyncHandler(async (_req, res) => {
   try {
     await db.execute(sql`SELECT 1`);

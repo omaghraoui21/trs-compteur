@@ -259,6 +259,27 @@ export const dailySummaries = pgTable("daily_summaries", {
   index("idx_daily_summaries_equipment").on(t.equipmentId),
 ]);
 
+// ─── Audit Log (pharma traceability) ──────────────────
+// Append-only. actorEmail is denormalised so the record survives user deletion.
+// payload stores a compact JSON snapshot of the changed entity.
+
+export const auditLog = pgTable("audit_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  actorId: uuid("actor_id").references(() => users.id),
+  actorEmail: text("actor_email").notNull(),
+  action: text("action").notNull(),       // e.g. START_LOT | CLOSE_LOT | VALIDATE_LOT | REJECT_LOT | OPEN_SESSION | CLOSE_SESSION
+  entityType: text("entity_type").notNull(), // lot | session | downtime | user | equipment
+  entityId: uuid("entity_id"),
+  payload: text("payload"),               // JSON snapshot (after-state or delta)
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_audit_log_actor").on(t.actorId),
+  index("idx_audit_log_entity").on(t.entityType, t.entityId),
+  index("idx_audit_log_created").on(t.createdAt),
+  index("idx_audit_log_action").on(t.action),
+]);
+
 // ─── Product × Equipment Cadences ──────────────────────
 
 export const productEquipmentCadences = pgTable("product_equipment_cadences", {

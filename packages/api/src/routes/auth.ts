@@ -53,7 +53,7 @@ authRouter.post("/login", validate(loginSchema), asyncHandler(async (req, res) =
     expiresAt: refreshExpiry(),
   });
 
-  const token = signToken(user.id, user.role);
+  const token = signToken(user.id, user.role, user.email);
   res.json({ token, refreshToken, user: publicUser(user) });
 }));
 
@@ -102,7 +102,7 @@ authRouter.post("/refresh", validate(refreshSchema), asyncHandler(async (req, re
     expiresAt: refreshExpiry(),
   });
 
-  const token = signToken(user.id, user.role);
+  const token = signToken(user.id, user.role, user.email);
   res.json({ token, refreshToken: newRefresh, user: publicUser(user) });
 }));
 
