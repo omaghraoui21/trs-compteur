@@ -15,6 +15,13 @@
       "when": 1780103400000,
       "tag": "0001_ensure_all_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780165800000,
+      "tag": "0002_downtime_events_columns",
+      "breakpoints": true
     }
   ]
 }
