@@ -1,6 +1,7 @@
 import { build } from "esbuild";
 import { cpSync, mkdirSync } from "fs";
 
+// Bundle the main API handler
 await build({
   entryPoints: ["packages/api/src/server.ts"],
   bundle: true,
@@ -15,6 +16,7 @@ await build({
     js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url);`,
   },
 });
+
 
 // Copy migration SQL files so they are available to the Vercel serverless
 // function bundle (server.ts resolves MIGRATIONS_DIR to ../../db/drizzle

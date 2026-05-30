@@ -1,5 +1,5 @@
 {
-  "buildCommand": "node scripts/build-api.mjs && cd packages/web && npx vite build",
+  "buildCommand": "node scripts/build-api.mjs && ./packages/api/node_modules/.bin/tsx scripts/migrate.ts && cd packages/web && npx vite build",
   "outputDirectory": "packages/web/dist",
   "installCommand": "npm install -g pnpm && pnpm install",
   "framework": "vite",

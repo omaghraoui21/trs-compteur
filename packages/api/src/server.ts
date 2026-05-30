@@ -45,22 +45,28 @@ const authLimiter = rateLimit({
 
 const db = createDb();
 
-// Run pending Drizzle migrations automatically on startup.
-// On Railway/Docker the container persists so this only runs once per deploy.
-// The path resolves to packages/db/drizzle/ whether we run via tsx or a built binary.
+// Run pending Drizzle migrations on startup — but only in Railway/Docker where
+// the process is long-lived and this runs once per deploy.
+// On Vercel, migrations run at build time (scripts/migrate.ts → db/migrate.mjs)
+// so each cold-start function invocation is not blocked by a DB round-trip.
+// Running migrate() inside a Vercel handler causes parallel cold-start timeouts
+// because Promise.all fires 3 simultaneous requests, each spawning a fresh
+// function instance that races to migrate the same already-migrated DB.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = process.env.MIGRATIONS_DIR
   ?? path.resolve(__dirname, "../../db/drizzle");
 
-try {
-  if (existsSync(MIGRATIONS_DIR)) {
-    await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
-    console.log("✓ Database migrations applied");
-    await seedIfEmpty(db);
+if (!process.env.VERCEL) {
+  try {
+    if (existsSync(MIGRATIONS_DIR)) {
+      await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
+      console.log("✓ Database migrations applied");
+      await seedIfEmpty(db);
+    }
+  } catch (err) {
+    console.error("Migration/seed failed:", err);
+    // Do not crash — let the health check surface the issue
   }
-} catch (err) {
-  console.error("Migration/seed failed:", err);
-  // Do not crash — let the health check surface the issue
 }
 
 // Inject db into request
