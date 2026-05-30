@@ -3,6 +3,7 @@ import { api, type Room, type Equipment, type Session, type SessionDetail, type 
 import { fmtDuration, fmtPct, trsColor, PHASE_CATEGORY_KEYS, PHASE_CATEGORY_LABELS } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { Onboarding } from "@/components/Onboarding";
+import { RateGauge } from "@/components/RateGauge";
 import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle, Zap, CheckCircle, XCircle, Wrench, Droplets, RotateCcw, Cpu } from "lucide-react";
 
 type View = "pick-room" | "pick-equip" | "timeline" | "new-lot" | "add-phase" | "add-downtime";
@@ -335,6 +336,12 @@ export default function CompteurPage() {
   const activeLot = detail?.lots.find(l => l.status === "active");
   const sessionTrs = trsData?.session;
   const activeLotProduct = activeLot ? products.find(p => p.id === activeLot.productId) : null;
+  // Reference (setpoint) cadence for the active lot, from product × equipment
+  // ref data already loaded — drives the live rate gauge & current-order table.
+  const setpointRef = activeLot && selectedEquipment
+    ? cadences.find(c => c.productId === activeLot.productId && c.equipmentId === selectedEquipment.id)
+    : undefined;
+  const setpointCadence = setpointRef ? Number(setpointRef.cadenceValue) : undefined;
   // "Phase actuelle" = production if a lot is running, else the most recent
   // recorded phase, else idle.
   const lastPhase = [...(detail?.events ?? [])].reverse()
@@ -411,6 +418,60 @@ export default function CompteurPage() {
               <div className={`font-semibold text-base leading-tight truncate ${activeLot ? "text-green-700" : "text-gray-700"}`}>
                 {currentActivity}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Live rate gauge + current-order table (Line-Performance style) */}
+      {activeSession && activeSession.status === "active" && activeLot && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+          <div className="lg:col-span-1">
+            <RateGauge
+              value={Number(activeLot.cadenceUsed)}
+              max={setpointCadence}
+              label="Cadence actuelle"
+              unit={activeLot.cadenceUnit}
+            />
+          </div>
+          <div className="lg:col-span-2 bg-white rounded-2xl border shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b flex items-center gap-2">
+              <Package className="h-4 w-4 text-green-600" />
+              <h3 className="font-semibold text-sm">Commande en cours</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-wide text-gray-400 text-left">
+                    <th className="px-4 py-2 font-medium">Lot</th>
+                    <th className="px-4 py-2 font-medium">Produit</th>
+                    <th className="px-4 py-2 font-medium">État</th>
+                    <th className="px-4 py-2 font-medium">Début</th>
+                    <th className="px-4 py-2 font-medium text-right">Consigne</th>
+                    <th className="px-4 py-2 font-medium text-right">Produits</th>
+                    <th className="px-4 py-2 font-medium text-right">Conformes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="bg-green-50/70 border-t">
+                    <td className="px-4 py-2.5 font-bold">{activeLot.batchNumber}</td>
+                    <td className="px-4 py-2.5 truncate max-w-[12rem]">{activeLotProduct?.name ?? "—"}</td>
+                    <td className="px-4 py-2.5">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700">
+                        <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" /> En production
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600">
+                      {new Date(activeLot.startedAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">
+                      {setpointCadence != null ? `${setpointCadence} ${activeLot.cadenceUnit}` : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{activeLot.quantityProduced.toLocaleString("fr-FR")}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-green-700">{activeLot.quantityConforming.toLocaleString("fr-FR")}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
