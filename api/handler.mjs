@@ -46792,6 +46792,58 @@ dashboardRouter.get("/heatmap", asyncHandler(async (req, res) => {
   }
   res.json({ period: { from, to, equipmentId }, heatmap: heatmapData });
 }));
+dashboardRouter.get("/downtime-log", asyncHandler(async (req, res) => {
+  const { db: db2 } = req;
+  const { equipmentId, from, to } = req.query;
+  if (!equipmentId || !from || !to) {
+    res.status(400).json({ error: "equipmentId, from, to requis" });
+    return;
+  }
+  const [equipment] = await db2.select().from(equipments).where(eq(equipments.id, equipmentId));
+  const closedSessions = await db2.select().from(sessions).where(and(
+    eq(sessions.equipmentId, equipmentId),
+    eq(sessions.status, "closed"),
+    gte(sessions.sessionDate, from),
+    lte(sessions.sessionDate, to)
+  ));
+  const sessionIds = closedSessions.map((s) => s.id);
+  if (sessionIds.length === 0) {
+    res.json({ period: { from, to, equipmentId }, log: [] });
+    return;
+  }
+  const allLots = [];
+  for (const sid of sessionIds) {
+    const lots = await db2.select().from(lotEntries).where(eq(lotEntries.sessionId, sid));
+    allLots.push(...lots);
+  }
+  const log = [];
+  for (const lot of allLots) {
+    const dts = await db2.select({
+      id: downtimeEvents.id,
+      startedAt: downtimeEvents.startedAt,
+      durationMinutes: downtimeEvents.durationMinutes,
+      comment: downtimeEvents.comment,
+      famille: downtimeCategories.famille,
+      reason: downtimeCategories.label,
+      isPlanned: downtimeCategories.isPlanned
+    }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(eq(downtimeEvents.lotEntryId, lot.id));
+    for (const dt of dts) {
+      log.push({
+        id: dt.id,
+        startedAt: dt.startedAt instanceof Date ? dt.startedAt.toISOString() : String(dt.startedAt),
+        durationMinutes: dt.durationMinutes,
+        isPlanned: dt.isPlanned,
+        famille: dt.famille,
+        reason: dt.reason,
+        batchNumber: lot.batchNumber,
+        equipment: equipment?.name ?? "",
+        comment: dt.comment
+      });
+    }
+  }
+  log.sort((a, b2) => new Date(b2.startedAt).getTime() - new Date(a.startedAt).getTime());
+  res.json({ period: { from, to, equipmentId }, log });
+}));
 dashboardRouter.get("/pending-lots", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const lots = await db2.select().from(lotEntries).where(eq(lotEntries.status, "closed")).orderBy(desc(lotEntries.endedAt));

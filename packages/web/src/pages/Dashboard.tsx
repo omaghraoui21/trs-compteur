@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
-import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ComparisonResponse, type TrsMetrics, type DailyTrs, type ByProductResponse, type SixLossesResponse, type HeatmapResponse } from "@/lib/api";
+import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ComparisonResponse, type TrsMetrics, type DailyTrs, type ByProductResponse, type SixLossesResponse, type HeatmapResponse, type DowntimeLogEntry, type DowntimeLogResponse } from "@/lib/api";
 import { fmtPct, fmtDuration, trsColor, familleToNorme, computeOeeBenchmark } from "@trs/engine";
 import type { BenchmarkRating } from "@trs/engine";
 import { useToast } from "@/components/Toast";
@@ -52,6 +52,7 @@ export default function DashboardPage() {
   const [byProductData, setByProductData] = useState<ByProductResponse | null>(null);
   const [sixLossesData, setSixLossesData] = useState<SixLossesResponse | null>(null);
   const [heatmapData, setHeatmapData] = useState<HeatmapResponse | null>(null);
+  const [downtimeLog, setDowntimeLog] = useState<DowntimeLogResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
@@ -73,18 +74,20 @@ export default function DashboardPage() {
     if (!selectedEquipment || !from || !to) return;
     setLoading(true);
     try {
-      const [trsRes, paretoRes, prodRes, lossesRes, heatRes] = await Promise.all([
+      const [trsRes, paretoRes, prodRes, lossesRes, heatRes, logRes] = await Promise.all([
         api.dashboardTrs(selectedEquipment, from, to),
         api.dashboardPareto(selectedEquipment, from, to),
         api.dashboardByProduct(selectedEquipment, from, to).catch(() => null),
         api.dashboardSixLosses(selectedEquipment, from, to).catch(() => null),
         api.dashboardHeatmap(selectedEquipment, from, to).catch(() => null),
+        api.dashboardDowntimeLog(selectedEquipment, from, to).catch(() => null),
       ]);
       setData(trsRes);
       setParetoData(paretoRes);
       setByProductData(prodRes);
       setSixLossesData(lossesRes);
       setHeatmapData(heatRes);
+      setDowntimeLog(logRes);
 
       if (showComparison) {
         try {
@@ -101,6 +104,7 @@ export default function DashboardPage() {
       setByProductData(null);
       setSixLossesData(null);
       setHeatmapData(null);
+      setDowntimeLog(null);
     } finally {
       setLoading(false);
     }
@@ -286,6 +290,9 @@ export default function DashboardPage() {
             onToggleDay={d => setExpandedDay(expandedDay === d ? null : d)}
             exportCsv={exportCsv}
           />
+
+          {/* ─── Chronological downtime log ──────────────────── */}
+          {downtimeLog && <DowntimeLog log={downtimeLog.log} />}
         </>
       )}
     </div>
@@ -355,6 +362,56 @@ function LinePerformanceBand({ daily }: { daily: DailyTrs[] }) {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+// Chronological stop-by-stop log (Grafana "DownTime Editor" style). Read-only
+// table sorted newest-first, fed by GET /dashboard/downtime-log.
+function DowntimeLog({ log }: { log: DowntimeLogEntry[] }) {
+  return (
+    <div className="bg-white rounded-xl border shadow-sm mt-4 overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b">
+        <AlertTriangle className="h-5 w-5 text-red-500" />
+        <h3 className="font-semibold">Journal des arrêts</h3>
+        <span className="ml-auto text-xs text-gray-400">{log.length} arrêt{log.length > 1 ? "s" : ""}</span>
+      </div>
+      {log.length === 0 ? (
+        <div className="px-4 py-8 text-center text-gray-400 text-sm">Aucun arrêt sur la période</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-[11px] uppercase tracking-wide text-gray-400 text-left border-b">
+                <th className="px-4 py-2 font-medium">Date</th>
+                <th className="px-4 py-2 font-medium text-right">Durée</th>
+                <th className="px-4 py-2 font-medium">Type</th>
+                <th className="px-4 py-2 font-medium">Famille</th>
+                <th className="px-4 py-2 font-medium">Raison</th>
+                <th className="px-4 py-2 font-medium">Lot</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {log.map(e => (
+                <tr key={e.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2.5 whitespace-nowrap text-gray-600">
+                    {new Date(e.startedAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                  </td>
+                  <td className="px-4 py-2.5 text-right tabular-nums font-medium">{fmtDuration(e.durationMinutes)}</td>
+                  <td className="px-4 py-2.5">
+                    <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full ${e.isPlanned ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
+                      {e.isPlanned ? "Planifié" : "Non planifié"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-gray-600">{e.famille}</td>
+                  <td className="px-4 py-2.5">{e.reason}</td>
+                  <td className="px-4 py-2.5 text-gray-500">{e.batchNumber}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

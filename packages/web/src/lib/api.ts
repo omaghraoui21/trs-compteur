@@ -119,6 +119,8 @@ export const api = {
     request<SixLossesResponse>(`/dashboard/six-losses?equipmentId=${equipmentId}&from=${from}&to=${to}`),
   dashboardHeatmap: (equipmentId: string, from: string, to: string) =>
     request<HeatmapResponse>(`/dashboard/heatmap?equipmentId=${equipmentId}&from=${from}&to=${to}`),
+  dashboardDowntimeLog: (equipmentId: string, from: string, to: string) =>
+    request<DowntimeLogResponse>(`/dashboard/downtime-log?equipmentId=${equipmentId}&from=${from}&to=${to}`),
   pendingLots: () => request<LotEntry[]>("/dashboard/pending-lots"),
 
   // Admin CRUD
@@ -230,3 +232,7 @@ export interface SixLossesResponse { period: { from: string; to: string; equipme
 // Y: Heatmap
 export interface HeatmapDataPoint { date: string; TRS: number; DO: number; TP: number; TQ: number; lotCount: number }
 export interface HeatmapResponse { period: { from: string; to: string; equipmentId: string }; heatmap: HeatmapDataPoint[] }
+
+// Chronological downtime log
+export interface DowntimeLogEntry { id: string; startedAt: string; durationMinutes: number; isPlanned: boolean; famille: string; reason: string; batchNumber: string; equipment: string; comment: string | null }
+export interface DowntimeLogResponse { period: { from: string; to: string; equipmentId: string }; log: DowntimeLogEntry[] }
