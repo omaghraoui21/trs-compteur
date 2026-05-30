@@ -440,6 +440,47 @@ dashboardRouter.get("/heatmap", asyncHandler(async (req, res) => {
   res.json({ period: { from, to, equipmentId }, heatmap: heatmapData });
 }));
 
+// ─── Chronological downtime log (stop-by-stop) ────────────────
+
+// Note: this log lists only recorded downtime_events (lot-linked stops). Unlike
+// /pareto, it intentionally excludes phase-based planned stops (nettoyage, CHSB…)
+// recorded as session events — those belong to the phase timeline, not the stop
+// log. A single join (downtimes → categories → lots → sessions) filtered by the
+// session range, newest first.
+dashboardRouter.get("/downtime-log", asyncHandler(async (req, res) => {
+  const { db } = req;
+  const { equipmentId, from, to } = req.query;
+
+  if (!equipmentId || !from || !to) {
+    res.status(400).json({ error: "equipmentId, from, to requis" });
+    return;
+  }
+
+  const rows = await db.select({
+    id: downtimeEvents.id,
+    startedAt: downtimeEvents.startedAt,
+    durationMinutes: downtimeEvents.durationMinutes,
+    famille: downtimeCategories.famille,
+    reason: downtimeCategories.label,
+    isPlanned: downtimeCategories.isPlanned,
+    batchNumber: lotEntries.batchNumber,
+  }).from(downtimeEvents)
+    .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+    .innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id))
+    .innerJoin(sessions, eq(lotEntries.sessionId, sessions.id))
+    .where(and(
+      eq(sessions.equipmentId, equipmentId as string),
+      eq(sessions.status, "closed"),
+      gte(sessions.sessionDate, from as string),
+      lte(sessions.sessionDate, to as string),
+    ))
+    .orderBy(desc(downtimeEvents.startedAt));
+
+  const log = rows.map((r: any) => ({ ...r, startedAt: r.startedAt.toISOString() }));
+
+  res.json({ period: { from, to, equipmentId }, log });
+}));
+
 // ─── Pending lots for supervisor validation ───────────────────
 
 dashboardRouter.get("/pending-lots", asyncHandler(async (req, res) => {
