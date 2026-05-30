@@ -22,6 +22,9 @@ import type { Request, Response, NextFunction } from "express";
 
 const app = express();
 
+// Trust Railway/Vercel reverse proxy so X-Forwarded-For is available for rate limiting
+app.set("trust proxy", 1);
+
 // H5: Security headers
 app.use(helmet());
 

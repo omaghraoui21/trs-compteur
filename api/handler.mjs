@@ -46967,6 +46967,7 @@ maintenanceRouter.post("/cleanup-tokens", cleanupHandler);
 
 // packages/api/src/server.ts
 var app = (0, import_express8.default)();
+app.set("trust proxy", 1);
 app.use(helmet());
 var allowedOrigin = process.env.ALLOWED_ORIGIN;
 app.use((0, import_cors.default)({ origin: allowedOrigin || "*" }));
