@@ -254,6 +254,9 @@ export default function DashboardPage() {
             <KpiCard metrics={data.total} title={eq?.name || ""} objective={objective} />
           )}
 
+          {/* ─── Line Performance band ───────────────────────── */}
+          {!showComparison && <LinePerformanceBand daily={data.daily} />}
+
           {/* ─── Buckets temps ───────────────────────────────── */}
           <TimeBuckets metrics={data.total} />
 
@@ -300,6 +303,60 @@ const RATING_LABELS: Record<BenchmarkRating, { label: string; cls: string }> = {
 function BenchmarkBadge({ rating }: { rating: BenchmarkRating }) {
   const { label, cls } = RATING_LABELS[rating];
   return <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cls}`}>{label}</span>;
+}
+
+// Period-wide state-timeline band (Grafana "Line Performance" style). Each day
+// is a column whose height is split into execute / planned-stop / unplanned-stop
+// / other, proportional to the day's open time (tO). Built from the daily array
+// already fetched — no chart lib, no extra request.
+const BAND_STATES = [
+  { key: "execute",   label: "Production",          color: "#22c55e" },
+  { key: "unplanned", label: "Arrêt non planifié",  color: "#ef4444" },
+  { key: "planned",   label: "Arrêt planifié",      color: "#fbbf24" },
+  { key: "other",     label: "Autre / fermeture",   color: "#cbd5e1" },
+] as const;
+
+function LinePerformanceBand({ daily }: { daily: DailyTrs[] }) {
+  if (!daily.length) return null;
+  return (
+    <div className="bg-white rounded-xl border shadow-sm p-4 mb-4">
+      <div className="flex items-center gap-2 mb-3">
+        <BarChart3 className="h-5 w-5 text-blue-600" />
+        <h3 className="font-semibold">Line Performance</h3>
+      </div>
+      <div className="flex items-end gap-0.5 h-36">
+        {daily.map(d => {
+          const execute = Math.max(Math.round(d.tF), 0);
+          const unplanned = Math.max(d.totalUnplannedMin, 0);
+          const planned = Math.max(d.tAP, 0);
+          const other = Math.max(d.tO - execute - unplanned - planned, 0);
+          const mins: Record<(typeof BAND_STATES)[number]["key"], number> = { execute, unplanned, planned, other };
+          const total = execute + unplanned + planned + other || 1;
+          const title = `${d.date}\nProduction ${fmtDuration(execute)} · Arrêt NP ${fmtDuration(unplanned)} · Arrêt P ${fmtDuration(planned)}`;
+          return (
+            <div key={d.date} className="flex-1 flex flex-col justify-end h-full min-w-0" title={title}>
+              <div className="flex flex-col-reverse h-full rounded-sm overflow-hidden bg-gray-50">
+                {BAND_STATES.map(s => mins[s.key] > 0 && (
+                  <div key={s.key} style={{ height: `${(mins[s.key] / total) * 100}%`, backgroundColor: s.color }} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-between mt-1 text-[10px] text-gray-400">
+        <span>{daily[0]?.date}</span>
+        {daily.length > 1 && <span>{daily[daily.length - 1]?.date}</span>}
+      </div>
+      <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
+        {BAND_STATES.map(s => (
+          <span key={s.key} className="flex items-center gap-1">
+            <span className="w-2.5 h-2.5 rounded" style={{ backgroundColor: s.color }} /> {s.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // Line-Performance-style headline strip: six at-a-glance numbers above the

@@ -28,7 +28,7 @@ export function RateGauge({
   unit?: string;
 }) {
   const hasTarget = typeof max === "number" && max > 0;
-  const ratio = hasTarget ? Math.min(Math.max(value / (max as number), 0), 1) : 0;
+  const ratio = hasTarget ? Math.min(Math.max(value / max, 0), 1) : 0;
   const color = hasTarget ? trsColor(ratio) : "#9ca3af";
 
   const cx = 100;
