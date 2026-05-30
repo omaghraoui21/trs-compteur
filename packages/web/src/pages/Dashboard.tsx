@@ -355,10 +355,16 @@ function KpiCard({ metrics, title, objective }: { metrics: TrsMetrics; title: st
           <div className="text-xl font-bold text-blue-700">{fmtPct(metrics.TEEP ?? 0)}</div>
           <div className="text-[10px] text-blue-500 mt-0.5">vs calendrier 24/7</div>
         </div>
-        <div className="bg-gray-50 rounded-xl p-3">
+        <div className={`rounded-xl p-3 ${(metrics.utilisation ?? 0) > 1 ? "bg-amber-50" : "bg-gray-50"}`}>
           <div className="text-xs text-gray-500 mb-1">Utilisation</div>
-          <div className="text-xl font-bold">{fmtPct(metrics.utilisation ?? 0)}</div>
-          <div className="text-[10px] text-gray-400 mt-0.5">tO / 24h</div>
+          <div className={`text-xl font-bold ${(metrics.utilisation ?? 0) > 1 ? "text-amber-600" : ""}`}>
+            {fmtPct(metrics.utilisation ?? 0)}
+          </div>
+          {(metrics.utilisation ?? 0) > 1 ? (
+            <div className="text-[10px] text-amber-600 mt-0.5">⚠ &gt;100% — vérifier les données</div>
+          ) : (
+            <div className="text-[10px] text-gray-400 mt-0.5">tO / 24h</div>
+          )}
         </div>
         {rel && rel.mtbf != null && (
           <div className="bg-gray-50 rounded-xl p-3">

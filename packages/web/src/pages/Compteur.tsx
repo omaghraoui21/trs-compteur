@@ -805,39 +805,98 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
   );
 }
 
-// ─── Add Phase Form (U2: large buttons) ──────────────────
+// ─── Add Phase Form ──────────────────────────────────────
+
+const PHASE_CATEGORIES = [
+  {
+    id: "production", label: "Production",
+    tabActive: "bg-green-600 text-white border-green-600",
+    phaseActive: "border-green-500 bg-green-50 text-green-800 font-semibold",
+    requiresComment: false,
+    phases: [
+      { eventType: "remplissage", label: "Remplissage", isPlanned: true },
+      { eventType: "custom", label: "Blistering", isPlanned: true },
+      { eventType: "custom", label: "Conditionnement", isPlanned: true },
+      { eventType: "custom", label: "Contrôle IPC", isPlanned: true },
+    ],
+  },
+  {
+    id: "nettoyage", label: "Nettoyage",
+    tabActive: "bg-blue-600 text-white border-blue-600",
+    phaseActive: "border-blue-500 bg-blue-50 text-blue-800 font-semibold",
+    requiresComment: false,
+    phases: [
+      { eventType: "custom", label: "Nettoyage partiel", isPlanned: true },
+      { eventType: "nettoyage", label: "Nettoyage complet", isPlanned: true },
+      { eventType: "vide_ligne", label: "Vide de ligne", isPlanned: true },
+    ],
+  },
+  {
+    id: "changement", label: "Changement",
+    tabActive: "bg-violet-600 text-white border-violet-600",
+    phaseActive: "border-violet-500 bg-violet-50 text-violet-800 font-semibold",
+    requiresComment: false,
+    phases: [
+      { eventType: "chsb", label: "CHSB — Série blistereuse", isPlanned: true },
+      { eventType: "chsg", label: "CHSG — Série géluleuse", isPlanned: true },
+      { eventType: "custom", label: "Changement format", isPlanned: true },
+    ],
+  },
+  {
+    id: "arret", label: "Arrêt",
+    tabActive: "bg-orange-500 text-white border-orange-500",
+    phaseActive: "border-orange-500 bg-orange-50 text-orange-800 font-semibold",
+    requiresComment: true,
+    phases: [
+      { eventType: "pause", label: "Pause", isPlanned: true },
+      { eventType: "apr", label: "APR — Arrêt programmé", isPlanned: true },
+      { eventType: "custom", label: "Panne", isPlanned: false },
+      { eventType: "custom", label: "Attente matière", isPlanned: false },
+      { eventType: "custom", label: "Attente QA", isPlanned: false },
+      { eventType: "custom", label: "Attente maintenance", isPlanned: false },
+    ],
+  },
+  {
+    id: "qualite", label: "Qualité",
+    tabActive: "bg-red-600 text-white border-red-600",
+    phaseActive: "border-red-500 bg-red-50 text-red-800 font-semibold",
+    requiresComment: true,
+    phases: [
+      { eventType: "mqch", label: "MQCH — Quarantaine", isPlanned: false },
+      { eventType: "custom", label: "Investigation", isPlanned: false },
+      { eventType: "custom", label: "Rejet", isPlanned: false },
+      { eventType: "custom", label: "Retouche", isPlanned: false },
+    ],
+  },
+];
+const QUICK_DURATIONS = [5, 10, 15, 30, 60];
 
 function AddPhaseForm({ sessionId, onAdded, onBack }: {
   sessionId: string; onAdded: () => void; onBack: () => void;
 }) {
-  const phases = [
-    { type: "nettoyage", label: "Nettoyage", planned: true },
-    { type: "vide_ligne", label: "Vide de ligne", planned: true },
-    { type: "remplissage", label: "Remplissage", planned: true },
-    { type: "pause", label: "Pause", planned: true },
-    { type: "chsb", label: "CHSB (Changement serie Blistereuse)", planned: true },
-    { type: "chsg", label: "CHSG (Changement serie Geluleuse)", planned: true },
-    { type: "apr", label: "APR (Arret programme)", planned: true },
-    { type: "mqch", label: "MQCH (Mise en quarantaine)", planned: true },
-  ];
-
-  const [selectedType, setSelectedType] = useState("");
+  const [catIdx, setCatIdx] = useState(0);
+  const [phaseIdx, setPhaseIdx] = useState<number | null>(null);
   const [duration, setDuration] = useState("");
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
   const toast = useToast();
 
+  const cat = PHASE_CATEGORIES[catIdx];
+  const phase = phaseIdx !== null ? cat.phases[phaseIdx] : null;
+  const canSubmit = phase !== null && duration !== "" && Number(duration) > 0 &&
+    (!cat.requiresComment || comment.trim() !== "");
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedType || !duration) return;
+    if (!canSubmit || !phase) return;
     setLoading(true);
-    const phase = phases.find(p => p.type === selectedType);
     try {
       await api.addEvent(sessionId, {
-        eventType: selectedType,
+        eventType: phase.eventType,
+        label: phase.eventType === "custom" ? phase.label : undefined,
         durationMinutes: Number(duration),
-        isPlanned: phase?.planned ?? true,
-        comment: comment || undefined,
+        isPlanned: phase.isPlanned,
+        comment: comment.trim() || undefined,
       });
       onAdded();
     } catch (err: any) {
@@ -847,43 +906,100 @@ function AddPhaseForm({ sessionId, onAdded, onBack }: {
   };
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-lg mx-auto pb-28">
       <button onClick={onBack} className="flex items-center gap-1 text-sm text-blue-600 mb-4">
         <ChevronLeft className="h-4 w-4" /> Retour
       </button>
       <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
         <Clock className="h-5 w-5" /> Ajouter une phase
       </h2>
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl border p-4 space-y-4">
-        {/* U2: Larger phase buttons */}
-        <div className="grid grid-cols-2 gap-2">
-          {phases.map(p => (
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {/* Category tabs */}
+        <div className="flex overflow-x-auto gap-1.5 pb-1">
+          {PHASE_CATEGORIES.map((c, i) => (
             <button
-              key={p.type}
+              key={c.id}
               type="button"
-              onClick={() => setSelectedType(p.type)}
-              className={`border rounded-lg px-3 py-3.5 text-sm text-left transition min-h-[48px] ${
-                selectedType === p.type ? "border-blue-500 bg-blue-50 text-blue-700 font-medium" : "hover:bg-gray-50"
+              onClick={() => { setCatIdx(i); setPhaseIdx(null); }}
+              className={`shrink-0 px-3 py-2 rounded-lg border text-sm font-medium transition ${
+                catIdx === i ? c.tabActive : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
               }`}
             >
-              {p.label}
+              {c.label}
             </button>
           ))}
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Duree (minutes)</label>
-          <input type="number" value={duration} onChange={e => setDuration(e.target.value)}
-            className="w-full border rounded-lg px-3 py-3 text-base" placeholder="30" required inputMode="numeric" />
+
+        {/* Phase grid */}
+        <div className="bg-white rounded-xl border p-3">
+          <div className="grid grid-cols-2 gap-2">
+            {cat.phases.map((p, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setPhaseIdx(i)}
+                className={`border rounded-lg px-3 py-3.5 text-sm text-left transition min-h-[52px] leading-snug ${
+                  phaseIdx === i ? cat.phaseActive : "border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Commentaire (optionnel)</label>
-          <input value={comment} onChange={e => setComment(e.target.value)}
-            className="w-full border rounded-lg px-3 py-3 text-base" />
+
+        {/* Duration */}
+        <div className="bg-white rounded-xl border p-3 space-y-2">
+          <label className="block text-sm font-medium">Durée (minutes)</label>
+          <div className="flex gap-2 flex-wrap">
+            {QUICK_DURATIONS.map(d => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDuration(String(d))}
+                className={`px-3 py-2 rounded-lg border text-sm font-medium transition min-w-[48px] ${
+                  duration === String(d) ? "bg-blue-600 text-white border-blue-600" : "bg-white border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+          <input
+            type="number"
+            value={duration}
+            onChange={e => setDuration(e.target.value)}
+            className="w-full border rounded-lg px-3 py-3 text-base"
+            placeholder="Autre durée…"
+            inputMode="numeric"
+            min="1"
+          />
         </div>
-        <button type="submit" disabled={loading || !selectedType}
-          className={`w-full bg-blue-600 text-white ${BTN_PRIMARY} hover:bg-blue-700 disabled:opacity-50`}>
-          Ajouter
-        </button>
+
+        {/* Comment */}
+        <div className="bg-white rounded-xl border p-3">
+          <label className="block text-sm font-medium mb-1">
+            Commentaire {cat.requiresComment ? <span className="text-red-500">*</span> : <span className="text-gray-400 font-normal">(optionnel)</span>}
+          </label>
+          <textarea
+            value={comment}
+            onChange={e => setComment(e.target.value)}
+            rows={2}
+            className="w-full border rounded-lg px-3 py-2 text-base resize-none"
+            placeholder={cat.requiresComment ? "Obligatoire pour cette catégorie" : ""}
+          />
+        </div>
+
+        {/* Submit — sticky above tab bar on mobile, inline on desktop */}
+        <div className="fixed bottom-[calc(56px+env(safe-area-inset-bottom))] inset-x-0 px-4 lg:static lg:px-0 z-30">
+          <button
+            type="submit"
+            disabled={loading || !canSubmit}
+            className={`w-full bg-blue-600 text-white ${BTN_PRIMARY} hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none shadow-lg lg:shadow-none`}
+          >
+            {loading ? "Ajout…" : "Ajouter la phase"}
+          </button>
+        </div>
       </form>
     </div>
   );

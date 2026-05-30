@@ -4,10 +4,10 @@ import { useAuth } from "@/lib/auth";
 import { Timer, ClipboardCheck, BarChart3, Settings, LogOut } from "lucide-react";
 
 const navItems = [
-  { to: "/", label: "Compteur", short: "Compteur", icon: Timer },
-  { to: "/supervisor", label: "Validation", short: "Valider", icon: ClipboardCheck },
-  { to: "/dashboard", label: "Tableau de bord", short: "Bord", icon: BarChart3 },
-  { to: "/admin", label: "Configuration", short: "Config", icon: Settings, roles: ["admin", "supervisor"] },
+  { to: "/", label: "Session", short: "Session", icon: Timer },
+  { to: "/supervisor", label: "Validation", short: "Validation", icon: ClipboardCheck },
+  { to: "/dashboard", label: "Tableau de bord", short: "Dashboard", icon: BarChart3 },
+  { to: "/admin", label: "Configuration", short: "Réglages", icon: Settings, roles: ["admin", "supervisor"] },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {

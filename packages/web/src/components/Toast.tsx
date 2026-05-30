@@ -19,6 +19,13 @@ export function useToast(): ToastApi {
 
 let nextId = 1;
 
+function normalizeError(msg: string): string {
+  if (/erreur serveur/i.test(msg) || /^HTTP 5/.test(msg)) {
+    return "Connexion serveur impossible. Vérifie internet ou réessaie.";
+  }
+  return msg;
+}
+
 function ToastItem({ t, onRemove }: { t: Toast; onRemove: () => void }) {
   const touchStartX = useRef<number | null>(null);
   const [offsetX, setOffsetX] = useState(0);
@@ -82,7 +89,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const api: ToastApi = {
     success: (message) => push(message, "success"),
-    error: (message) => push(message, "error"),
+    error: (message) => push(normalizeError(message), "error"),
   };
 
   return (
