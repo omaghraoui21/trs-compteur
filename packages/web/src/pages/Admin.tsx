@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type AdminPhaseTemplate, type ProductEquipmentCadence } from "@/lib/api";
 import { PHASE_CATEGORY_KEYS, PHASE_CATEGORY_LABELS, PHASE_EVENT_TYPES } from "@trs/engine";
-import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, Clock } from "lucide-react";
+import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, Clock, List, Network, ChevronDown, ChevronRight } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
 
 type Tab = "rooms" | "equipments" | "products" | "phases" | "downtimes" | "cadences";
@@ -649,6 +649,7 @@ function DowntimesPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ code: "", label: "", famille: FAMILLES[0], isPlanned: false, appliesToEquipmentType: "" });
   const [error, setError] = useState("");
+  const [treeView, setTreeView] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -711,7 +712,23 @@ function DowntimesPanel() {
             </span>
           </div>
         </div>
-        <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary shrink-0"><Plus className="h-4 w-4" /> Ajouter</button>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded border overflow-hidden text-xs">
+            <button
+              onClick={() => setTreeView(false)}
+              className={`px-2.5 py-1.5 flex items-center gap-1 transition ${!treeView ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
+            >
+              <List className="h-3 w-3" /> Liste
+            </button>
+            <button
+              onClick={() => setTreeView(true)}
+              className={`px-2.5 py-1.5 flex items-center gap-1 border-l transition ${treeView ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
+            >
+              <Network className="h-3 w-3" /> Arbre
+            </button>
+          </div>
+          <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary shrink-0"><Plus className="h-4 w-4" /> Ajouter</button>
+        </div>
       </div>
 
       {error && <ErrorBanner msg={error} onClose={() => setError("")} />}
@@ -743,49 +760,53 @@ function DowntimesPanel() {
         </FormCard>
       )}
 
-      {Object.entries(grouped).map(([famille, cats]) => (
-        <div key={famille} className="mb-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-            {famille}
-            <span className="text-xs font-normal text-gray-400">({cats.length})</span>
-          </h3>
-          <div className="overflow-x-auto">
-          <table className="rtable w-full text-sm">
-            <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Label</th><th className="py-2 px-3">Équipement</th><th className="py-2 px-3 text-center">Planifié</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
-            <tbody>
-              {cats.map((c) => (
-                <tr key={c.id} className={`border-b hover:bg-gray-50 ${!c.isActive ? "opacity-50" : ""}`}>
-                  <td data-label="Code" className="py-2 px-3 font-mono text-xs">{c.code}</td>
-                  <td data-label="Label" className="py-2 px-3 font-medium">{c.label}</td>
-                  <td data-label="Équipement" className="py-2 px-3 capitalize">{c.appliesToEquipmentType || "Tous"}</td>
-                  <td data-label="Planifié" className="py-2 px-3 text-center">
-                    <button onClick={() => togglePlanned(c)} className="inline-flex items-center gap-1" title={c.isPlanned ? "Planifié → cliquez pour changer" : "Non planifié → cliquez pour changer"}>
-                      {c.isPlanned ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
-                          <ToggleRight className="h-3.5 w-3.5" /> Planifié
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
-                          <ToggleLeft className="h-3.5 w-3.5" /> Non planifié
-                        </span>
-                      )}
-                    </button>
-                  </td>
-                  <td data-label="Statut" className="py-2 px-3"><StatusBadge active={c.isActive} /></td>
-                  <td data-label="Actions" className="py-2 px-3">
-                    <div className="flex gap-1">
-                      <IconBtn icon={Pencil} onClick={() => startEdit(c)} title="Modifier" />
-                      {c.isActive && <IconBtn icon={Trash2} onClick={() => remove(c.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                      {!c.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateDowntimeCategory(c.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {treeView ? (
+        <DowntimeTree categories={items} />
+      ) : (
+        Object.entries(grouped).map(([famille, cats]) => (
+          <div key={famille} className="mb-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              {famille}
+              <span className="text-xs font-normal text-gray-400">({cats.length})</span>
+            </h3>
+            <div className="overflow-x-auto">
+            <table className="rtable w-full text-sm">
+              <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Label</th><th className="py-2 px-3">Équipement</th><th className="py-2 px-3 text-center">Planifié</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
+              <tbody>
+                {cats.map((c) => (
+                  <tr key={c.id} className={`border-b hover:bg-gray-50 ${!c.isActive ? "opacity-50" : ""}`}>
+                    <td data-label="Code" className="py-2 px-3 font-mono text-xs">{c.code}</td>
+                    <td data-label="Label" className="py-2 px-3 font-medium">{c.label}</td>
+                    <td data-label="Équipement" className="py-2 px-3 capitalize">{c.appliesToEquipmentType || "Tous"}</td>
+                    <td data-label="Planifié" className="py-2 px-3 text-center">
+                      <button onClick={() => togglePlanned(c)} className="inline-flex items-center gap-1" title={c.isPlanned ? "Planifié → cliquez pour changer" : "Non planifié → cliquez pour changer"}>
+                        {c.isPlanned ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
+                            <ToggleRight className="h-3.5 w-3.5" /> Planifié
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
+                            <ToggleLeft className="h-3.5 w-3.5" /> Non planifié
+                          </span>
+                        )}
+                      </button>
+                    </td>
+                    <td data-label="Statut" className="py-2 px-3"><StatusBadge active={c.isActive} /></td>
+                    <td data-label="Actions" className="py-2 px-3">
+                      <div className="flex gap-1">
+                        <IconBtn icon={Pencil} onClick={() => startEdit(c)} title="Modifier" />
+                        {c.isActive && <IconBtn icon={Trash2} onClick={() => remove(c.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
+                        {!c.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateDowntimeCategory(c.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </div>
           </div>
-        </div>
-      ))}
+        ))
+      )}
 
       <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <h4 className="text-sm font-semibold text-blue-800 mb-2">Règles de calcul TRS (NF E 60-182)</h4>
@@ -806,6 +827,98 @@ function DowntimesPanel() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Downtime Tree View ───────────────────────────────────
+
+const TREE_BRANCHES = [
+  { isPlanned: false, label: "Non planifié", color: "#ef4444", bgClass: "bg-red-50", borderClass: "border-red-200", connectorColor: "#fca5a5" },
+  { isPlanned: true,  label: "Planifié",     color: "#d97706", bgClass: "bg-amber-50", borderClass: "border-amber-200", connectorColor: "#fcd34d" },
+] as const;
+
+function DowntimeTree({ categories }: { categories: AdminDowntimeCategory[] }) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const toggle = (key: string) =>
+    setCollapsed(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
+
+  return (
+    <div className="mb-6 space-y-3">
+      {TREE_BRANCHES.map(branch => {
+        const branchCats = categories.filter(c => c.isPlanned === branch.isPlanned);
+        if (branchCats.length === 0) return null;
+
+        const byFamille = branchCats.reduce<Record<string, AdminDowntimeCategory[]>>((acc, c) => {
+          (acc[c.famille] ||= []).push(c);
+          return acc;
+        }, {});
+
+        return (
+          <div key={String(branch.isPlanned)}>
+            {/* Branch root */}
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${branch.bgClass} border ${branch.borderClass}`}>
+              <span className="font-semibold text-sm" style={{ color: branch.color }}>{branch.label}</span>
+              <span className="text-xs text-gray-400 font-normal">{branchCats.length} raison{branchCats.length > 1 ? "s" : ""}</span>
+            </div>
+
+            {/* Famille nodes */}
+            <div className="ml-5 border-l-2 pl-0" style={{ borderColor: branch.connectorColor }}>
+              {Object.entries(byFamille).map(([famille, cats]) => {
+                const nodeKey = `${branch.isPlanned}-${famille}`;
+                const isCollapsed = collapsed.has(nodeKey);
+                const activeCount = cats.filter(c => c.isActive).length;
+
+                return (
+                  <div key={famille} className="mt-1">
+                    {/* Famille toggle */}
+                    <button
+                      onClick={() => toggle(nodeKey)}
+                      className="flex items-center gap-1.5 w-full text-left px-3 py-1.5 hover:bg-gray-50 rounded-r transition"
+                    >
+                      <span className="text-gray-300 mr-0.5">├─</span>
+                      {isCollapsed
+                        ? <ChevronRight className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                        : <ChevronDown className="h-3.5 w-3.5 text-gray-400 shrink-0" />}
+                      <span className="text-xs font-medium text-gray-700">{famille}</span>
+                      <span className="text-xs text-gray-400">({activeCount}/{cats.length})</span>
+                    </button>
+
+                    {/* Leaf reason nodes */}
+                    {!isCollapsed && (
+                      <div className="ml-8 border-l border-gray-200">
+                        {cats.map((c, i) => (
+                          <div
+                            key={c.id}
+                            className={`flex items-center gap-2 px-3 py-1 text-xs ${!c.isActive ? "opacity-40" : ""}`}
+                          >
+                            <span className="text-gray-300 shrink-0">{i === cats.length - 1 ? "└─" : "├─"}</span>
+                            <span className="font-medium text-gray-800">{c.label}</span>
+                            <span className="font-mono text-gray-400">{c.code}</span>
+                            {c.appliesToEquipmentType && (
+                              <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 capitalize">{c.appliesToEquipmentType}</span>
+                            )}
+                            {!c.isActive && (
+                              <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-400">inactif</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {categories.length === 0 && (
+        <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-400 text-sm">
+          Aucune catégorie d'arrêt configurée.
+        </div>
+      )}
     </div>
   );
 }
