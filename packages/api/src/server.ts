@@ -9,6 +9,7 @@ import { fileURLToPath } from "url";
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { createDb } from "@trs/db";
+import { seedIfEmpty } from "./lib/seed";
 import { authRouter } from "./routes/auth";
 import { sessionsRouter } from "./routes/sessions";
 import { lotsRouter } from "./routes/lots";
@@ -53,9 +54,10 @@ if (!process.env.VERCEL) {
     if (existsSync(MIGRATIONS_DIR)) {
       await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
       console.log("✓ Database migrations applied");
+      await seedIfEmpty(db);
     }
   } catch (err) {
-    console.error("Migration failed:", err);
+    console.error("Migration/seed failed:", err);
     // Do not crash — let the health check surface the issue
   }
 }

@@ -25225,7 +25225,7 @@ var require_bcrypt = __commonJS({
         (global2["dcodeIO"] = global2["dcodeIO"] || {})["bcrypt"] = factory();
     })(exports, function() {
       "use strict";
-      var bcrypt2 = {};
+      var bcrypt3 = {};
       var randomFallback = null;
       function random(len) {
         if (typeof module !== "undefined" && module && module["exports"])
@@ -25250,10 +25250,10 @@ var require_bcrypt = __commonJS({
       } catch (e) {
       }
       randomFallback = null;
-      bcrypt2.setRandomFallback = function(random2) {
+      bcrypt3.setRandomFallback = function(random2) {
         randomFallback = random2;
       };
-      bcrypt2.genSaltSync = function(rounds, seed_length) {
+      bcrypt3.genSaltSync = function(rounds, seed_length) {
         rounds = rounds || GENSALT_DEFAULT_LOG2_ROUNDS;
         if (typeof rounds !== "number")
           throw Error("Illegal arguments: " + typeof rounds + ", " + typeof seed_length);
@@ -25270,7 +25270,7 @@ var require_bcrypt = __commonJS({
         salt.push(base64_encode(random(BCRYPT_SALT_LEN), BCRYPT_SALT_LEN));
         return salt.join("");
       };
-      bcrypt2.genSalt = function(rounds, seed_length, callback) {
+      bcrypt3.genSalt = function(rounds, seed_length, callback) {
         if (typeof seed_length === "function")
           callback = seed_length, seed_length = void 0;
         if (typeof rounds === "function")
@@ -25282,7 +25282,7 @@ var require_bcrypt = __commonJS({
         function _async(callback2) {
           nextTick(function() {
             try {
-              callback2(null, bcrypt2.genSaltSync(rounds));
+              callback2(null, bcrypt3.genSaltSync(rounds));
             } catch (err) {
               callback2(err);
             }
@@ -25303,19 +25303,19 @@ var require_bcrypt = __commonJS({
             });
           });
       };
-      bcrypt2.hashSync = function(s, salt) {
+      bcrypt3.hashSync = function(s, salt) {
         if (typeof salt === "undefined")
           salt = GENSALT_DEFAULT_LOG2_ROUNDS;
         if (typeof salt === "number")
-          salt = bcrypt2.genSaltSync(salt);
+          salt = bcrypt3.genSaltSync(salt);
         if (typeof s !== "string" || typeof salt !== "string")
           throw Error("Illegal arguments: " + typeof s + ", " + typeof salt);
         return _hash(s, salt);
       };
-      bcrypt2.hash = function(s, salt, callback, progressCallback) {
+      bcrypt3.hash = function(s, salt, callback, progressCallback) {
         function _async(callback2) {
           if (typeof s === "string" && typeof salt === "number")
-            bcrypt2.genSalt(salt, function(err, salt2) {
+            bcrypt3.genSalt(salt, function(err, salt2) {
               _hash(s, salt2, callback2, progressCallback);
             });
           else if (typeof s === "string" && typeof salt === "string")
@@ -25350,14 +25350,14 @@ var require_bcrypt = __commonJS({
           return false;
         return wrong === 0;
       }
-      bcrypt2.compareSync = function(s, hash) {
+      bcrypt3.compareSync = function(s, hash) {
         if (typeof s !== "string" || typeof hash !== "string")
           throw Error("Illegal arguments: " + typeof s + ", " + typeof hash);
         if (hash.length !== 60)
           return false;
-        return safeStringCompare(bcrypt2.hashSync(s, hash.substr(0, hash.length - 31)), hash);
+        return safeStringCompare(bcrypt3.hashSync(s, hash.substr(0, hash.length - 31)), hash);
       };
-      bcrypt2.compare = function(s, hash, callback, progressCallback) {
+      bcrypt3.compare = function(s, hash, callback, progressCallback) {
         function _async(callback2) {
           if (typeof s !== "string" || typeof hash !== "string") {
             nextTick(callback2.bind(this, Error("Illegal arguments: " + typeof s + ", " + typeof hash)));
@@ -25367,7 +25367,7 @@ var require_bcrypt = __commonJS({
             nextTick(callback2.bind(this, null, false));
             return;
           }
-          bcrypt2.hash(s, hash.substr(0, 29), function(err, comp) {
+          bcrypt3.hash(s, hash.substr(0, 29), function(err, comp) {
             if (err)
               callback2(err);
             else
@@ -25389,12 +25389,12 @@ var require_bcrypt = __commonJS({
             });
           });
       };
-      bcrypt2.getRounds = function(hash) {
+      bcrypt3.getRounds = function(hash) {
         if (typeof hash !== "string")
           throw Error("Illegal arguments: " + typeof hash);
         return parseInt(hash.split("$")[2], 10);
       };
-      bcrypt2.getSalt = function(hash) {
+      bcrypt3.getSalt = function(hash) {
         if (typeof hash !== "string")
           throw Error("Illegal arguments: " + typeof hash);
         if (hash.length !== 60)
@@ -27017,9 +27017,9 @@ var require_bcrypt = __commonJS({
           }, progressCallback);
         }
       }
-      bcrypt2.encodeBase64 = base64_encode;
-      bcrypt2.decodeBase64 = base64_decode;
-      return bcrypt2;
+      bcrypt3.encodeBase64 = base64_encode;
+      bcrypt3.decodeBase64 = base64_decode;
+      return bcrypt3;
     });
   }
 });
@@ -41284,9 +41284,126 @@ function createDb(url = connectionString) {
   return drizzle(client, { schema: schema_exports });
 }
 
+// packages/api/src/lib/seed.ts
+var import_bcryptjs = __toESM(require_bcryptjs(), 1);
+async function seedIfEmpty(db2) {
+  const existing = await db2.select().from(users).limit(1);
+  if (existing.length > 0) return false;
+  console.log("[seed] Seeding initial data\u2026");
+  const [opHash, supHash, admHash] = await Promise.all([
+    import_bcryptjs.default.hash("oper123", 10),
+    import_bcryptjs.default.hash("super123", 10),
+    import_bcryptjs.default.hash("admin123", 10)
+  ]);
+  await db2.insert(users).values([
+    { email: "operateur@dpi.local", passwordHash: opHash, displayName: "Op\xE9rateur DPI", role: "operator" },
+    { email: "superviseur@dpi.local", passwordHash: supHash, displayName: "Superviseur DPI", role: "supervisor" },
+    { email: "admin@dpi.local", passwordHash: admHash, displayName: "Admin DPI", role: "admin" }
+  ]).onConflictDoNothing();
+  const [roomBli] = await db2.insert(rooms).values({
+    code: "LOCAL-BLI",
+    name: "Local Blistereuse",
+    description: "Salle de conditionnement sous blisters"
+  }).onConflictDoNothing().returning();
+  const [roomGel] = await db2.insert(rooms).values({
+    code: "LOCAL-GEL",
+    name: "Local G\xE9luleuse",
+    description: "Salle de remplissage g\xE9lules"
+  }).onConflictDoNothing().returning();
+  let eqBliId;
+  let eqGelId;
+  if (roomBli) {
+    const [r] = await db2.insert(equipments).values({
+      roomId: roomBli.id,
+      code: "BLI-IMA-TR135S",
+      name: "Blistereuse IMA TR135S",
+      equipmentType: "blistereuse",
+      trsObjective: "75",
+      defaultCadenceUnit: "u/min"
+    }).onConflictDoNothing().returning();
+    eqBliId = r?.id;
+  }
+  if (roomGel) {
+    const [r] = await db2.insert(equipments).values({
+      roomId: roomGel.id,
+      code: "GEL-HH-MODUC",
+      name: "G\xE9luleuse Harro H\xF6fliger Modu-C",
+      equipmentType: "geluleuse",
+      trsObjective: "75",
+      defaultCadenceUnit: "u/min"
+    }).onConflictDoNothing().returning();
+    eqGelId = r?.id;
+  }
+  const productData = [
+    { code: "AEROFOR-12", name: "Aerofor 12\xB5g", defaultCadence: "100", cadenceUnit: "u/min", unit: "blisters" },
+    { code: "AERONIDE-200", name: "Aeronide 200\xB5g", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" },
+    { code: "AERONIDE-400", name: "Aeronide 400\xB5g", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" },
+    { code: "COMBIFOR-12-200", name: "Combifor 12/200\xB5g", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" },
+    { code: "COMBIFOR-12-400", name: "Combifor 12/400\xB5g", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" }
+  ];
+  const insertedIds = {};
+  for (const p of productData) {
+    const [r] = await db2.insert(products).values(p).onConflictDoNothing().returning();
+    if (r) insertedIds[p.code] = r.id;
+  }
+  const cadences = [
+    { productCode: "AEROFOR-12", eqId: eqBliId, cadence: "100" },
+    { productCode: "AERONIDE-200", eqId: eqBliId, cadence: "120" },
+    { productCode: "AERONIDE-400", eqId: eqBliId, cadence: "120" },
+    { productCode: "COMBIFOR-12-200", eqId: eqBliId, cadence: "107" },
+    { productCode: "COMBIFOR-12-400", eqId: eqBliId, cadence: "50" },
+    { productCode: "AEROFOR-12", eqId: eqGelId, cadence: "1020" },
+    { productCode: "AERONIDE-200", eqId: eqGelId, cadence: "1020" },
+    { productCode: "AERONIDE-400", eqId: eqGelId, cadence: "1020" },
+    { productCode: "COMBIFOR-12-200", eqId: eqGelId, cadence: "1020" },
+    { productCode: "COMBIFOR-12-400", eqId: eqGelId, cadence: "1020" }
+  ];
+  for (const c of cadences) {
+    const productId = insertedIds[c.productCode];
+    if (productId && c.eqId) {
+      await db2.insert(productEquipmentCadences).values({
+        productId,
+        equipmentId: c.eqId,
+        cadenceValue: c.cadence,
+        cadenceUnit: "u/min"
+      }).onConflictDoNothing();
+    }
+  }
+  const categories = [
+    { code: "AB-BOUCHAGE", label: "Bouchage", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
+    { code: "AB-FORMAGE", label: "Probl\xE8me de formage", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
+    { code: "AB-DECOUPE", label: "Mauvaise d\xE9coupe", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
+    { code: "AB-SCELLAGE", label: "Probl\xE8me de scellage", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
+    { code: "AB-ENCODEUR", label: "Anomalie encodeur", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
+    { code: "AG-DOSAGE", label: "Probl\xE8me de dosage", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
+    { code: "AG-FERMETURE", label: "Probl\xE8me fermeture g\xE9lules", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
+    { code: "AG-ALIMENTATION", label: "Alimentation g\xE9lules", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
+    { code: "IM-PREVENTIVE", label: "Maintenance pr\xE9ventive", famille: "Intervention maintenance", isPlanned: false, appliesToEquipmentType: null },
+    { code: "IM-CORRECTIVE", label: "Maintenance corrective", famille: "Intervention maintenance", isPlanned: false, appliesToEquipmentType: null },
+    { code: "IM-DI", label: "Demande d'intervention (DI)", famille: "Intervention maintenance", isPlanned: false, appliesToEquipmentType: null },
+    { code: "AI-MATIERE", label: "Attente mati\xE8re/article", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
+    { code: "AI-PERSONNEL", label: "Absence/manque effectif", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
+    { code: "AI-VALIDATION", label: "Attente validation CQ", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
+    { code: "AI-LIBERATION", label: "Lib\xE9ration AC", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
+    { code: "AI-SAGE", label: "Probl\xE8me connexion SAGE", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
+    { code: "AI-TEST", label: "Test machinabilit\xE9", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
+    { code: "UE-PURIFIEE", label: "Eau purifi\xE9e", famille: "Utilit\xE9s", isPlanned: false, appliesToEquipmentType: null },
+    { code: "UE-AIR", label: "Air comprim\xE9", famille: "Utilit\xE9s", isPlanned: false, appliesToEquipmentType: null },
+    { code: "UE-HVAC", label: "HVAC/Climatisation", famille: "Utilit\xE9s", isPlanned: false, appliesToEquipmentType: null },
+    { code: "CQ-IPC", label: "Contr\xF4le en cours (IPC)", famille: "Contr\xF4le qualit\xE9", isPlanned: false, appliesToEquipmentType: null },
+    { code: "CQ-RESERVE", label: "R\xE9serve conditionnement secondaire", famille: "Contr\xF4le qualit\xE9", isPlanned: false, appliesToEquipmentType: null },
+    { code: "CQ-RECONDITIONNEMENT", label: "Reconditionnement", famille: "Contr\xF4le qualit\xE9", isPlanned: false, appliesToEquipmentType: null }
+  ];
+  for (const c of categories) {
+    await db2.insert(downtimeCategories).values(c).onConflictDoNothing();
+  }
+  console.log("[seed] \u2713 Initial data loaded (3 users \xB7 2 salles \xB7 2 \xE9quipements \xB7 5 produits \xB7 23 cat\xE9gories)");
+  return true;
+}
+
 // packages/api/src/routes/auth.ts
 var import_express = __toESM(require_express2(), 1);
-var import_bcryptjs = __toESM(require_bcryptjs(), 1);
+var import_bcryptjs2 = __toESM(require_bcryptjs(), 1);
 import crypto3 from "crypto";
 
 // packages/api/src/middleware.ts
@@ -45544,7 +45661,7 @@ authRouter.post("/login", validate(loginSchema), asyncHandler(async (req, res) =
     res.status(401).json({ error: "Identifiants invalides" });
     return;
   }
-  const valid = await import_bcryptjs.default.compare(password, user.passwordHash);
+  const valid = await import_bcryptjs2.default.compare(password, user.passwordHash);
   if (!valid) {
     res.status(401).json({ error: "Identifiants invalides" });
     return;
@@ -46869,9 +46986,10 @@ if (!process.env.VERCEL) {
     if (existsSync(MIGRATIONS_DIR)) {
       await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
       console.log("\u2713 Database migrations applied");
+      await seedIfEmpty(db);
     }
   } catch (err) {
-    console.error("Migration failed:", err);
+    console.error("Migration/seed failed:", err);
   }
 }
 app.use((req, _res, next) => {
