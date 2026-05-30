@@ -5,7 +5,7 @@
   "framework": "vite",
   "functions": {
     "api/index.mjs": {
-      "includeFiles": "api/handler.mjs"
+      "includeFiles": "api/handler.mjs,db/drizzle/**"
     }
   },
   "rewrites": [

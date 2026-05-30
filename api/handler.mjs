@@ -46982,16 +46982,14 @@ var authLimiter = rate_limit_default({
 var db = createDb();
 var __dirname = path.dirname(fileURLToPath(import.meta.url));
 var MIGRATIONS_DIR = process.env.MIGRATIONS_DIR ?? path.resolve(__dirname, "../../db/drizzle");
-if (!process.env.VERCEL) {
-  try {
-    if (existsSync(MIGRATIONS_DIR)) {
-      await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
-      console.log("\u2713 Database migrations applied");
-      await seedIfEmpty(db);
-    }
-  } catch (err) {
-    console.error("Migration/seed failed:", err);
+try {
+  if (existsSync(MIGRATIONS_DIR)) {
+    await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
+    console.log("\u2713 Database migrations applied");
+    await seedIfEmpty(db);
   }
+} catch (err) {
+  console.error("Migration/seed failed:", err);
 }
 app.use((req, _res, next) => {
   req.db = db;

@@ -52,17 +52,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = process.env.MIGRATIONS_DIR
   ?? path.resolve(__dirname, "../../db/drizzle");
 
-if (!process.env.VERCEL) {
-  try {
-    if (existsSync(MIGRATIONS_DIR)) {
-      await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
-      console.log("✓ Database migrations applied");
-      await seedIfEmpty(db);
-    }
-  } catch (err) {
-    console.error("Migration/seed failed:", err);
-    // Do not crash — let the health check surface the issue
+try {
+  if (existsSync(MIGRATIONS_DIR)) {
+    await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
+    console.log("✓ Database migrations applied");
+    await seedIfEmpty(db);
   }
+} catch (err) {
+  console.error("Migration/seed failed:", err);
+  // Do not crash — let the health check surface the issue
 }
 
 // Inject db into request
