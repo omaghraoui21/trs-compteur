@@ -41018,6 +41018,7 @@ __export(schema_exports, {
   eventTypeEnum: () => eventTypeEnum,
   lotEntries: () => lotEntries,
   lotStatusEnum: () => lotStatusEnum,
+  phaseTemplates: () => phaseTemplates,
   productEquipmentCadences: () => productEquipmentCadences,
   products: () => products,
   refreshTokens: () => refreshTokens,
@@ -41121,6 +41122,21 @@ var downtimeCategories = pgTable("downtime_categories", {
   isPlanned: boolean("is_planned").notNull().default(false),
   appliesToEquipmentType: text("applies_to_equipment_type"),
   // blistereuse | geluleuse | null (both)
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+});
+var phaseTemplates = pgTable("phase_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: text("code").notNull().unique(),
+  label: text("label").notNull(),
+  category: text("category").notNull(),
+  // production | nettoyage | changement
+  eventType: eventTypeEnum("event_type").notNull(),
+  isPlanned: boolean("is_planned").notNull().default(true),
+  requiresComment: boolean("requires_comment").notNull().default(false),
+  appliesToEquipmentType: text("applies_to_equipment_type"),
+  // blistereuse | geluleuse | null (both)
+  sortOrder: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
@@ -41403,8 +41419,28 @@ async function seedIfEmpty(db2) {
   for (const c of categories) {
     await db2.insert(downtimeCategories).values(c).onConflictDoNothing();
   }
-  console.log("[seed] \u2713 Initial data loaded (3 users \xB7 2 salles \xB7 2 \xE9quipements \xB7 5 produits \xB7 23 cat\xE9gories)");
+  await seedPhaseTemplates(db2);
+  console.log("[seed] \u2713 Initial data loaded (3 users \xB7 2 salles \xB7 2 \xE9quipements \xB7 5 produits \xB7 23 cat\xE9gories \xB7 12 phases)");
   return true;
+}
+async function seedPhaseTemplates(db2) {
+  const phases = [
+    { code: "PH-REMPLISSAGE", label: "Remplissage", category: "production", eventType: "remplissage", isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 10 },
+    { code: "PH-BLISTERING", label: "Blistering", category: "production", eventType: "custom", isPlanned: true, requiresComment: false, appliesToEquipmentType: "blistereuse", sortOrder: 20 },
+    { code: "PH-CONDITIONNEMENT", label: "Conditionnement", category: "production", eventType: "custom", isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 30 },
+    { code: "PH-IPC", label: "Contr\xF4le IPC", category: "production", eventType: "custom", isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 40 },
+    { code: "PH-NETT-PARTIEL", label: "Nettoyage partiel", category: "nettoyage", eventType: "custom", isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 10 },
+    { code: "PH-NETT-COMPLET", label: "Nettoyage complet", category: "nettoyage", eventType: "nettoyage", isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 20 },
+    { code: "PH-VIDE-LIGNE", label: "Vide de ligne", category: "nettoyage", eventType: "vide_ligne", isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 30 },
+    { code: "PH-CHSB", label: "CHSB \u2014 Changement s\xE9rie", category: "changement", eventType: "chsb", isPlanned: true, requiresComment: false, appliesToEquipmentType: "blistereuse", sortOrder: 10 },
+    { code: "PH-CHSG", label: "CHSG \u2014 Changement s\xE9rie", category: "changement", eventType: "chsg", isPlanned: true, requiresComment: false, appliesToEquipmentType: "geluleuse", sortOrder: 20 },
+    { code: "PH-FORMAT", label: "Changement de format", category: "changement", eventType: "custom", isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 30 },
+    { code: "PH-PAUSE", label: "Pause", category: "arret_planifie", eventType: "pause", isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 10 },
+    { code: "PH-APR", label: "APR \u2014 Arr\xEAt programm\xE9", category: "arret_planifie", eventType: "apr", isPlanned: true, requiresComment: true, appliesToEquipmentType: null, sortOrder: 20 }
+  ];
+  for (const p of phases) {
+    await db2.insert(phaseTemplates).values(p).onConflictDoNothing();
+  }
 }
 
 // packages/api/src/routes/auth.ts
@@ -45637,6 +45673,20 @@ var createDowntimeCategorySchema = external_exports.object({
 var updateDowntimeCategorySchema = createDowntimeCategorySchema.partial().extend({
   isActive: external_exports.boolean().optional()
 });
+var phaseCategory = external_exports.enum(["production", "nettoyage", "changement", "arret_planifie"]);
+var createPhaseTemplateSchema = external_exports.object({
+  code: external_exports.string().min(1, "code requis"),
+  label: external_exports.string().min(1, "label requis"),
+  category: phaseCategory,
+  eventType,
+  isPlanned: external_exports.boolean().optional(),
+  requiresComment: external_exports.boolean().optional(),
+  appliesToEquipmentType: external_exports.string().nullable().optional(),
+  sortOrder: external_exports.number().int().min(0).optional()
+});
+var updatePhaseTemplateSchema = createPhaseTemplateSchema.partial().extend({
+  isActive: external_exports.boolean().optional()
+});
 var createCadenceSchema = external_exports.object({
   productId: external_exports.string().uuid("productId invalide"),
   equipmentId: external_exports.string().uuid("equipmentId invalide"),
@@ -46392,6 +46442,15 @@ refRouter.get("/downtime-categories", asyncHandler(async (req, res) => {
   }
   res.json(data);
 }));
+refRouter.get("/phase-templates", asyncHandler(async (req, res) => {
+  const { db: db2 } = req;
+  const eqType = req.query.equipmentType;
+  let data = await db2.select().from(phaseTemplates).where(eq(phaseTemplates.isActive, true)).orderBy(phaseTemplates.category, phaseTemplates.sortOrder);
+  if (eqType) {
+    data = data.filter((p) => !p.appliesToEquipmentType || p.appliesToEquipmentType === eqType);
+  }
+  res.json(data);
+}));
 refRouter.get("/cadences", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const equipmentId = req.query.equipmentId;
@@ -46905,6 +46964,55 @@ adminRouter.delete("/downtime-categories/:id", asyncHandler(async (req, res) => 
   const [row] = await req.db.update(downtimeCategories).set({ isActive: false }).where(eq(downtimeCategories.id, String(req.params.id))).returning();
   if (!row) {
     res.status(404).json({ error: "Categorie introuvable" });
+    return;
+  }
+  res.json(row);
+}));
+adminRouter.get("/phase-templates", asyncHandler(async (req, res) => {
+  const data = await req.db.select().from(phaseTemplates).orderBy(phaseTemplates.category, phaseTemplates.sortOrder);
+  res.json(data);
+}));
+adminRouter.post("/phase-templates", validate(createPhaseTemplateSchema), asyncHandler(async (req, res) => {
+  const { code, label, category, eventType: eventType2, isPlanned, requiresComment, appliesToEquipmentType, sortOrder } = req.body;
+  const [row] = await req.db.insert(phaseTemplates).values({
+    code,
+    label,
+    category,
+    eventType: eventType2,
+    isPlanned: isPlanned ?? true,
+    requiresComment: requiresComment ?? false,
+    appliesToEquipmentType: appliesToEquipmentType || null,
+    sortOrder: sortOrder ?? 0
+  }).returning();
+  res.status(201).json(row);
+}));
+adminRouter.patch("/phase-templates/:id", validate(updatePhaseTemplateSchema), asyncHandler(async (req, res) => {
+  const { code, label, category, eventType: eventType2, isPlanned, requiresComment, appliesToEquipmentType, sortOrder, isActive } = req.body;
+  const updates = {};
+  if (code !== void 0) updates.code = code;
+  if (label !== void 0) updates.label = label;
+  if (category !== void 0) updates.category = category;
+  if (eventType2 !== void 0) updates.eventType = eventType2;
+  if (isPlanned !== void 0) updates.isPlanned = isPlanned;
+  if (requiresComment !== void 0) updates.requiresComment = requiresComment;
+  if (appliesToEquipmentType !== void 0) updates.appliesToEquipmentType = appliesToEquipmentType || null;
+  if (sortOrder !== void 0) updates.sortOrder = sortOrder;
+  if (isActive !== void 0) updates.isActive = isActive;
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "Aucune mise \xE0 jour" });
+    return;
+  }
+  const [row] = await req.db.update(phaseTemplates).set(updates).where(eq(phaseTemplates.id, String(req.params.id))).returning();
+  if (!row) {
+    res.status(404).json({ error: "Phase introuvable" });
+    return;
+  }
+  res.json(row);
+}));
+adminRouter.delete("/phase-templates/:id", asyncHandler(async (req, res) => {
+  const [row] = await req.db.update(phaseTemplates).set({ isActive: false }).where(eq(phaseTemplates.id, String(req.params.id))).returning();
+  if (!row) {
+    res.status(404).json({ error: "Phase introuvable" });
     return;
   }
   res.json(row);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type ProductEquipmentCadence, type SessionTrsResponse } from "@/lib/api";
+import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type PhaseTemplate, type ProductEquipmentCadence, type SessionTrsResponse } from "@/lib/api";
 import { fmtDuration, fmtPct, trsColor } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { Onboarding } from "@/components/Onboarding";
@@ -54,6 +54,7 @@ export default function CompteurPage() {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<DowntimeCategory[]>([]);
+  const [phaseTemplates, setPhaseTemplates] = useState<PhaseTemplate[]>([]);
   const [cadences, setCadences] = useState<ProductEquipmentCadence[]>([]);
   const [trsData, setTrsData] = useState<SessionTrsResponse | null>(null);
   const [error, setError] = useState("");
@@ -106,11 +107,13 @@ export default function CompteurPage() {
   const handleEquipmentSelect = async (eq: Equipment) => {
     setSelectedEquipment(eq);
     try {
-      const [cats, cads] = await Promise.all([
+      const [cats, phases, cads] = await Promise.all([
         api.downtimeCategories(eq.equipmentType ?? undefined),
+        api.phaseTemplates(eq.equipmentType ?? undefined),
         api.cadences(eq.id),
       ]);
       setCategories(cats);
+      setPhaseTemplates(phases);
       setCadences(cads);
 
       // Check for existing active session
@@ -242,13 +245,11 @@ export default function CompteurPage() {
   }
 
   if (view === "add-phase" && activeSession) {
-    const activeLotForPhase = detail?.lots.find(l => l.status === "active");
     return <AddPhaseForm
       sessionId={activeSession.id}
-      activeLotId={activeLotForPhase?.id}
+      phases={phaseTemplates}
       onAdded={() => { loadDetail(activeSession.id); setView("timeline"); }}
       onBack={() => setView("timeline")}
-      onSwitchToDowntime={() => setView("add-downtime")}
     />;
   }
 
@@ -877,102 +878,57 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
 
 // ─── Add Phase Form ──────────────────────────────────────
 
-const PHASE_CATEGORIES = [
-  {
-    id: "production", label: "Production",
-    tabActive: "bg-green-600 text-white border-green-600",
-    phaseActive: "border-green-500 bg-green-50 text-green-800 font-semibold",
-    requiresComment: false,
-    phases: [
-      { eventType: "remplissage", label: "Remplissage", isPlanned: true },
-      { eventType: "custom", label: "Blistering", isPlanned: true },
-      { eventType: "custom", label: "Conditionnement", isPlanned: true },
-      { eventType: "custom", label: "Contrôle IPC", isPlanned: true },
-    ],
-  },
-  {
-    id: "nettoyage", label: "Nettoyage",
-    tabActive: "bg-blue-600 text-white border-blue-600",
-    phaseActive: "border-blue-500 bg-blue-50 text-blue-800 font-semibold",
-    requiresComment: false,
-    phases: [
-      { eventType: "custom", label: "Nettoyage partiel", isPlanned: true },
-      { eventType: "nettoyage", label: "Nettoyage complet", isPlanned: true },
-      { eventType: "vide_ligne", label: "Vide de ligne", isPlanned: true },
-    ],
-  },
-  {
-    id: "changement", label: "Changement",
-    tabActive: "bg-violet-600 text-white border-violet-600",
-    phaseActive: "border-violet-500 bg-violet-50 text-violet-800 font-semibold",
-    requiresComment: false,
-    phases: [
-      { eventType: "chsb", label: "CHSB — Série blistereuse", isPlanned: true },
-      { eventType: "chsg", label: "CHSG — Série géluleuse", isPlanned: true },
-      { eventType: "custom", label: "Changement format", isPlanned: true },
-    ],
-  },
-  {
-    id: "arret", label: "Arrêt",
-    tabActive: "bg-orange-500 text-white border-orange-500",
-    phaseActive: "border-orange-500 bg-orange-50 text-orange-800 font-semibold",
-    requiresComment: true,
-    phases: [
-      { eventType: "pause", label: "Pause", isPlanned: true },
-      { eventType: "apr", label: "APR — Arrêt programmé", isPlanned: true },
-      { eventType: "custom", label: "Panne", isPlanned: false },
-      { eventType: "custom", label: "Attente matière", isPlanned: false },
-      { eventType: "custom", label: "Attente QA", isPlanned: false },
-      { eventType: "custom", label: "Attente maintenance", isPlanned: false },
-    ],
-  },
-  {
-    id: "qualite", label: "Qualité",
-    tabActive: "bg-red-600 text-white border-red-600",
-    phaseActive: "border-red-500 bg-red-50 text-red-800 font-semibold",
-    requiresComment: true,
-    phases: [
-      { eventType: "mqch", label: "MQCH — Quarantaine", isPlanned: false },
-      { eventType: "custom", label: "Investigation", isPlanned: false },
-      { eventType: "custom", label: "Rejet", isPlanned: false },
-      { eventType: "custom", label: "Retouche", isPlanned: false },
-    ],
-  },
-];
 const QUICK_DURATIONS = [5, 10, 15, 30, 60];
 
-function AddPhaseForm({ sessionId, activeLotId, onAdded, onBack, onSwitchToDowntime }: {
+// Per-category color theme so the picker reads at a glance. Phases are loaded
+// from the DB (phase_templates), equipment-specific, so Blistereuse and
+// Géluleuse share one UI but show only their own phases (e.g. CHSB vs CHSG).
+const PHASE_CATEGORY_THEME: Record<string, { label: string; tab: string; phase: string }> = {
+  production:     { label: "Production",   tab: "bg-green-600 text-white border-green-600",   phase: "border-green-500 bg-green-50 text-green-800 font-semibold" },
+  nettoyage:      { label: "Nettoyage",    tab: "bg-blue-600 text-white border-blue-600",     phase: "border-blue-500 bg-blue-50 text-blue-800 font-semibold" },
+  changement:     { label: "Changement",   tab: "bg-violet-600 text-white border-violet-600", phase: "border-violet-500 bg-violet-50 text-violet-800 font-semibold" },
+  arret_planifie: { label: "Arrêt planifié", tab: "bg-orange-500 text-white border-orange-500", phase: "border-orange-500 bg-orange-50 text-orange-800 font-semibold" },
+};
+const PHASE_CATEGORY_ORDER = ["production", "nettoyage", "changement", "arret_planifie"];
+
+function AddPhaseForm({ sessionId, phases, onAdded, onBack }: {
   sessionId: string;
-  activeLotId?: string;
+  phases: PhaseTemplate[];
   onAdded: () => void;
   onBack: () => void;
-  onSwitchToDowntime?: () => void;
 }) {
-  const [catIdx, setCatIdx] = useState(0);
-  const [phaseIdx, setPhaseIdx] = useState<number | null>(null);
   const [duration, setDuration] = useState("");
   const [comment, setComment] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const toast = useToast();
 
-  const cat = PHASE_CATEGORIES[catIdx];
-  // "Arrêt" is index 3 — when a lot is active, unplanned stops must go through
-  // AddDowntimeForm so they are recorded as downtimeEvents and affect tF in TRS.
-  const isArretWithActiveLot = cat.id === "arret" && !!activeLotId;
-  const phase = phaseIdx !== null ? cat.phases[phaseIdx] : null;
-  const canSubmit = !isArretWithActiveLot && phase !== null && duration !== "" && Number(duration) > 0 &&
-    (!cat.requiresComment || comment.trim() !== "");
+  // Group active phases by category, ordered.
+  const categories = useMemo(() => {
+    const grouped = phases.reduce<Record<string, PhaseTemplate[]>>((acc, p) => {
+      (acc[p.category] ||= []).push(p);
+      return acc;
+    }, {});
+    return PHASE_CATEGORY_ORDER.filter(k => grouped[k]?.length).map(k => ({ key: k, phases: grouped[k] }));
+  }, [phases]);
+
+  const [catKey, setCatKey] = useState(categories[0]?.key ?? "production");
+  const cat = categories.find(c => c.key === catKey) ?? categories[0];
+  const theme = PHASE_CATEGORY_THEME[catKey] ?? PHASE_CATEGORY_THEME.production;
+  const selected = cat?.phases.find(p => p.id === selectedId) ?? null;
+  const canSubmit = selected !== null && duration !== "" && Number(duration) > 0 &&
+    (!selected.requiresComment || comment.trim() !== "");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit || !phase) return;
+    if (!canSubmit || !selected) return;
     setLoading(true);
     try {
       await api.addEvent(sessionId, {
-        eventType: phase.eventType,
-        label: phase.eventType === "custom" ? phase.label : undefined,
+        eventType: selected.eventType,
+        label: selected.eventType === "custom" ? selected.label : undefined,
         durationMinutes: Number(duration),
-        isPlanned: phase.isPlanned,
+        isPlanned: selected.isPlanned,
         comment: comment.trim() || undefined,
       });
       onAdded();
@@ -981,6 +937,20 @@ function AddPhaseForm({ sessionId, activeLotId, onAdded, onBack, onSwitchToDownt
     }
     setLoading(false);
   };
+
+  if (categories.length === 0) {
+    return (
+      <div className="max-w-lg mx-auto">
+        <button onClick={onBack} className="flex items-center gap-1 text-sm text-blue-600 mb-4">
+          <ChevronLeft className="h-4 w-4" /> Retour
+        </button>
+        <div className="bg-white rounded-xl border p-6 text-center text-gray-500 text-sm">
+          Aucune phase configurée pour cet équipement.<br />
+          Ajoutez-en dans Configuration → Phases.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-lg mx-auto pb-28">
@@ -993,55 +963,40 @@ function AddPhaseForm({ sessionId, activeLotId, onAdded, onBack, onSwitchToDownt
       <form onSubmit={handleSubmit} className="space-y-3">
         {/* Category tabs */}
         <div className="flex overflow-x-auto gap-1.5 pb-1">
-          {PHASE_CATEGORIES.map((c, i) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => { setCatIdx(i); setPhaseIdx(null); }}
-              className={`shrink-0 px-3 py-2 rounded-lg border text-sm font-medium transition ${
-                catIdx === i ? c.tabActive : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
+          {categories.map((c) => {
+            const t = PHASE_CATEGORY_THEME[c.key] ?? PHASE_CATEGORY_THEME.production;
+            return (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => { setCatKey(c.key); setSelectedId(null); }}
+                className={`shrink-0 px-3 py-2 rounded-lg border text-sm font-medium transition ${
+                  catKey === c.key ? t.tab : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Phase grid — or redirect notice when "Arrêt" + active lot */}
-        {isArretWithActiveLot ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-              <p className="text-sm text-amber-800">
-                Un lot est actif. Les arrêts doivent être déclarés sur le lot pour être comptés dans le TRS (indicateur tF).
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onSwitchToDowntime}
-              className={`w-full bg-orange-500 text-white ${BTN_PRIMARY} hover:bg-orange-600`}
-            >
-              <AlertTriangle className="h-5 w-5" /> Déclarer l'arrêt sur le lot
-            </button>
+        {/* Phase grid */}
+        <div className="bg-white rounded-xl border p-3">
+          <div className="grid grid-cols-2 gap-2">
+            {cat?.phases.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setSelectedId(p.id)}
+                className={`border rounded-lg px-3 py-3.5 text-sm text-left transition min-h-[52px] leading-snug ${
+                  selectedId === p.id ? theme.phase : "border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
-        ) : (
-          <div className="bg-white rounded-xl border p-3">
-            <div className="grid grid-cols-2 gap-2">
-              {cat.phases.map((p, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setPhaseIdx(i)}
-                  className={`border rounded-lg px-3 py-3.5 text-sm text-left transition min-h-[52px] leading-snug ${
-                    phaseIdx === i ? cat.phaseActive : "border-gray-200 hover:bg-gray-50"
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        </div>
 
         {/* Duration */}
         <div className="bg-white rounded-xl border p-3 space-y-2">
@@ -1074,14 +1029,14 @@ function AddPhaseForm({ sessionId, activeLotId, onAdded, onBack, onSwitchToDownt
         {/* Comment */}
         <div className="bg-white rounded-xl border p-3">
           <label className="block text-sm font-medium mb-1">
-            Commentaire {cat.requiresComment ? <span className="text-red-500">*</span> : <span className="text-gray-400 font-normal">(optionnel)</span>}
+            Commentaire {selected?.requiresComment ? <span className="text-red-500">*</span> : <span className="text-gray-400 font-normal">(optionnel)</span>}
           </label>
           <textarea
             value={comment}
             onChange={e => setComment(e.target.value)}
             rows={2}
             className="w-full border rounded-lg px-3 py-2 text-base resize-none"
-            placeholder={cat.requiresComment ? "Obligatoire pour cette catégorie" : ""}
+            placeholder={selected?.requiresComment ? "Obligatoire pour cette phase" : ""}
           />
         </div>
 

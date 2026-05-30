@@ -126,6 +126,24 @@ export const downtimeCategories = pgTable("downtime_categories", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ─── Phase Templates (configurable session phases) ─────
+// Mirrors downtimeCategories: DB-driven, equipment-specific, admin-managed.
+// Drives the "Ajouter une phase" picker in Compteur so Blistereuse and
+// Géluleuse each show the correct phases (e.g. CHSB vs CHSG) with one UI.
+export const phaseTemplates = pgTable("phase_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: text("code").notNull().unique(),
+  label: text("label").notNull(),
+  category: text("category").notNull(),          // production | nettoyage | changement
+  eventType: eventTypeEnum("event_type").notNull(),
+  isPlanned: boolean("is_planned").notNull().default(true),
+  requiresComment: boolean("requires_comment").notNull().default(false),
+  appliesToEquipmentType: text("applies_to_equipment_type"), // blistereuse | geluleuse | null (both)
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── Sessions (= Compteur Continu) ─────────────────────
 
 export const sessions = pgTable("sessions", {

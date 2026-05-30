@@ -138,6 +138,22 @@ export const updateDowntimeCategorySchema = createDowntimeCategorySchema.partial
   isActive: z.boolean().optional(),
 });
 
+const phaseCategory = z.enum(["production", "nettoyage", "changement", "arret_planifie"]);
+
+export const createPhaseTemplateSchema = z.object({
+  code: z.string().min(1, "code requis"),
+  label: z.string().min(1, "label requis"),
+  category: phaseCategory,
+  eventType,
+  isPlanned: z.boolean().optional(),
+  requiresComment: z.boolean().optional(),
+  appliesToEquipmentType: z.string().nullable().optional(),
+  sortOrder: z.number().int().min(0).optional(),
+});
+export const updatePhaseTemplateSchema = createPhaseTemplateSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
+
 export const createCadenceSchema = z.object({
   productId: z.string().uuid("productId invalide"),
   equipmentId: z.string().uuid("equipmentId invalide"),

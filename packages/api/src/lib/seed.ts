@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import type { Db } from "@trs/db";
 import {
   users, rooms, equipments, products, downtimeCategories, productEquipmentCadences,
+  phaseTemplates,
 } from "@trs/db";
 
 export async function seedIfEmpty(db: Db): Promise<boolean> {
@@ -109,6 +110,31 @@ export async function seedIfEmpty(db: Db): Promise<boolean> {
     await db.insert(downtimeCategories).values(c).onConflictDoNothing();
   }
 
-  console.log("[seed] ✓ Initial data loaded (3 users · 2 salles · 2 équipements · 5 produits · 23 catégories)");
+  await seedPhaseTemplates(db);
+
+  console.log("[seed] ✓ Initial data loaded (3 users · 2 salles · 2 équipements · 5 produits · 23 catégories · 12 phases)");
   return true;
+}
+
+// Idempotent — safe to call on every boot. Mirrors the inserts in migration
+// 0003 so fresh local DBs (created via `db:push`, which skips SQL migrations)
+// also get the default phases.
+export async function seedPhaseTemplates(db: Db): Promise<void> {
+  const phases = [
+    { code: "PH-REMPLISSAGE", label: "Remplissage", category: "production", eventType: "remplissage" as const, isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 10 },
+    { code: "PH-BLISTERING", label: "Blistering", category: "production", eventType: "custom" as const, isPlanned: true, requiresComment: false, appliesToEquipmentType: "blistereuse", sortOrder: 20 },
+    { code: "PH-CONDITIONNEMENT", label: "Conditionnement", category: "production", eventType: "custom" as const, isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 30 },
+    { code: "PH-IPC", label: "Contrôle IPC", category: "production", eventType: "custom" as const, isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 40 },
+    { code: "PH-NETT-PARTIEL", label: "Nettoyage partiel", category: "nettoyage", eventType: "custom" as const, isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 10 },
+    { code: "PH-NETT-COMPLET", label: "Nettoyage complet", category: "nettoyage", eventType: "nettoyage" as const, isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 20 },
+    { code: "PH-VIDE-LIGNE", label: "Vide de ligne", category: "nettoyage", eventType: "vide_ligne" as const, isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 30 },
+    { code: "PH-CHSB", label: "CHSB — Changement série", category: "changement", eventType: "chsb" as const, isPlanned: true, requiresComment: false, appliesToEquipmentType: "blistereuse", sortOrder: 10 },
+    { code: "PH-CHSG", label: "CHSG — Changement série", category: "changement", eventType: "chsg" as const, isPlanned: true, requiresComment: false, appliesToEquipmentType: "geluleuse", sortOrder: 20 },
+    { code: "PH-FORMAT", label: "Changement de format", category: "changement", eventType: "custom" as const, isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 30 },
+    { code: "PH-PAUSE", label: "Pause", category: "arret_planifie", eventType: "pause" as const, isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 10 },
+    { code: "PH-APR", label: "APR — Arrêt programmé", category: "arret_planifie", eventType: "apr" as const, isPlanned: true, requiresComment: true, appliesToEquipmentType: null, sortOrder: 20 },
+  ];
+  for (const p of phases) {
+    await db.insert(phaseTemplates).values(p).onConflictDoNothing();
+  }
 }
