@@ -15,6 +15,32 @@ interface WaterfallStep {
   lossFill: string;
 }
 
+// Custom tooltip: keyed off dataKey (reliable), hides the invisible stacking
+// base and any zero entries, and labels the time bar vs. the loss bar correctly.
+function WaterfallTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  const rows = payload
+    .filter((p: any) => p.dataKey !== "base" && Number(p.value) > 0)
+    .map((p: any) => ({
+      name: p.dataKey === "value" ? "Temps" : "Perte",
+      value: fmtDuration(Number(p.value)),
+      color: p.dataKey === "value" ? p.payload.fill : p.payload.lossFill,
+    }));
+  if (rows.length === 0) return null;
+  return (
+    <div className="bg-white border rounded-lg shadow-sm px-3 py-2 text-xs">
+      <div className="font-semibold mb-1">{label}</div>
+      {rows.map((r: any, i: number) => (
+        <div key={i} className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-sm inline-block" style={{ background: r.color }} />
+          <span className="text-gray-600">{r.name} :</span>
+          <span className="font-medium">{r.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function WaterfallChart({ metrics }: Props) {
   const { tT, tO, fermeture, tAP, tR, totalUnplannedMin, tF, ecartCadenceMin, tN, nonQualiteMin, tU } = metrics;
 
@@ -49,18 +75,12 @@ export default function WaterfallChart({ metrics }: Props) {
       <h3 className="font-semibold text-sm mb-1">Cascade NF E 60-182</h3>
       <p className="text-xs text-gray-500 mb-3">Décomposition des pertes de temps</p>
 
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data} margin={{ top: 20, right: 10, left: 0, bottom: 5 }}>
+      <ResponsiveContainer width="100%" height={340}>
+        <BarChart data={data} margin={{ top: 20, right: 10, left: 0, bottom: 30 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-          <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} />
+          <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-40} textAnchor="end" height={60} />
           <YAxis tick={{ fontSize: 11 }} tickFormatter={v => fmtDuration(v)} />
-          <Tooltip
-            formatter={(value, name) => {
-              if (String(name) === "invisible") return [null, null];
-              return [fmtDuration(Number(value)), String(name) === "value" ? "Temps" : "Perte"];
-            }}
-            labelFormatter={l => String(l)}
-          />
+          <Tooltip content={<WaterfallTooltip />} cursor={{ fill: "rgba(0,0,0,0.03)" }} />
 
           {/* Invisible base bar for stacking */}
           <Bar dataKey="base" stackId="a" fill="transparent" name="invisible" />

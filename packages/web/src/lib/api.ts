@@ -48,6 +48,13 @@ async function request<T>(path: string, opts?: RequestInit, retried = false): Pr
   }
 
   if (!res.ok) {
+    // A non-JSON error body means the request never reached our API — e.g. the
+    // domain points at the wrong Vercel project, or a CDN/proxy served an HTML
+    // error page. Surface that distinctly from a real server-side failure.
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      throw new Error("API introuvable à cette adresse. Vérifie l'URL de l'application.");
+    }
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `HTTP ${res.status}`);
   }
