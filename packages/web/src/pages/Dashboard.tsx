@@ -246,6 +246,9 @@ export default function DashboardPage() {
             </div>
           )}
 
+          {/* ─── Headline stat strip ─────────────────────────── */}
+          {!showComparison && <StatStrip metrics={data.total} />}
+
           {/* ─── Main KPI card ───────────────────────────────── */}
           {!showComparison && (
             <KpiCard metrics={data.total} title={eq?.name || ""} objective={objective} />
@@ -297,6 +300,33 @@ const RATING_LABELS: Record<BenchmarkRating, { label: string; cls: string }> = {
 function BenchmarkBadge({ rating }: { rating: BenchmarkRating }) {
   const { label, cls } = RATING_LABELS[rating];
   return <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cls}`}>{label}</span>;
+}
+
+// Line-Performance-style headline strip: six at-a-glance numbers above the
+// detailed KPI card. All values come straight off the period total already
+// fetched — no extra request.
+function StatStrip({ metrics }: { metrics: TrsMetrics }) {
+  if (metrics.lotCount === 0) return null;
+  const heldMin = metrics.tAP + metrics.totalUnplannedMin;
+  const cards: { label: string; value: string; sub?: string; color?: string }[] = [
+    { label: "Production", value: metrics.totalProduced.toLocaleString("fr-FR"), sub: "pièces produites" },
+    { label: "Conformes", value: metrics.totalConforming.toLocaleString("fr-FR"), sub: `${metrics.totalRebut.toLocaleString("fr-FR")} rebuts` },
+    { label: "Temps d'arrêt", value: fmtDuration(heldMin), sub: "planifiés + non planifiés" },
+    { label: "Temps de marche", value: fmtDuration(Math.round(metrics.tF)), sub: "tF" },
+    { label: "Disponibilité", value: fmtPct(metrics.DO), sub: "DO", color: trsColor(metrics.DO) },
+    { label: "Performance", value: fmtPct(metrics.TP), sub: "TP", color: trsColor(metrics.TP) },
+  ];
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+      {cards.map(c => (
+        <div key={c.label} className="bg-white rounded-xl border shadow-sm p-4 text-center">
+          <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">{c.label}</div>
+          <div className="text-2xl font-bold tabular-nums" style={c.color ? { color: c.color } : undefined}>{c.value}</div>
+          {c.sub && <div className="text-[11px] text-gray-400 mt-0.5">{c.sub}</div>}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function KpiCard({ metrics, title, objective }: { metrics: TrsMetrics; title: string; objective?: number }) {
