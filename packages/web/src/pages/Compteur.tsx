@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type PhaseTemplate, type ProductEquipmentCadence, type SessionTrsResponse } from "@/lib/api";
-import { fmtDuration, fmtPct, trsColor } from "@trs/engine";
+import { fmtDuration, fmtPct, trsColor, PHASE_CATEGORY_KEYS, PHASE_CATEGORY_LABELS } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { Onboarding } from "@/components/Onboarding";
 import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle, Zap } from "lucide-react";
@@ -883,13 +883,12 @@ const QUICK_DURATIONS = [5, 10, 15, 30, 60];
 // Per-category color theme so the picker reads at a glance. Phases are loaded
 // from the DB (phase_templates), equipment-specific, so Blistereuse and
 // Géluleuse share one UI but show only their own phases (e.g. CHSB vs CHSG).
-const PHASE_CATEGORY_THEME: Record<string, { label: string; tab: string; phase: string }> = {
-  production:     { label: "Production",   tab: "bg-green-600 text-white border-green-600",   phase: "border-green-500 bg-green-50 text-green-800 font-semibold" },
-  nettoyage:      { label: "Nettoyage",    tab: "bg-blue-600 text-white border-blue-600",     phase: "border-blue-500 bg-blue-50 text-blue-800 font-semibold" },
-  changement:     { label: "Changement",   tab: "bg-violet-600 text-white border-violet-600", phase: "border-violet-500 bg-violet-50 text-violet-800 font-semibold" },
-  arret_planifie: { label: "Arrêt planifié", tab: "bg-orange-500 text-white border-orange-500", phase: "border-orange-500 bg-orange-50 text-orange-800 font-semibold" },
+const PHASE_CATEGORY_THEME: Record<string, { tab: string; phase: string }> = {
+  production:     { tab: "bg-green-600 text-white border-green-600",   phase: "border-green-500 bg-green-50 text-green-800 font-semibold" },
+  nettoyage:      { tab: "bg-blue-600 text-white border-blue-600",     phase: "border-blue-500 bg-blue-50 text-blue-800 font-semibold" },
+  changement:     { tab: "bg-violet-600 text-white border-violet-600", phase: "border-violet-500 bg-violet-50 text-violet-800 font-semibold" },
+  arret_planifie: { tab: "bg-orange-500 text-white border-orange-500", phase: "border-orange-500 bg-orange-50 text-orange-800 font-semibold" },
 };
-const PHASE_CATEGORY_ORDER = ["production", "nettoyage", "changement", "arret_planifie"];
 
 function AddPhaseForm({ sessionId, phases, onAdded, onBack }: {
   sessionId: string;
@@ -909,7 +908,7 @@ function AddPhaseForm({ sessionId, phases, onAdded, onBack }: {
       (acc[p.category] ||= []).push(p);
       return acc;
     }, {});
-    return PHASE_CATEGORY_ORDER.filter(k => grouped[k]?.length).map(k => ({ key: k, phases: grouped[k] }));
+    return PHASE_CATEGORY_KEYS.filter(k => grouped[k]?.length).map(k => ({ key: k, phases: grouped[k] }));
   }, [phases]);
 
   const [catKey, setCatKey] = useState(categories[0]?.key ?? "production");
@@ -974,7 +973,7 @@ function AddPhaseForm({ sessionId, phases, onAdded, onBack }: {
                   catKey === c.key ? t.tab : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                 }`}
               >
-                {t.label}
+                {PHASE_CATEGORY_LABELS[c.key as keyof typeof PHASE_CATEGORY_LABELS] ?? c.key}
               </button>
             );
           })}
