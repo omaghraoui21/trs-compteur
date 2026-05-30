@@ -3,7 +3,11 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { existsSync } from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { sql } from "drizzle-orm";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { createDb } from "@trs/db";
 import { authRouter } from "./routes/auth";
 import { sessionsRouter } from "./routes/sessions";
@@ -37,6 +41,25 @@ const authLimiter = rateLimit({
 
 const db = createDb();
 
+// Run pending Drizzle migrations automatically on startup.
+// On Railway/Docker the container persists so this only runs once per deploy.
+// The path resolves to packages/db/drizzle/ whether we run via tsx or a built binary.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const MIGRATIONS_DIR = process.env.MIGRATIONS_DIR
+  ?? path.resolve(__dirname, "../../db/drizzle");
+
+if (!process.env.VERCEL) {
+  try {
+    if (existsSync(MIGRATIONS_DIR)) {
+      await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
+      console.log("✓ Database migrations applied");
+    }
+  } catch (err) {
+    console.error("Migration failed:", err);
+    // Do not crash — let the health check surface the issue
+  }
+}
+
 // Inject db into request
 app.use((req, _res, next) => {
   (req as any).db = db;
@@ -64,6 +87,16 @@ app.get("/api/health", asyncHandler(async (_req, res) => {
     res.status(503).json({ status: "error", version: "1.0.0", db: "disconnected" });
   }
 }));
+
+// Serve the React SPA when STATIC_ROOT is set (Railway/Docker single-service mode).
+// API routes above take precedence; everything else falls through to index.html.
+const STATIC_ROOT = process.env.STATIC_ROOT;
+if (STATIC_ROOT && existsSync(STATIC_ROOT)) {
+  app.use(express.static(STATIC_ROOT));
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(STATIC_ROOT, "index.html"));
+  });
+}
 
 // Terminal error handler — keeps failed requests from hanging and returns JSON.
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
