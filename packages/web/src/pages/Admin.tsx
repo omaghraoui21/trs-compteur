@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type AdminPhaseTemplate, type ProductEquipmentCadence } from "@/lib/api";
+import { PHASE_CATEGORY_KEYS, PHASE_CATEGORY_LABELS, PHASE_EVENT_TYPES } from "@trs/engine";
 import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, Clock } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
 
@@ -14,17 +15,10 @@ const TABS: { key: Tab; label: string; icon: typeof Building2 }[] = [
   { key: "downtimes", label: "Arrêts", icon: AlertTriangle },
 ];
 
-// Phase categories shown in the "Ajouter une phase" picker. "arret_planifie"
-// = planned stops (pause, APR) which reduce tR (not tF); unplanned stops live
-// in the Arrêts tab because they must be linked to a lot.
-const PHASE_CATEGORY_LABELS: Record<string, string> = {
-  production: "Production",
-  nettoyage: "Nettoyage",
-  changement: "Changement de série",
-  arret_planifie: "Arrêt planifié",
-};
-const PHASE_CATEGORY_KEYS = ["production", "nettoyage", "changement", "arret_planifie"];
-const EVENT_TYPES = ["remplissage", "nettoyage", "vide_ligne", "chsb", "chsg", "pause", "apr", "mqch", "custom"];
+// Phase category keys, labels, and selectable event types come from @trs/engine
+// (single source of truth shared with the API). "arret_planifie" = planned
+// stops (pause, APR) which reduce tR (not tF); unplanned stops live in the
+// Arrêts tab because they must be linked to a lot.
 
 const FAMILLES = [
   "Panne équipement",
@@ -506,7 +500,7 @@ function PhasesPanel() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const emptyForm = { code: "", label: "", category: PHASE_CATEGORY_KEYS[0], eventType: "custom", requiresComment: false, appliesToEquipmentType: "", sortOrder: "0" };
+  const emptyForm = { code: "", label: "", category: PHASE_CATEGORY_KEYS[0] as string, eventType: "custom" as string, requiresComment: false, appliesToEquipmentType: "", sortOrder: "0" };
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState("");
 
@@ -587,7 +581,7 @@ function PhasesPanel() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Type d'événement (TRS)</label>
             <select value={form.eventType} onChange={(e) => setForm({ ...form, eventType: e.target.value })} className="input-field">
-              {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              {PHASE_EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div>

@@ -45560,239 +45560,6 @@ var coerce = {
 };
 var NEVER = INVALID;
 
-// packages/api/src/schemas.ts
-var cadenceUnit = external_exports.enum(["u/min", "u/h"]);
-var eventType = external_exports.enum([
-  "nettoyage",
-  "vide_ligne",
-  "remplissage",
-  "pause",
-  "chsb",
-  "chsg",
-  "apr",
-  "mqch",
-  "lot_start",
-  "lot_end",
-  "custom"
-]);
-var loginSchema = external_exports.object({
-  email: external_exports.string().email("Email invalide"),
-  password: external_exports.string().min(1, "Mot de passe requis")
-});
-var refreshSchema = external_exports.object({
-  refreshToken: external_exports.string().min(1, "refreshToken requis")
-});
-var openSessionSchema = external_exports.object({
-  equipmentId: external_exports.string().uuid("equipmentId invalide"),
-  roomId: external_exports.string().uuid("roomId invalide")
-});
-var addEventSchema = external_exports.object({
-  eventType,
-  label: external_exports.string().optional(),
-  durationMinutes: external_exports.number().min(0, "Dur\xE9e invalide").optional(),
-  isPlanned: external_exports.boolean().optional(),
-  comment: external_exports.string().optional()
-});
-var startLotSchema = external_exports.object({
-  sessionId: external_exports.string().uuid("sessionId invalide"),
-  productId: external_exports.string().uuid("productId invalide"),
-  batchNumber: external_exports.string().min(1, "Num\xE9ro de lot requis"),
-  cadenceUsed: external_exports.number().positive("Cadence doit \xEAtre positive"),
-  cadenceUnit: cadenceUnit.optional()
-});
-var quantityFields = {
-  quantityProduced: external_exports.number().int().min(0, "Quantit\xE9 produite invalide"),
-  quantityConforming: external_exports.number().int().min(0, "Quantit\xE9 conforme invalide"),
-  quantityRejected: external_exports.number().int().min(0, "Quantit\xE9 rejet\xE9e invalide").optional()
-};
-var closeLotSchema = external_exports.object(quantityFields).refine((d) => d.quantityConforming <= d.quantityProduced, {
-  message: "La quantit\xE9 conforme ne peut pas d\xE9passer la quantit\xE9 produite",
-  path: ["quantityConforming"]
-});
-var updateLotSchema = external_exports.object({
-  quantityProduced: external_exports.number().int().min(0, "Quantit\xE9 produite invalide").optional(),
-  quantityConforming: external_exports.number().int().min(0, "Quantit\xE9 conforme invalide").optional(),
-  quantityRejected: external_exports.number().int().min(0, "Quantit\xE9 rejet\xE9e invalide").optional(),
-  cadenceUsed: external_exports.number().positive("Cadence doit \xEAtre positive").optional(),
-  cadenceUnit: cadenceUnit.optional()
-}).refine(
-  (d) => d.quantityProduced === void 0 || d.quantityConforming === void 0 || d.quantityConforming <= d.quantityProduced,
-  {
-    message: "La quantit\xE9 conforme ne peut pas d\xE9passer la quantit\xE9 produite",
-    path: ["quantityConforming"]
-  }
-);
-var addDowntimeSchema = external_exports.object({
-  categoryId: external_exports.string().uuid("categoryId invalide"),
-  durationMinutes: external_exports.number().positive("Dur\xE9e doit \xEAtre positive"),
-  isShortStop: external_exports.boolean().optional(),
-  comment: external_exports.string().optional()
-});
-var validateLotSchema = external_exports.object({
-  action: external_exports.enum(["validate", "reject"]),
-  comment: external_exports.string().optional()
-});
-var equipmentType = external_exports.enum(["blistereuse", "geluleuse"]);
-var createRoomSchema = external_exports.object({
-  code: external_exports.string().min(1, "code requis"),
-  name: external_exports.string().min(1, "name requis"),
-  description: external_exports.string().optional()
-});
-var updateRoomSchema = createRoomSchema.partial().extend({
-  isActive: external_exports.boolean().optional()
-});
-var createEquipmentSchema = external_exports.object({
-  code: external_exports.string().min(1, "code requis"),
-  name: external_exports.string().min(1, "name requis"),
-  roomId: external_exports.string().uuid("roomId invalide"),
-  equipmentType: equipmentType.optional(),
-  trsObjective: external_exports.string().optional(),
-  defaultCadenceUnit: cadenceUnit.optional(),
-  microStopThresholdMin: external_exports.number().int().min(1).optional()
-});
-var updateEquipmentSchema = createEquipmentSchema.partial().extend({
-  isActive: external_exports.boolean().optional()
-});
-var createProductSchema = external_exports.object({
-  code: external_exports.string().min(1, "code requis"),
-  name: external_exports.string().min(1, "name requis"),
-  defaultCadence: external_exports.string().optional(),
-  cadenceUnit: cadenceUnit.optional(),
-  unit: external_exports.string().optional()
-});
-var updateProductSchema = createProductSchema.partial().extend({
-  isActive: external_exports.boolean().optional()
-});
-var createDowntimeCategorySchema = external_exports.object({
-  code: external_exports.string().min(1, "code requis"),
-  label: external_exports.string().min(1, "label requis"),
-  famille: external_exports.string().min(1, "famille requise"),
-  isPlanned: external_exports.boolean().optional(),
-  appliesToEquipmentType: external_exports.string().nullable().optional()
-});
-var updateDowntimeCategorySchema = createDowntimeCategorySchema.partial().extend({
-  isActive: external_exports.boolean().optional()
-});
-var phaseCategory = external_exports.enum(["production", "nettoyage", "changement", "arret_planifie"]);
-var createPhaseTemplateSchema = external_exports.object({
-  code: external_exports.string().min(1, "code requis"),
-  label: external_exports.string().min(1, "label requis"),
-  category: phaseCategory,
-  eventType,
-  isPlanned: external_exports.boolean().optional(),
-  requiresComment: external_exports.boolean().optional(),
-  appliesToEquipmentType: external_exports.string().nullable().optional(),
-  sortOrder: external_exports.number().int().min(0).optional()
-});
-var updatePhaseTemplateSchema = createPhaseTemplateSchema.partial().extend({
-  isActive: external_exports.boolean().optional()
-});
-var createCadenceSchema = external_exports.object({
-  productId: external_exports.string().uuid("productId invalide"),
-  equipmentId: external_exports.string().uuid("equipmentId invalide"),
-  cadenceValue: external_exports.number().positive("cadenceValue doit \xEAtre positive"),
-  cadenceUnit: cadenceUnit.optional(),
-  trsObjective: external_exports.number().min(0).max(100).optional()
-});
-
-// packages/api/src/routes/auth.ts
-var authRouter = (0, import_express.Router)();
-var REFRESH_TTL_DAYS = 30;
-var REUSE_GRACE_MS = 1e4;
-function generateRefreshToken() {
-  return crypto3.randomBytes(32).toString("hex");
-}
-function hashToken(token) {
-  return crypto3.createHash("sha256").update(token).digest("hex");
-}
-function refreshExpiry() {
-  return new Date(Date.now() + REFRESH_TTL_DAYS * 864e5);
-}
-var publicUser = (u) => ({ id: u.id, email: u.email, displayName: u.displayName, role: u.role });
-authRouter.post("/login", validate(loginSchema), asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
-  const { db: db2 } = req;
-  const [user] = await db2.select().from(users).where(eq(users.email, email)).limit(1);
-  if (!user || !user.isActive) {
-    res.status(401).json({ error: "Identifiants invalides" });
-    return;
-  }
-  const valid = await import_bcryptjs2.default.compare(password, user.passwordHash);
-  if (!valid) {
-    res.status(401).json({ error: "Identifiants invalides" });
-    return;
-  }
-  const refreshToken = generateRefreshToken();
-  await db2.insert(refreshTokens).values({
-    userId: user.id,
-    tokenHash: hashToken(refreshToken),
-    familyId: crypto3.randomUUID(),
-    expiresAt: refreshExpiry()
-  });
-  const token = signToken(user.id, user.role, user.email);
-  res.json({ token, refreshToken, user: publicUser(user) });
-}));
-authRouter.post("/refresh", validate(refreshSchema), asyncHandler(async (req, res) => {
-  const { refreshToken } = req.body;
-  const { db: db2 } = req;
-  const hash = hashToken(refreshToken);
-  const [row] = await db2.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, hash)).limit(1);
-  if (!row) {
-    res.status(401).json({ error: "Refresh token invalide" });
-    return;
-  }
-  if (row.revokedAt && Date.now() - row.revokedAt.getTime() > REUSE_GRACE_MS) {
-    await db2.update(refreshTokens).set({ revokedAt: /* @__PURE__ */ new Date() }).where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt)));
-    res.status(401).json({ error: "R\xE9utilisation d\xE9tect\xE9e \u2014 session r\xE9voqu\xE9e" });
-    return;
-  }
-  if (row.expiresAt.getTime() < Date.now()) {
-    res.status(401).json({ error: "Refresh token expir\xE9" });
-    return;
-  }
-  const [user] = await db2.select().from(users).where(eq(users.id, row.userId)).limit(1);
-  if (!user || !user.isActive) {
-    res.status(401).json({ error: "Utilisateur inactif" });
-    return;
-  }
-  const now = /* @__PURE__ */ new Date();
-  await db2.update(refreshTokens).set({ revokedAt: now }).where(eq(refreshTokens.id, row.id));
-  const newRefresh = generateRefreshToken();
-  await db2.insert(refreshTokens).values({
-    userId: user.id,
-    tokenHash: hashToken(newRefresh),
-    familyId: row.familyId,
-    expiresAt: refreshExpiry()
-  });
-  const token = signToken(user.id, user.role, user.email);
-  res.json({ token, refreshToken: newRefresh, user: publicUser(user) });
-}));
-authRouter.post("/logout", validate(refreshSchema), asyncHandler(async (req, res) => {
-  const { refreshToken } = req.body;
-  const { db: db2 } = req;
-  const [row] = await db2.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, hashToken(refreshToken))).limit(1);
-  if (row) {
-    await db2.update(refreshTokens).set({ revokedAt: /* @__PURE__ */ new Date() }).where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt)));
-  }
-  res.json({ ok: true });
-}));
-authRouter.get("/me", authenticate, asyncHandler(async (req, res) => {
-  const { db: db2, userId } = req;
-  if (!userId) {
-    res.status(401).json({ error: "Non authentifi\xE9" });
-    return;
-  }
-  const [user] = await db2.select().from(users).where(eq(users.id, userId)).limit(1);
-  if (!user) {
-    res.status(404).json({ error: "Utilisateur introuvable" });
-    return;
-  }
-  res.json(publicUser(user));
-}));
-
-// packages/api/src/routes/sessions.ts
-var import_express2 = __toESM(require_express2(), 1);
-
 // packages/engine/src/time.ts
 function diffMinutes(start, end) {
   const s = typeof start === "string" ? new Date(start).getTime() : start.getTime();
@@ -46099,6 +45866,242 @@ function computeMtbfMttr(downtimes, runTimeMin, microStopThresholdMin = 5) {
   const availability = mtbf / (mtbf + mttr);
   return { breakdownCount, totalBreakdownMin, mtbf, mttr, availability };
 }
+
+// packages/engine/src/phases.ts
+var PHASE_CATEGORY_KEYS = ["production", "nettoyage", "changement", "arret_planifie"];
+
+// packages/api/src/schemas.ts
+var cadenceUnit = external_exports.enum(["u/min", "u/h"]);
+var eventType = external_exports.enum([
+  "nettoyage",
+  "vide_ligne",
+  "remplissage",
+  "pause",
+  "chsb",
+  "chsg",
+  "apr",
+  "mqch",
+  "lot_start",
+  "lot_end",
+  "custom"
+]);
+var loginSchema = external_exports.object({
+  email: external_exports.string().email("Email invalide"),
+  password: external_exports.string().min(1, "Mot de passe requis")
+});
+var refreshSchema = external_exports.object({
+  refreshToken: external_exports.string().min(1, "refreshToken requis")
+});
+var openSessionSchema = external_exports.object({
+  equipmentId: external_exports.string().uuid("equipmentId invalide"),
+  roomId: external_exports.string().uuid("roomId invalide")
+});
+var addEventSchema = external_exports.object({
+  eventType,
+  label: external_exports.string().optional(),
+  durationMinutes: external_exports.number().min(0, "Dur\xE9e invalide").optional(),
+  isPlanned: external_exports.boolean().optional(),
+  comment: external_exports.string().optional()
+});
+var startLotSchema = external_exports.object({
+  sessionId: external_exports.string().uuid("sessionId invalide"),
+  productId: external_exports.string().uuid("productId invalide"),
+  batchNumber: external_exports.string().min(1, "Num\xE9ro de lot requis"),
+  cadenceUsed: external_exports.number().positive("Cadence doit \xEAtre positive"),
+  cadenceUnit: cadenceUnit.optional()
+});
+var quantityFields = {
+  quantityProduced: external_exports.number().int().min(0, "Quantit\xE9 produite invalide"),
+  quantityConforming: external_exports.number().int().min(0, "Quantit\xE9 conforme invalide"),
+  quantityRejected: external_exports.number().int().min(0, "Quantit\xE9 rejet\xE9e invalide").optional()
+};
+var closeLotSchema = external_exports.object(quantityFields).refine((d) => d.quantityConforming <= d.quantityProduced, {
+  message: "La quantit\xE9 conforme ne peut pas d\xE9passer la quantit\xE9 produite",
+  path: ["quantityConforming"]
+});
+var updateLotSchema = external_exports.object({
+  quantityProduced: external_exports.number().int().min(0, "Quantit\xE9 produite invalide").optional(),
+  quantityConforming: external_exports.number().int().min(0, "Quantit\xE9 conforme invalide").optional(),
+  quantityRejected: external_exports.number().int().min(0, "Quantit\xE9 rejet\xE9e invalide").optional(),
+  cadenceUsed: external_exports.number().positive("Cadence doit \xEAtre positive").optional(),
+  cadenceUnit: cadenceUnit.optional()
+}).refine(
+  (d) => d.quantityProduced === void 0 || d.quantityConforming === void 0 || d.quantityConforming <= d.quantityProduced,
+  {
+    message: "La quantit\xE9 conforme ne peut pas d\xE9passer la quantit\xE9 produite",
+    path: ["quantityConforming"]
+  }
+);
+var addDowntimeSchema = external_exports.object({
+  categoryId: external_exports.string().uuid("categoryId invalide"),
+  durationMinutes: external_exports.number().positive("Dur\xE9e doit \xEAtre positive"),
+  isShortStop: external_exports.boolean().optional(),
+  comment: external_exports.string().optional()
+});
+var validateLotSchema = external_exports.object({
+  action: external_exports.enum(["validate", "reject"]),
+  comment: external_exports.string().optional()
+});
+var equipmentType = external_exports.enum(["blistereuse", "geluleuse"]);
+var createRoomSchema = external_exports.object({
+  code: external_exports.string().min(1, "code requis"),
+  name: external_exports.string().min(1, "name requis"),
+  description: external_exports.string().optional()
+});
+var updateRoomSchema = createRoomSchema.partial().extend({
+  isActive: external_exports.boolean().optional()
+});
+var createEquipmentSchema = external_exports.object({
+  code: external_exports.string().min(1, "code requis"),
+  name: external_exports.string().min(1, "name requis"),
+  roomId: external_exports.string().uuid("roomId invalide"),
+  equipmentType: equipmentType.optional(),
+  trsObjective: external_exports.string().optional(),
+  defaultCadenceUnit: cadenceUnit.optional(),
+  microStopThresholdMin: external_exports.number().int().min(1).optional()
+});
+var updateEquipmentSchema = createEquipmentSchema.partial().extend({
+  isActive: external_exports.boolean().optional()
+});
+var createProductSchema = external_exports.object({
+  code: external_exports.string().min(1, "code requis"),
+  name: external_exports.string().min(1, "name requis"),
+  defaultCadence: external_exports.string().optional(),
+  cadenceUnit: cadenceUnit.optional(),
+  unit: external_exports.string().optional()
+});
+var updateProductSchema = createProductSchema.partial().extend({
+  isActive: external_exports.boolean().optional()
+});
+var createDowntimeCategorySchema = external_exports.object({
+  code: external_exports.string().min(1, "code requis"),
+  label: external_exports.string().min(1, "label requis"),
+  famille: external_exports.string().min(1, "famille requise"),
+  isPlanned: external_exports.boolean().optional(),
+  appliesToEquipmentType: external_exports.string().nullable().optional()
+});
+var updateDowntimeCategorySchema = createDowntimeCategorySchema.partial().extend({
+  isActive: external_exports.boolean().optional()
+});
+var phaseCategory = external_exports.enum(PHASE_CATEGORY_KEYS);
+var createPhaseTemplateSchema = external_exports.object({
+  code: external_exports.string().min(1, "code requis"),
+  label: external_exports.string().min(1, "label requis"),
+  category: phaseCategory,
+  eventType,
+  isPlanned: external_exports.boolean().optional(),
+  requiresComment: external_exports.boolean().optional(),
+  appliesToEquipmentType: external_exports.string().nullable().optional(),
+  sortOrder: external_exports.number().int().min(0).optional()
+});
+var updatePhaseTemplateSchema = createPhaseTemplateSchema.partial().extend({
+  isActive: external_exports.boolean().optional()
+});
+var createCadenceSchema = external_exports.object({
+  productId: external_exports.string().uuid("productId invalide"),
+  equipmentId: external_exports.string().uuid("equipmentId invalide"),
+  cadenceValue: external_exports.number().positive("cadenceValue doit \xEAtre positive"),
+  cadenceUnit: cadenceUnit.optional(),
+  trsObjective: external_exports.number().min(0).max(100).optional()
+});
+
+// packages/api/src/routes/auth.ts
+var authRouter = (0, import_express.Router)();
+var REFRESH_TTL_DAYS = 30;
+var REUSE_GRACE_MS = 1e4;
+function generateRefreshToken() {
+  return crypto3.randomBytes(32).toString("hex");
+}
+function hashToken(token) {
+  return crypto3.createHash("sha256").update(token).digest("hex");
+}
+function refreshExpiry() {
+  return new Date(Date.now() + REFRESH_TTL_DAYS * 864e5);
+}
+var publicUser = (u) => ({ id: u.id, email: u.email, displayName: u.displayName, role: u.role });
+authRouter.post("/login", validate(loginSchema), asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  const { db: db2 } = req;
+  const [user] = await db2.select().from(users).where(eq(users.email, email)).limit(1);
+  if (!user || !user.isActive) {
+    res.status(401).json({ error: "Identifiants invalides" });
+    return;
+  }
+  const valid = await import_bcryptjs2.default.compare(password, user.passwordHash);
+  if (!valid) {
+    res.status(401).json({ error: "Identifiants invalides" });
+    return;
+  }
+  const refreshToken = generateRefreshToken();
+  await db2.insert(refreshTokens).values({
+    userId: user.id,
+    tokenHash: hashToken(refreshToken),
+    familyId: crypto3.randomUUID(),
+    expiresAt: refreshExpiry()
+  });
+  const token = signToken(user.id, user.role, user.email);
+  res.json({ token, refreshToken, user: publicUser(user) });
+}));
+authRouter.post("/refresh", validate(refreshSchema), asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+  const { db: db2 } = req;
+  const hash = hashToken(refreshToken);
+  const [row] = await db2.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, hash)).limit(1);
+  if (!row) {
+    res.status(401).json({ error: "Refresh token invalide" });
+    return;
+  }
+  if (row.revokedAt && Date.now() - row.revokedAt.getTime() > REUSE_GRACE_MS) {
+    await db2.update(refreshTokens).set({ revokedAt: /* @__PURE__ */ new Date() }).where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt)));
+    res.status(401).json({ error: "R\xE9utilisation d\xE9tect\xE9e \u2014 session r\xE9voqu\xE9e" });
+    return;
+  }
+  if (row.expiresAt.getTime() < Date.now()) {
+    res.status(401).json({ error: "Refresh token expir\xE9" });
+    return;
+  }
+  const [user] = await db2.select().from(users).where(eq(users.id, row.userId)).limit(1);
+  if (!user || !user.isActive) {
+    res.status(401).json({ error: "Utilisateur inactif" });
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  await db2.update(refreshTokens).set({ revokedAt: now }).where(eq(refreshTokens.id, row.id));
+  const newRefresh = generateRefreshToken();
+  await db2.insert(refreshTokens).values({
+    userId: user.id,
+    tokenHash: hashToken(newRefresh),
+    familyId: row.familyId,
+    expiresAt: refreshExpiry()
+  });
+  const token = signToken(user.id, user.role, user.email);
+  res.json({ token, refreshToken: newRefresh, user: publicUser(user) });
+}));
+authRouter.post("/logout", validate(refreshSchema), asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+  const { db: db2 } = req;
+  const [row] = await db2.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, hashToken(refreshToken))).limit(1);
+  if (row) {
+    await db2.update(refreshTokens).set({ revokedAt: /* @__PURE__ */ new Date() }).where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt)));
+  }
+  res.json({ ok: true });
+}));
+authRouter.get("/me", authenticate, asyncHandler(async (req, res) => {
+  const { db: db2, userId } = req;
+  if (!userId) {
+    res.status(401).json({ error: "Non authentifi\xE9" });
+    return;
+  }
+  const [user] = await db2.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) {
+    res.status(404).json({ error: "Utilisateur introuvable" });
+    return;
+  }
+  res.json(publicUser(user));
+}));
+
+// packages/api/src/routes/sessions.ts
+var import_express2 = __toESM(require_express2(), 1);
 
 // packages/api/src/lib/audit.ts
 async function audit(db2, req, action, entityType, entityId, payload) {

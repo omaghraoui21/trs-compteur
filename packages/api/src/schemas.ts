@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PHASE_CATEGORY_KEYS } from "@trs/engine";
 
 const cadenceUnit = z.enum(["u/min", "u/h"]);
 
@@ -138,7 +139,7 @@ export const updateDowntimeCategorySchema = createDowntimeCategorySchema.partial
   isActive: z.boolean().optional(),
 });
 
-const phaseCategory = z.enum(["production", "nettoyage", "changement", "arret_planifie"]);
+const phaseCategory = z.enum(PHASE_CATEGORY_KEYS as unknown as [string, ...string[]]);
 
 export const createPhaseTemplateSchema = z.object({
   code: z.string().min(1, "code requis"),

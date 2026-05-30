@@ -1,15 +1,67 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type PhaseTemplate, type ProductEquipmentCadence, type SessionTrsResponse } from "@/lib/api";
-import { fmtDuration, fmtPct, trsColor } from "@trs/engine";
+import { fmtDuration, fmtPct, trsColor, PHASE_CATEGORY_KEYS, PHASE_CATEGORY_LABELS } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { Onboarding } from "@/components/Onboarding";
-import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle, Zap } from "lucide-react";
+import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle, Zap, CheckCircle, XCircle, Wrench, Droplets, RotateCcw, Cpu } from "lucide-react";
 
 type View = "pick-room" | "pick-equip" | "timeline" | "new-lot" | "add-phase" | "add-downtime";
 
 // ─── Touch-friendly class constants (U2) ─────────────────
 const BTN_PRIMARY = "min-h-[48px] text-base font-semibold rounded-xl px-4 py-3 flex items-center justify-center gap-2 transition active:scale-95";
 const BTN_ICON = "h-6 w-6";
+
+// Machine-specific accent palette — blue for Blistereuse, violet for Géluleuse.
+// Keeps operator context clear when both machines are in the same room.
+function equipmentAccent(type?: string | null) {
+  if (type === "geluleuse") return {
+    badge: "bg-violet-100 text-violet-700",
+    btnOpen: "bg-violet-600 text-white hover:bg-violet-700",
+    timerText: "text-violet-700",
+    timerBg: "bg-violet-50 border-violet-200",
+    cardBorder: "hover:border-violet-400",
+  };
+  return {
+    badge: "bg-blue-100 text-blue-700",
+    btnOpen: "bg-blue-600 text-white hover:bg-blue-700",
+    timerText: "text-blue-700",
+    timerBg: "bg-blue-50 border-blue-200",
+    cardBorder: "hover:border-blue-400",
+  };
+}
+
+const EVENT_TYPE_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  lot_start:    Play,
+  lot_end:      Square,
+  nettoyage:    Droplets,
+  vide_ligne:   Droplets,
+  remplissage:  Droplets,
+  pause:        Clock,
+  chsb:         Wrench,
+  chsg:         Wrench,
+  apr:          RotateCcw,
+  mqch:         Wrench,
+  custom:       Plus,
+};
+
+function ValidationBadge({ status }: { status: string }) {
+  if (status === "validated") return (
+    <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium shrink-0">
+      <CheckCircle className="h-3 w-3" /> Validé
+    </span>
+  );
+  if (status === "rejected") return (
+    <span className="inline-flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium shrink-0">
+      <XCircle className="h-3 w-3" /> Rejeté
+    </span>
+  );
+  // "closed" = awaiting supervisor validation
+  return (
+    <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium shrink-0">
+      <Clock className="h-3 w-3" /> En attente
+    </span>
+  );
+}
 
 function useFlash(): [boolean, () => void] {
   const [flashing, setFlashing] = useState(false);
@@ -209,20 +261,34 @@ export default function CompteurPage() {
         </button>
         <h2 className="text-xl font-bold mb-4">{selectedRoom?.name} — Equipement</h2>
         <div className="grid gap-3">
-          {equipmentsList.map(eq => (
-            <button
-              key={eq.id}
-              onClick={() => handleEquipmentSelect(eq)}
-              className="bg-white rounded-xl border p-5 text-left hover:border-blue-500 hover:shadow transition min-h-[56px]"
-            >
-              <div className="font-semibold text-lg">{eq.name}</div>
-              <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
-                <span>{eq.code}</span>
-                <span className="capitalize bg-gray-100 px-2 py-0.5 rounded">{eq.equipmentType}</span>
-                <span>Obj. TRS: {eq.trsObjective}%</span>
-              </div>
-            </button>
-          ))}
+          {equipmentsList.map(eq => {
+            const accent = equipmentAccent(eq.equipmentType);
+            return (
+              <button
+                key={eq.id}
+                onClick={() => handleEquipmentSelect(eq)}
+                className={`bg-white rounded-xl border p-5 text-left hover:shadow-md transition min-h-[56px] ${accent.cardBorder}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${accent.timerBg}`}>
+                    <Cpu className={`h-5 w-5 ${accent.timerText}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-lg leading-tight">{eq.name}</div>
+                    <div className="flex items-center gap-2 text-sm text-gray-500 mt-0.5">
+                      <span className="font-mono text-xs">{eq.code}</span>
+                      {eq.equipmentType && (
+                        <span className={`capitalize text-xs px-2 py-0.5 rounded-full font-medium ${accent.badge}`}>
+                          {eq.equipmentType}
+                        </span>
+                      )}
+                      <span className="text-xs">Obj. {eq.trsObjective}%</span>
+                    </div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
     );
@@ -286,13 +352,29 @@ export default function CompteurPage() {
         <ChevronLeft className="h-4 w-4" /> Retour
       </button>
 
-      <div className="mb-4">
-        <h2 className="text-xl font-bold flex items-center gap-2">
-          <Timer className={`h-5 w-5 ${activeSession ? "text-green-600" : "text-gray-400"}`} />
-          {selectedEquipment?.name}
-        </h2>
-        <p className="text-sm text-gray-500">{selectedRoom?.name}</p>
-      </div>
+      {(() => {
+        const accent = equipmentAccent(selectedEquipment?.equipmentType);
+        return (
+          <div className="mb-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl ${accent.timerBg}`}>
+                <Cpu className={`h-5 w-5 ${accent.timerText}`} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold leading-tight flex items-center gap-2">
+                  {selectedEquipment?.name}
+                  {selectedEquipment?.equipmentType && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${accent.badge}`}>
+                      {selectedEquipment.equipmentType}
+                    </span>
+                  )}
+                </h2>
+                <p className="text-sm text-gray-500">{selectedRoom?.name}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Big status card: timer + active lot + current phase */}
       {activeSession && activeSession.status === "active" && (
@@ -338,7 +420,7 @@ export default function CompteurPage() {
 
       {!activeSession && (
         <button onClick={handleOpenSession}
-          className={`w-full bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700 text-lg`}>
+          className={`w-full ${equipmentAccent(selectedEquipment?.equipmentType).btnOpen} ${BTN_PRIMARY} text-lg`}>
           <Play className={BTN_ICON} /> Ouvrir le compteur
         </button>
       )}
@@ -354,28 +436,34 @@ export default function CompteurPage() {
               <h3 className="font-semibold text-sm">Timeline</h3>
               <span className="text-xs text-gray-400">{detail.events.length} événements</span>
             </div>
-            <div className="divide-y max-h-64 overflow-y-auto">
+            <div className="divide-y max-h-72 overflow-y-auto">
               {detail.events.map(ev => {
                 const lot = detail.lots.find(l => l.id === ev.lotEntryId);
                 const product = lot ? products.find(p => p.id === lot.productId) : null;
+                const Icon = EVENT_TYPE_ICON[ev.eventType] ?? Plus;
+                const isLotLifecycle = ev.eventType === "lot_start" || ev.eventType === "lot_end";
+                const iconCls = isLotLifecycle
+                  ? ev.eventType === "lot_start" ? "text-green-600 bg-green-50" : "text-blue-600 bg-blue-50"
+                  : ev.isPlanned ? "text-amber-600 bg-amber-50" : "text-gray-500 bg-gray-50";
+                const label = ev.eventType === "lot_start" ? `Lot ${lot?.batchNumber ?? "?"} démarré`
+                  : ev.eventType === "lot_end" ? `Lot ${lot?.batchNumber ?? "?"} clôturé`
+                  : ev.label || ev.eventType.replace(/_/g, " ");
                 return (
-                  <div key={ev.id} className="px-4 py-2.5 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2.5 h-2.5 rounded-full ${
-                        ev.eventType === "lot_start" ? "bg-green-500" :
-                        ev.eventType === "lot_end" ? "bg-blue-500" :
-                        ev.isPlanned ? "bg-amber-400" : "bg-gray-400"
-                      }`} />
-                      <span className="text-sm font-medium">
-                        {ev.eventType === "lot_start" ? `Lot ${lot?.batchNumber ?? "?"} démarré` :
-                         ev.eventType === "lot_end" ? `Lot ${lot?.batchNumber ?? "?"} clôturé` :
-                         ev.label || ev.eventType.replace("_", " ")}
-                      </span>
-                      {product && <span className="text-gray-400 ml-2">({product.name})</span>}
+                  <div key={ev.id} className="px-4 py-2.5 flex items-center gap-3">
+                    <div className={`p-1.5 rounded-lg shrink-0 ${iconCls}`}>
+                      <Icon className="h-3.5 w-3.5" />
                     </div>
-                    <div className="text-gray-400 text-xs">
-                      {new Date(ev.startedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                      {ev.durationMinutes != null && <span className="ml-1">· {ev.durationMinutes} min</span>}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{label}</div>
+                      {product && <div className="text-xs text-gray-400 truncate">{product.name}</div>}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-xs text-gray-400">
+                        {new Date(ev.startedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                      {ev.durationMinutes != null && (
+                        <div className="text-xs font-medium text-gray-600">{ev.durationMinutes} min</div>
+                      )}
                     </div>
                   </div>
                 );
@@ -408,22 +496,33 @@ export default function CompteurPage() {
                 {detail.lots.filter(l => l.status !== "active").map(lot => {
                   const product = products.find(p => p.id === lot.productId);
                   const lotTrs = trsData?.lots?.find((t: any) => t.lotId === lot.id);
+                  const rejectQty = lot.quantityProduced - lot.quantityConforming;
                   return (
                     <div key={lot.id} className="px-4 py-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="font-medium">Lot {lot.batchNumber}</span>
-                          <span className="text-gray-400 ml-2 text-sm">{product?.name}</span>
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-semibold truncate">Lot {lot.batchNumber}</span>
+                          {product && <span className="text-gray-400 text-xs truncate">{product.name}</span>}
                         </div>
-                        {lotTrs && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">TP {fmtPct(lotTrs.TP)}</span>
-                            <span className="text-xs text-gray-500">TQ {fmtPct(lotTrs.TQ)}</span>
-                          </div>
-                        )}
+                        <ValidationBadge status={lot.status} />
                       </div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        Produit: {lot.quantityProduced} · Conforme: {lot.quantityConforming} · Cadence: {lot.cadenceUsed} {lot.cadenceUnit}
+                      <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <span className="font-medium text-gray-700">{lot.quantityProduced}</span> produits
+                        </span>
+                        <span className="flex items-center gap-1 text-green-700">
+                          <CheckCircle className="h-3 w-3" /> {lot.quantityConforming} conformes
+                        </span>
+                        {rejectQty > 0 && (
+                          <span className="flex items-center gap-1 text-red-600">
+                            <XCircle className="h-3 w-3" /> {rejectQty} rebuts
+                          </span>
+                        )}
+                        {lotTrs && (
+                          <span className="ml-auto font-medium" style={{ color: trsColor(lotTrs.TP) }}>
+                            TP {fmtPct(lotTrs.TP)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
@@ -579,21 +678,28 @@ function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs:
       <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
         <Gauge className="h-4 w-4" /> TRS Consolide Session
       </h3>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-center">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
         {[
-          { label: "TRS", value: sessionTrs.TRS },
-          { label: "TRG", value: sessionTrs.TRG },
-          { label: "DO", value: sessionTrs.DO },
-          { label: "TP", value: sessionTrs.TP },
-          { label: "TQ", value: sessionTrs.TQ },
-        ].map(item => (
-          <div key={item.label} className="bg-gray-50 rounded-lg p-2">
-            <div className="text-xs text-gray-500">{item.label}</div>
-            <div className="text-lg font-bold" style={{ color: item.label === "TRS" || item.label === "TRG" ? trsColor(item.value) : undefined }}>
-              {fmtPct(item.value)}
+          { label: "TRS", value: sessionTrs.TRS, hero: true },
+          { label: "TRG", value: sessionTrs.TRG, hero: true },
+          { label: "DO",  value: sessionTrs.DO,  hero: false },
+          { label: "TP",  value: sessionTrs.TP,  hero: false },
+          { label: "TQ",  value: sessionTrs.TQ,  hero: false },
+        ].map(item => {
+          const color = trsColor(item.value);
+          return (
+            <div key={item.label} className="bg-gray-50 rounded-lg p-2.5">
+              <div className="text-xs text-gray-500 mb-1">{item.label}</div>
+              <div className="text-lg font-bold" style={{ color }}>{fmtPct(item.value)}</div>
+              <div className="h-1.5 bg-gray-200 rounded-full mt-1.5 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(item.value * 100, 100)}%`, backgroundColor: color }}
+                />
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* U8: Historical reference + objective */}
@@ -883,13 +989,12 @@ const QUICK_DURATIONS = [5, 10, 15, 30, 60];
 // Per-category color theme so the picker reads at a glance. Phases are loaded
 // from the DB (phase_templates), equipment-specific, so Blistereuse and
 // Géluleuse share one UI but show only their own phases (e.g. CHSB vs CHSG).
-const PHASE_CATEGORY_THEME: Record<string, { label: string; tab: string; phase: string }> = {
-  production:     { label: "Production",   tab: "bg-green-600 text-white border-green-600",   phase: "border-green-500 bg-green-50 text-green-800 font-semibold" },
-  nettoyage:      { label: "Nettoyage",    tab: "bg-blue-600 text-white border-blue-600",     phase: "border-blue-500 bg-blue-50 text-blue-800 font-semibold" },
-  changement:     { label: "Changement",   tab: "bg-violet-600 text-white border-violet-600", phase: "border-violet-500 bg-violet-50 text-violet-800 font-semibold" },
-  arret_planifie: { label: "Arrêt planifié", tab: "bg-orange-500 text-white border-orange-500", phase: "border-orange-500 bg-orange-50 text-orange-800 font-semibold" },
+const PHASE_CATEGORY_THEME: Record<string, { tab: string; phase: string }> = {
+  production:     { tab: "bg-green-600 text-white border-green-600",   phase: "border-green-500 bg-green-50 text-green-800 font-semibold" },
+  nettoyage:      { tab: "bg-blue-600 text-white border-blue-600",     phase: "border-blue-500 bg-blue-50 text-blue-800 font-semibold" },
+  changement:     { tab: "bg-violet-600 text-white border-violet-600", phase: "border-violet-500 bg-violet-50 text-violet-800 font-semibold" },
+  arret_planifie: { tab: "bg-orange-500 text-white border-orange-500", phase: "border-orange-500 bg-orange-50 text-orange-800 font-semibold" },
 };
-const PHASE_CATEGORY_ORDER = ["production", "nettoyage", "changement", "arret_planifie"];
 
 function AddPhaseForm({ sessionId, phases, onAdded, onBack }: {
   sessionId: string;
@@ -909,7 +1014,7 @@ function AddPhaseForm({ sessionId, phases, onAdded, onBack }: {
       (acc[p.category] ||= []).push(p);
       return acc;
     }, {});
-    return PHASE_CATEGORY_ORDER.filter(k => grouped[k]?.length).map(k => ({ key: k, phases: grouped[k] }));
+    return PHASE_CATEGORY_KEYS.filter(k => grouped[k]?.length).map(k => ({ key: k, phases: grouped[k] }));
   }, [phases]);
 
   const [catKey, setCatKey] = useState(categories[0]?.key ?? "production");
@@ -974,7 +1079,7 @@ function AddPhaseForm({ sessionId, phases, onAdded, onBack }: {
                   catKey === c.key ? t.tab : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                 }`}
               >
-                {t.label}
+                {PHASE_CATEGORY_LABELS[c.key as keyof typeof PHASE_CATEGORY_LABELS] ?? c.key}
               </button>
             );
           })}
