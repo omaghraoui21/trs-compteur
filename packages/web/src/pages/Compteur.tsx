@@ -242,10 +242,13 @@ export default function CompteurPage() {
   }
 
   if (view === "add-phase" && activeSession) {
+    const activeLotForPhase = detail?.lots.find(l => l.status === "active");
     return <AddPhaseForm
       sessionId={activeSession.id}
+      activeLotId={activeLotForPhase?.id}
       onAdded={() => { loadDetail(activeSession.id); setView("timeline"); }}
       onBack={() => setView("timeline")}
+      onSwitchToDowntime={() => setView("add-downtime")}
     />;
   }
 
@@ -938,8 +941,12 @@ const PHASE_CATEGORIES = [
 ];
 const QUICK_DURATIONS = [5, 10, 15, 30, 60];
 
-function AddPhaseForm({ sessionId, onAdded, onBack }: {
-  sessionId: string; onAdded: () => void; onBack: () => void;
+function AddPhaseForm({ sessionId, activeLotId, onAdded, onBack, onSwitchToDowntime }: {
+  sessionId: string;
+  activeLotId?: string;
+  onAdded: () => void;
+  onBack: () => void;
+  onSwitchToDowntime?: () => void;
 }) {
   const [catIdx, setCatIdx] = useState(0);
   const [phaseIdx, setPhaseIdx] = useState<number | null>(null);
@@ -949,8 +956,11 @@ function AddPhaseForm({ sessionId, onAdded, onBack }: {
   const toast = useToast();
 
   const cat = PHASE_CATEGORIES[catIdx];
+  // "Arrêt" is index 3 — when a lot is active, unplanned stops must go through
+  // AddDowntimeForm so they are recorded as downtimeEvents and affect tF in TRS.
+  const isArretWithActiveLot = cat.id === "arret" && !!activeLotId;
   const phase = phaseIdx !== null ? cat.phases[phaseIdx] : null;
-  const canSubmit = phase !== null && duration !== "" && Number(duration) > 0 &&
+  const canSubmit = !isArretWithActiveLot && phase !== null && duration !== "" && Number(duration) > 0 &&
     (!cat.requiresComment || comment.trim() !== "");
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -997,23 +1007,41 @@ function AddPhaseForm({ sessionId, onAdded, onBack }: {
           ))}
         </div>
 
-        {/* Phase grid */}
-        <div className="bg-white rounded-xl border p-3">
-          <div className="grid grid-cols-2 gap-2">
-            {cat.phases.map((p, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => setPhaseIdx(i)}
-                className={`border rounded-lg px-3 py-3.5 text-sm text-left transition min-h-[52px] leading-snug ${
-                  phaseIdx === i ? cat.phaseActive : "border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
+        {/* Phase grid — or redirect notice when "Arrêt" + active lot */}
+        {isArretWithActiveLot ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800">
+                Un lot est actif. Les arrêts doivent être déclarés sur le lot pour être comptés dans le TRS (indicateur tF).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onSwitchToDowntime}
+              className={`w-full bg-orange-500 text-white ${BTN_PRIMARY} hover:bg-orange-600`}
+            >
+              <AlertTriangle className="h-5 w-5" /> Déclarer l'arrêt sur le lot
+            </button>
           </div>
-        </div>
+        ) : (
+          <div className="bg-white rounded-xl border p-3">
+            <div className="grid grid-cols-2 gap-2">
+              {cat.phases.map((p, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setPhaseIdx(i)}
+                  className={`border rounded-lg px-3 py-3.5 text-sm text-left transition min-h-[52px] leading-snug ${
+                    phaseIdx === i ? cat.phaseActive : "border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Duration */}
         <div className="bg-white rounded-xl border p-3 space-y-2">
@@ -1150,7 +1178,7 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
         <ChevronLeft className="h-4 w-4" /> Retour
       </button>
       <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-        <AlertTriangle className="h-5 w-5 text-orange-500" /> Declarer un arret
+        <AlertTriangle className="h-5 w-5 text-orange-500" /> Déclarer un arrêt
       </h2>
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border p-4 space-y-4">
         {/* Category selection (U2: larger buttons) */}
@@ -1178,15 +1206,29 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
           </button>
           <button type="button" onClick={() => setMode("timer")}
             className={`flex-1 border rounded-lg py-2.5 text-sm font-medium transition ${mode === "timer" ? "border-blue-500 bg-blue-50 text-blue-700" : "hover:bg-gray-50"}`}>
-            Chronometre
+            Chronomètre
           </button>
         </div>
 
         {mode === "manual" ? (
-          <div>
-            <label className="block text-sm font-medium mb-1">Duree (minutes)</label>
+          <div className="space-y-2">
+            <label className="block text-sm font-medium">Durée (minutes)</label>
+            <div className="flex gap-2 flex-wrap">
+              {QUICK_DURATIONS.map(d => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDuration(String(d))}
+                  className={`px-3 py-2 rounded-lg border text-sm font-medium transition min-w-[48px] ${
+                    duration === String(d) ? "bg-orange-500 text-white border-orange-500" : "bg-white border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
             <input type="number" value={duration} onChange={e => setDuration(e.target.value)}
-              className="w-full border rounded-lg px-3 py-3 text-base" placeholder="15" required inputMode="numeric" />
+              className="w-full border rounded-lg px-3 py-3 text-base" placeholder="Autre durée…" inputMode="numeric" min="1" />
           </div>
         ) : (
           <div className="text-center">
@@ -1194,16 +1236,16 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
             {!timerRunning ? (
               <button type="button" onClick={startTimer}
                 className={`bg-orange-500 text-white ${BTN_PRIMARY} w-full hover:bg-orange-600`}>
-                <Play className={BTN_ICON} /> Demarrer le chrono
+                <Play className={BTN_ICON} /> Démarrer le chrono
               </button>
             ) : (
               <button type="button" onClick={stopTimer}
                 className={`bg-red-600 text-white ${BTN_PRIMARY} w-full hover:bg-red-700`}>
-                <StopCircle className={BTN_ICON} /> Arreter ({fmtTimerElapsed(timerElapsed)})
+                <StopCircle className={BTN_ICON} /> Arrêter ({fmtTimerElapsed(timerElapsed)})
               </button>
             )}
             {duration && !timerRunning && (
-              <p className="text-sm text-green-600 mt-2">Duree capturee: {duration} min</p>
+              <p className="text-sm text-green-600 mt-2">Durée capturée : {duration} min</p>
             )}
           </div>
         )}
@@ -1226,7 +1268,7 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
         </div>
         <button type="submit" disabled={loading || !catId || !duration}
           className={`w-full bg-orange-500 text-white ${BTN_PRIMARY} hover:bg-orange-600 disabled:opacity-50 ${flashDowntime ? "btn-flash" : ""}`}>
-          Enregistrer l'arret
+          Enregistrer l'arrêt
         </button>
       </form>
     </div>
