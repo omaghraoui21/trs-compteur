@@ -41169,8 +41169,7 @@ var sessionEvents = pgTable("session_events", {
   durationMinutes: integer("duration_minutes"),
   // Calculated or manual
   isPlanned: boolean("is_planned").notNull().default(true),
-  lotEntryId: uuid("lot_entry_id"),
-  // Links lot_start/lot_end to a lot
+  lotEntryId: uuid("lot_entry_id").references(() => lotEntries.id, { onDelete: "set null" }),
   sortOrder: integer("sort_order").notNull().default(0),
   comment: text("comment"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
@@ -41259,6 +41258,8 @@ var dailySummaries = pgTable("daily_summaries", {
 ]);
 var auditLog = pgTable("audit_log", {
   id: uuid("id").primaryKey().defaultRandom(),
+  // ON DELETE NO ACTION is intentional: in a regulated pharma system, users
+  // with audit records must be deactivated (is_active=false), never deleted.
   actorId: uuid("actor_id").references(() => users.id),
   actorEmail: text("actor_email").notNull(),
   action: text("action").notNull(),
@@ -46116,8 +46117,14 @@ async function audit(db2, req, action, entityType, entityId, payload) {
       payload: payload ? JSON.stringify(payload) : null,
       ipAddress: req.ip ?? null
     });
-  } catch {
-    console.error("audit write failed", { action, entityType, entityId });
+  } catch (err) {
+    console.error("[AUDIT FAILURE] write failed \u2014 investigate immediately", {
+      action,
+      entityType,
+      entityId,
+      actor: req.userEmail,
+      error: err instanceof Error ? err.message : String(err)
+    });
   }
 }
 

@@ -21,8 +21,17 @@ export async function audit(
       payload: payload ? JSON.stringify(payload) : null,
       ipAddress: req.ip ?? null,
     });
-  } catch {
-    // Audit failures must not break the primary operation
-    console.error("audit write failed", { action, entityType, entityId });
+  } catch (err) {
+    // Audit failures must not abort the primary operation, but they must
+    // never be silent — a missing audit trail breaks pharma traceability.
+    console.error("[AUDIT FAILURE] write failed — investigate immediately", {
+      action,
+      entityType,
+      entityId,
+      actor: (req as any).userEmail,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    // In production, alert via external monitoring (e.g. Sentry) rather than
+    // swallowing. Wire an error-reporting integration here if available.
   }
 }

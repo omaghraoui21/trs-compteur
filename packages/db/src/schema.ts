@@ -176,7 +176,7 @@ export const sessionEvents = pgTable("session_events", {
   endedAt: timestamp("ended_at", { withTimezone: true }),
   durationMinutes: integer("duration_minutes"),  // Calculated or manual
   isPlanned: boolean("is_planned").notNull().default(true),
-  lotEntryId: uuid("lot_entry_id"),              // Links lot_start/lot_end to a lot
+  lotEntryId: uuid("lot_entry_id").references(() => lotEntries.id, { onDelete: "set null" }),
   sortOrder: integer("sort_order").notNull().default(0),
   comment: text("comment"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -283,6 +283,8 @@ export const dailySummaries = pgTable("daily_summaries", {
 
 export const auditLog = pgTable("audit_log", {
   id: uuid("id").primaryKey().defaultRandom(),
+  // ON DELETE NO ACTION is intentional: in a regulated pharma system, users
+  // with audit records must be deactivated (is_active=false), never deleted.
   actorId: uuid("actor_id").references(() => users.id),
   actorEmail: text("actor_email").notNull(),
   action: text("action").notNull(),       // e.g. START_LOT | CLOSE_LOT | VALIDATE_LOT | REJECT_LOT | OPEN_SESSION | CLOSE_SESSION
