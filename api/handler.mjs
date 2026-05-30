@@ -41280,7 +41280,13 @@ var connectionString = process.env.DATABASE_URL ?? (() => {
   process.exit(1);
 })();
 function createDb(url = connectionString) {
-  const client = src_default(url);
+  const isServerless = !!process.env.VERCEL;
+  const client = src_default(url, {
+    max: isServerless ? 1 : 10,
+    idle_timeout: 20,
+    connect_timeout: 15,
+    prepare: false
+  });
   return drizzle(client, { schema: schema_exports });
 }
 

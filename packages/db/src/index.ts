@@ -13,7 +13,24 @@ const connectionString: string =
   })();
 
 export function createDb(url = connectionString) {
-  const client = postgres(url);
+  // Serverless-safe connection config. On Vercel each invocation is a separate
+  // process, and the operator UI fires several requests at once (Promise.all on
+  // equipment select). With the postgres default pool (max: 10) a burst of
+  // concurrent cold-start instances opens too many connections to Neon at once
+  // and the requests time out → "Connexion serveur impossible" in the UI.
+  //   - max: 1 on Vercel keeps each instance to a single connection (requests
+  //     queue on it instead of opening a connection storm).
+  //   - idle_timeout closes idle connections so Neon's limit isn't exhausted.
+  //   - connect_timeout gives a suspended Neon compute time to wake.
+  //   - prepare: false is required when DATABASE_URL points at a pooled
+  //     (PgBouncer / Neon pooler, transaction mode) endpoint.
+  const isServerless = !!process.env.VERCEL;
+  const client = postgres(url, {
+    max: isServerless ? 1 : 10,
+    idle_timeout: 20,
+    connect_timeout: 15,
+    prepare: false,
+  });
   return drizzle(client, { schema });
 }
 
