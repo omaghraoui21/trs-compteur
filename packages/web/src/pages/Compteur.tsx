@@ -24,6 +24,26 @@ function useFlash(): [boolean, () => void] {
   return [flashing, trigger];
 }
 
+// ─── Reusable error card with a Réessayer button ─────────
+function RetryError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const isServer = /erreur serveur/i.test(message) || /^HTTP 5/.test(message);
+  return (
+    <div className="bg-white rounded-2xl border border-red-200 shadow-sm p-6 text-center max-w-md mx-auto mt-6">
+      <AlertTriangle className="h-9 w-9 text-red-500 mx-auto mb-3" />
+      <p className="text-base font-semibold text-gray-800 mb-1">Connexion serveur impossible</p>
+      <p className="text-sm text-gray-500 mb-5">
+        {isServer ? "Vérifie ta connexion internet, puis réessaie." : message}
+      </p>
+      <button
+        onClick={onRetry}
+        className="w-full bg-blue-600 text-white min-h-[48px] rounded-xl font-semibold text-base active:scale-95 transition hover:bg-blue-700"
+      >
+        Réessayer
+      </button>
+    </div>
+  );
+}
+
 export default function CompteurPage() {
   const [view, setView] = useState<View>("pick-room");
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -40,11 +60,19 @@ export default function CompteurPage() {
   const [elapsed, setElapsed] = useState(0);
   const [prefillProductId, setPrefillProductId] = useState("");
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [bootError, setBootError] = useState("");
   const toast = useToast();
 
-  // Load rooms on mount
-  useEffect(() => { api.rooms().then(setRooms).catch((err) => toast.error(err.message || "Chargement des salles échoué")); }, []);
-  useEffect(() => { api.products().then(setProducts).catch((err) => toast.error(err.message || "Chargement des produits échoué")); }, []);
+  // Load reference data (rooms + products) on mount, with a retry path so a
+  // transient server/network error shows a "Réessayer" button instead of a
+  // dead-end empty screen.
+  const loadBootstrap = useCallback(() => {
+    setBootError("");
+    Promise.all([api.rooms(), api.products()])
+      .then(([r, p]) => { setRooms(r); setProducts(p); })
+      .catch((err) => setBootError(err.message || "Erreur serveur"));
+  }, []);
+  useEffect(() => { loadBootstrap(); }, [loadBootstrap]);
 
   // Timer for active session
   useEffect(() => {
@@ -142,6 +170,11 @@ export default function CompteurPage() {
       <div className="max-w-lg mx-auto">
         <Onboarding />
         <h2 className="text-xl font-bold mb-4">Choisir le local</h2>
+        {bootError ? (
+          <RetryError message={bootError} onRetry={loadBootstrap} />
+        ) : rooms.length === 0 ? (
+          <div className="text-center text-gray-400 text-sm py-10">Chargement…</div>
+        ) : (
         <div className="grid gap-3">
           {rooms.map(r => (
             <button
@@ -158,6 +191,7 @@ export default function CompteurPage() {
             </button>
           ))}
         </div>
+        )}
       </div>
     );
   }
@@ -230,6 +264,16 @@ export default function CompteurPage() {
 
   const activeLot = detail?.lots.find(l => l.status === "active");
   const sessionTrs = trsData?.session;
+  const activeLotProduct = activeLot ? products.find(p => p.id === activeLot.productId) : null;
+  // "Phase actuelle" = production if a lot is running, else the most recent
+  // recorded phase, else idle.
+  const lastPhase = [...(detail?.events ?? [])].reverse()
+    .find(e => e.eventType !== "lot_start" && e.eventType !== "lot_end");
+  const currentActivity = activeLot
+    ? "Production en cours"
+    : lastPhase
+      ? (lastPhase.label || lastPhase.eventType.replace(/_/g, " "))
+      : "En attente";
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -238,30 +282,53 @@ export default function CompteurPage() {
         <ChevronLeft className="h-4 w-4" /> Retour
       </button>
 
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <Timer className={`h-5 w-5 ${activeSession ? "text-green-600" : "text-gray-400"}`} />
-            {selectedEquipment?.name}
-          </h2>
-          <p className="text-sm text-gray-500">{selectedRoom?.name}</p>
-        </div>
-        {activeSession && activeSession.status === "active" && (
-          <div className="text-right">
-            <div className="text-3xl font-mono font-bold text-green-700">{fmtElapsed(elapsed)}</div>
-            <div className="text-xs text-gray-400">Session ouverte</div>
+      <div className="mb-4">
+        <h2 className="text-xl font-bold flex items-center gap-2">
+          <Timer className={`h-5 w-5 ${activeSession ? "text-green-600" : "text-gray-400"}`} />
+          {selectedEquipment?.name}
+        </h2>
+        <p className="text-sm text-gray-500">{selectedRoom?.name}</p>
+      </div>
+
+      {/* Big status card: timer + active lot + current phase */}
+      {activeSession && activeSession.status === "active" && (
+        <div className="bg-white rounded-2xl border shadow-sm p-5 mb-4">
+          <div className="text-center">
+            <div className="text-[11px] uppercase tracking-wider text-gray-400 mb-1">Session ouverte</div>
+            <div className="text-5xl sm:text-6xl font-mono font-bold text-green-700 tabular-nums leading-none">
+              {fmtElapsed(elapsed)}
+            </div>
             {trsData && trsData.session.lotCount > 0 && (
-              <div className="mt-1">
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+              <div className="mt-2 inline-flex items-center gap-1.5">
+                <span className="text-sm font-bold px-3 py-1 rounded-full"
                   style={{ backgroundColor: trsColor(trsData.session.TRS) + "22", color: trsColor(trsData.session.TRS) }}>
                   TRS {fmtPct(trsData.session.TRS)}
                 </span>
-                <div className="text-xs text-gray-400">en direct</div>
+                <span className="text-xs text-gray-400">en direct</span>
               </div>
             )}
           </div>
-        )}
-      </div>
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            <div className="rounded-xl bg-gray-50 p-3">
+              <div className="text-[11px] text-gray-400 mb-0.5">Lot en cours</div>
+              {activeLot ? (
+                <>
+                  <div className="font-bold text-base leading-tight truncate">{activeLot.batchNumber}</div>
+                  <div className="text-xs text-gray-500 truncate">{activeLotProduct?.name ?? ""}</div>
+                </>
+              ) : (
+                <div className="text-sm text-gray-400 font-medium">Aucun lot actif</div>
+              )}
+            </div>
+            <div className={`rounded-xl p-3 ${activeLot ? "bg-green-50" : "bg-gray-50"}`}>
+              <div className="text-[11px] text-gray-400 mb-0.5">Phase actuelle</div>
+              <div className={`font-semibold text-base leading-tight truncate ${activeLot ? "text-green-700" : "text-gray-700"}`}>
+                {currentActivity}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && <div className="bg-red-50 text-red-600 rounded-lg p-3 mb-4 text-sm">{error}</div>}
 

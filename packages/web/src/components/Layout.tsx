@@ -49,8 +49,9 @@ export default function Layout({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        {/* extra bottom padding on mobile so the fixed tab bar never covers content */}
-        <main className="flex-1 p-4 pb-24 lg:pb-4 overflow-auto bg-gray-50">{children}</main>
+        {/* extra bottom padding on mobile so the fixed tab bar (56px + safe area)
+            never covers content or action buttons */}
+        <main className="flex-1 p-4 pb-[calc(72px+env(safe-area-inset-bottom))] lg:pb-4 overflow-auto bg-gray-50">{children}</main>
       </div>
 
       {/* ── Mobile/tablet bottom tab bar (< lg) ── */}
