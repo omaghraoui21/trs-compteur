@@ -1,16 +1,42 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { api, type LotEntry, type Product } from "@/lib/api";
+import { api, type LotEntry, type Product, type DowntimeCategory, type DowntimeEvent } from "@/lib/api";
 import { fmtPct, trsColor } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
-import { ClipboardCheck, Check, X, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { ClipboardCheck, Check, X, ChevronDown, ChevronUp, RefreshCw, Clock, AlertOctagon } from "lucide-react";
 
 const PULL_THRESHOLD = 60;
+
+function fmtDuration(start: string, end: string | null): string {
+  if (!end) return "En cours";
+  const mins = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
+  if (mins < 60) return `${mins} min`;
+  return `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}`;
+}
+
+function QualityBar({ produced, conforming }: { produced: number; conforming: number }) {
+  const tq = produced > 0 ? conforming / produced : 0;
+  const color = produced > 0 ? trsColor(tq) : "#9ca3af";
+  const pct = (tq * 100).toFixed(1);
+  return (
+    <div className="flex items-center gap-2 mt-1.5">
+      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className="h-full rounded-full transition-all" style={{ width: `${tq * 100}%`, backgroundColor: color }} />
+      </div>
+      <span className="text-xs font-semibold shrink-0" style={{ color }}>
+        {produced > 0 ? `${pct}% conf.` : "—"}
+      </span>
+    </div>
+  );
+}
 
 export default function SupervisorPage() {
   const [lots, setLots] = useState<LotEntry[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<DowntimeCategory[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [lotDowntimes, setLotDowntimes] = useState<Record<string, DowntimeEvent[]>>({});
+  const [loadingDowntimes, setLoadingDowntimes] = useState<Set<string>>(new Set());
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -22,9 +48,14 @@ export default function SupervisorPage() {
   const loadData = useCallback(async (showLoader = false) => {
     if (showLoader) setLoading(true);
     try {
-      const [l, p] = await Promise.all([api.pendingLots(), api.products()]);
+      const [l, p, cats] = await Promise.all([
+        api.pendingLots(),
+        api.products(),
+        api.downtimeCategories(),
+      ]);
       setLots(l);
       setProducts(p);
+      setCategories(cats);
     } catch (err: any) {
       toast.error(err.message || "Chargement des lots échoué");
     } finally {
@@ -35,27 +66,31 @@ export default function SupervisorPage() {
 
   useEffect(() => { loadData(true); }, [loadData]);
 
-  const onTouchStart = (e: React.TouchEvent) => {
-    if (window.scrollY === 0) {
-      touchStartY.current = e.touches[0].clientY;
+  const expandLot = useCallback(async (lotId: string) => {
+    if (expanded === lotId) { setExpanded(null); return; }
+    setExpanded(lotId);
+    if (lotDowntimes[lotId] !== undefined) return;
+    setLoadingDowntimes(prev => new Set(prev).add(lotId));
+    try {
+      const dts = await api.lotDowntimes(lotId);
+      setLotDowntimes(prev => ({ ...prev, [lotId]: dts }));
+    } catch {
+      setLotDowntimes(prev => ({ ...prev, [lotId]: [] }));
+    } finally {
+      setLoadingDowntimes(prev => { const n = new Set(prev); n.delete(lotId); return n; });
     }
-  };
+  }, [expanded, lotDowntimes]);
 
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) touchStartY.current = e.touches[0].clientY;
+  };
   const onTouchMove = (e: React.TouchEvent) => {
     const delta = e.touches[0].clientY - touchStartY.current;
-    if (delta > 0 && window.scrollY === 0) {
-      setPullDistance(Math.min(delta, 80));
-    }
+    if (delta > 0 && window.scrollY === 0) setPullDistance(Math.min(delta, 80));
   };
-
   const onTouchEnd = async () => {
-    if (pullDistance >= PULL_THRESHOLD) {
-      setRefreshing(true);
-      setPullDistance(0);
-      await loadData();
-    } else {
-      setPullDistance(0);
-    }
+    if (pullDistance >= PULL_THRESHOLD) { setRefreshing(true); setPullDistance(0); await loadData(); }
+    else setPullDistance(0);
   };
 
   const handleAction = async (lotId: string, action: "validate" | "reject") => {
@@ -74,6 +109,10 @@ export default function SupervisorPage() {
   };
 
   const getProduct = (id: string) => products.find(p => p.id === id);
+  const getCategoryLabel = (categoryId: string) => {
+    const cat = categories.find(c => c.id === categoryId);
+    return cat ? { label: cat.label, famille: cat.famille, isPlanned: cat.isPlanned } : { label: "—", famille: "—", isPlanned: false };
+  };
 
   return (
     <div
@@ -82,16 +121,10 @@ export default function SupervisorPage() {
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
-      {/* Pull-to-refresh indicator */}
       {(pullDistance > 0 || refreshing) && (
-        <div
-          className="flex items-center justify-center overflow-hidden transition-all"
-          style={{ height: refreshing ? 40 : pullDistance }}
-        >
+        <div className="flex items-center justify-center overflow-hidden transition-all" style={{ height: refreshing ? 40 : pullDistance }}>
           <RefreshCw
-            className={`h-5 w-5 transition-colors ${
-              pullDistance >= PULL_THRESHOLD || refreshing ? "text-blue-600" : "text-blue-300"
-            } ${refreshing ? "animate-spin" : ""}`}
+            className={`h-5 w-5 transition-colors ${pullDistance >= PULL_THRESHOLD || refreshing ? "text-blue-600" : "text-blue-300"} ${refreshing ? "animate-spin" : ""}`}
             style={{ transform: `rotate(${(pullDistance / PULL_THRESHOLD) * 180}deg)` }}
           />
         </div>
@@ -99,6 +132,9 @@ export default function SupervisorPage() {
 
       <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
         <ClipboardCheck className="h-5 w-5" /> Lots à valider
+        {lots.length > 0 && (
+          <span className="ml-1 text-sm font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{lots.length}</span>
+        )}
       </h2>
 
       {loading && <ListSkeleton />}
@@ -115,84 +151,156 @@ export default function SupervisorPage() {
         {lots.map(lot => {
           const product = getProduct(lot.productId);
           const isExpanded = expanded === lot.id;
-          const rejected = lot.quantityRejected;
-          const rejectRate = lot.quantityProduced > 0 ? rejected / lot.quantityProduced : 0;
+          const rejectRate = lot.quantityProduced > 0 ? lot.quantityRejected / lot.quantityProduced : 0;
 
-          // Coherence checks
-          const warnings: string[] = [];
           const errors: string[] = [];
+          const warnings: string[] = [];
           if (lot.quantityConforming > lot.quantityProduced) errors.push("Conforme > Produit");
           if (lot.quantityProduced === 0) errors.push("Production nulle");
           if (Number(lot.cadenceUsed) <= 0) errors.push("Cadence absente");
           if (rejectRate > 0.05) warnings.push(`Taux rebut élevé: ${(rejectRate * 100).toFixed(1)}%`);
 
+          const dts = lotDowntimes[lot.id];
+          const totalDowntimeMin = dts ? dts.reduce((s, d) => s + d.durationMinutes, 0) : null;
+
           return (
             <div key={lot.id} className="bg-white rounded-xl border shadow-sm overflow-hidden">
-              <button onClick={() => setExpanded(isExpanded ? null : lot.id)}
-                className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 transition">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <div className="font-medium">Lot {lot.batchNumber}</div>
-                    <div className="text-xs text-gray-400">{product?.name} · Lot #{lot.lotOrder}</div>
+              {/* Card header — always visible */}
+              <button
+                onClick={() => expandLot(lot.id)}
+                className="w-full px-4 py-3 text-left hover:bg-gray-50 transition"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium">Lot {lot.batchNumber}</span>
+                      {errors.length > 0 && (
+                        <span className="inline-flex items-center gap-0.5 bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full">
+                          <AlertOctagon className="h-3 w-3" />{errors.length}
+                        </span>
+                      )}
+                      {warnings.length > 0 && (
+                        <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full">{warnings.length} warn</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      {product?.name} · Lot #{lot.lotOrder}
+                      {lot.endedAt && (
+                        <span className="ml-2 inline-flex items-center gap-0.5">
+                          <Clock className="h-3 w-3" />{fmtDuration(lot.startedAt, lot.endedAt)}
+                        </span>
+                      )}
+                    </div>
+                    <QualityBar produced={lot.quantityProduced} conforming={lot.quantityConforming} />
                   </div>
-                  {errors.length > 0 && (
-                    <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full">{errors.length} err</span>
-                  )}
-                  {warnings.length > 0 && (
-                    <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full">{warnings.length} warn</span>
-                  )}
+                  {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400 shrink-0 mt-1" /> : <ChevronDown className="h-4 w-4 text-gray-400 shrink-0 mt-1" />}
                 </div>
-                {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
               </button>
 
+              {/* Expanded detail */}
               {isExpanded && (
                 <div className="border-t px-4 py-3 space-y-3">
+                  {/* Quantities */}
                   <div className="grid grid-cols-3 gap-3 text-sm">
-                    <div className="bg-gray-50 rounded p-2">
-                      <div className="text-xs text-gray-500">Produit</div>
-                      <div className="font-medium">{lot.quantityProduced}</div>
-                    </div>
-                    <div className="bg-gray-50 rounded p-2">
-                      <div className="text-xs text-gray-500">Conforme</div>
-                      <div className="font-medium">{lot.quantityConforming}</div>
-                    </div>
-                    <div className="bg-gray-50 rounded p-2">
-                      <div className="text-xs text-gray-500">Rebut</div>
-                      <div className="font-medium">{lot.quantityRejected}</div>
-                    </div>
+                    {[
+                      { label: "Produit", value: lot.quantityProduced },
+                      { label: "Conforme", value: lot.quantityConforming },
+                      { label: "Rebut", value: lot.quantityRejected },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="bg-gray-50 rounded-lg p-2">
+                        <div className="text-xs text-gray-500">{label}</div>
+                        <div className="font-semibold text-base">{value.toLocaleString("fr-FR")}</div>
+                      </div>
+                    ))}
                   </div>
 
-                  <div className="text-sm">
-                    <span className="text-gray-500">Cadence:</span> {lot.cadenceUsed} {lot.cadenceUnit}
+                  <div className="flex gap-4 text-sm flex-wrap">
+                    <span><span className="text-gray-500">Cadence:</span> {lot.cadenceUsed} {lot.cadenceUnit}</span>
+                    {lot.quantityProduced > 0 && (
+                      <span>
+                        <span className="text-gray-500">TQ:</span>{" "}
+                        <span style={{ color: trsColor(lot.quantityConforming / lot.quantityProduced) }} className="font-semibold">
+                          {fmtPct(lot.quantityConforming / lot.quantityProduced)}
+                        </span>
+                      </span>
+                    )}
                   </div>
 
+                  {/* Downtime events */}
+                  <div>
+                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                      Arrêts enregistrés
+                      {totalDowntimeMin !== null && totalDowntimeMin > 0 && (
+                        <span className="ml-1 font-normal text-gray-400">— {totalDowntimeMin} min total</span>
+                      )}
+                    </div>
+                    {loadingDowntimes.has(lot.id) && (
+                      <div className="text-xs text-gray-400 py-2">Chargement…</div>
+                    )}
+                    {dts && dts.length === 0 && (
+                      <div className="text-xs text-gray-400 py-1">Aucun arrêt enregistré sur ce lot.</div>
+                    )}
+                    {dts && dts.length > 0 && (
+                      <div className="space-y-1">
+                        {dts.map(dt => {
+                          const cat = getCategoryLabel(dt.categoryId);
+                          return (
+                            <div key={dt.id} className="flex items-center gap-2 text-xs py-1 border-b border-gray-50 last:border-0">
+                              <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${cat.isPlanned ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
+                                {cat.isPlanned ? "P" : "NP"}
+                              </span>
+                              <span className="text-gray-400 shrink-0">{cat.famille}</span>
+                              <span className="text-gray-300">›</span>
+                              <span className="font-medium text-gray-700 flex-1">{cat.label}</span>
+                              <span className="shrink-0 font-mono text-gray-500">{dt.durationMinutes} min</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Coherence warnings */}
                   {errors.length > 0 && (
-                    <div className="bg-red-50 rounded-lg p-2">
-                      {errors.map((e, i) => <div key={i} className="text-xs text-red-600">{e}</div>)}
+                    <div className="bg-red-50 rounded-lg p-2 space-y-0.5">
+                      {errors.map((e, i) => <div key={i} className="text-xs text-red-600 font-medium">{e}</div>)}
                     </div>
                   )}
                   {warnings.length > 0 && (
-                    <div className="bg-yellow-50 rounded-lg p-2">
+                    <div className="bg-yellow-50 rounded-lg p-2 space-y-0.5">
                       {warnings.map((w, i) => <div key={i} className="text-xs text-yellow-700">{w}</div>)}
                     </div>
                   )}
 
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Commentaire superviseur</label>
-                    <input value={comment} onChange={e => setComment(e.target.value)}
-                      className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Optionnel..." />
+                    <input
+                      value={comment}
+                      onChange={e => setComment(e.target.value)}
+                      className="w-full border rounded-lg px-3 py-2 text-sm"
+                      placeholder="Optionnel…"
+                    />
                   </div>
 
                   <div className="flex gap-2">
-                    <button onClick={() => handleAction(lot.id, "validate")} disabled={submitting}
-                      className="flex-1 bg-green-600 text-white rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-1 hover:bg-green-700 transition disabled:opacity-50 disabled:pointer-events-none">
+                    <button
+                      onClick={() => handleAction(lot.id, "validate")}
+                      disabled={submitting || errors.length > 0}
+                      className="flex-1 bg-green-600 text-white rounded-lg py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-green-700 transition disabled:opacity-40 disabled:pointer-events-none"
+                    >
                       <Check className="h-4 w-4" /> Valider
                     </button>
-                    <button onClick={() => handleAction(lot.id, "reject")} disabled={submitting}
-                      className="flex-1 bg-red-100 text-red-700 rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-1 hover:bg-red-200 transition disabled:opacity-50 disabled:pointer-events-none">
+                    <button
+                      onClick={() => handleAction(lot.id, "reject")}
+                      disabled={submitting}
+                      className="flex-1 bg-red-100 text-red-700 rounded-lg py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-red-200 transition disabled:opacity-40 disabled:pointer-events-none"
+                    >
                       <X className="h-4 w-4" /> Rejeter
                     </button>
                   </div>
+                  {errors.length > 0 && (
+                    <p className="text-xs text-red-500 text-center">Résolvez les erreurs avant de valider. Vous pouvez rejeter le lot.</p>
+                  )}
                 </div>
               )}
             </div>
