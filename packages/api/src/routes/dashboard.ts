@@ -442,6 +442,11 @@ dashboardRouter.get("/heatmap", asyncHandler(async (req, res) => {
 
 // ─── Chronological downtime log (stop-by-stop) ────────────────
 
+// Note: this log lists only recorded downtime_events (lot-linked stops). Unlike
+// /pareto, it intentionally excludes phase-based planned stops (nettoyage, CHSB…)
+// recorded as session events — those belong to the phase timeline, not the stop
+// log. A single join (downtimes → categories → lots → sessions) filtered by the
+// session range, newest first.
 dashboardRouter.get("/downtime-log", asyncHandler(async (req, res) => {
   const { db } = req;
   const { equipmentId, from, to } = req.query;
@@ -451,62 +456,27 @@ dashboardRouter.get("/downtime-log", asyncHandler(async (req, res) => {
     return;
   }
 
-  const [equipment] = await db.select().from(equipments).where(eq(equipments.id, equipmentId as string));
-
-  const closedSessions = await db.select().from(sessions)
+  const rows = await db.select({
+    id: downtimeEvents.id,
+    startedAt: downtimeEvents.startedAt,
+    durationMinutes: downtimeEvents.durationMinutes,
+    famille: downtimeCategories.famille,
+    reason: downtimeCategories.label,
+    isPlanned: downtimeCategories.isPlanned,
+    batchNumber: lotEntries.batchNumber,
+  }).from(downtimeEvents)
+    .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+    .innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id))
+    .innerJoin(sessions, eq(lotEntries.sessionId, sessions.id))
     .where(and(
       eq(sessions.equipmentId, equipmentId as string),
       eq(sessions.status, "closed"),
       gte(sessions.sessionDate, from as string),
       lte(sessions.sessionDate, to as string),
-    ));
+    ))
+    .orderBy(desc(downtimeEvents.startedAt));
 
-  const sessionIds = closedSessions.map((s: any) => s.id);
-  if (sessionIds.length === 0) {
-    res.json({ period: { from, to, equipmentId }, log: [] });
-    return;
-  }
-
-  const allLots: any[] = [];
-  for (const sid of sessionIds) {
-    const lots = await db.select().from(lotEntries).where(eq(lotEntries.sessionId, sid));
-    allLots.push(...lots);
-  }
-
-  const log: {
-    id: string; startedAt: string; durationMinutes: number; isPlanned: boolean;
-    famille: string; reason: string; batchNumber: string; equipment: string; comment: string | null;
-  }[] = [];
-
-  for (const lot of allLots) {
-    const dts = await db.select({
-      id: downtimeEvents.id,
-      startedAt: downtimeEvents.startedAt,
-      durationMinutes: downtimeEvents.durationMinutes,
-      comment: downtimeEvents.comment,
-      famille: downtimeCategories.famille,
-      reason: downtimeCategories.label,
-      isPlanned: downtimeCategories.isPlanned,
-    }).from(downtimeEvents)
-      .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
-      .where(eq(downtimeEvents.lotEntryId, lot.id));
-
-    for (const dt of dts) {
-      log.push({
-        id: dt.id,
-        startedAt: dt.startedAt instanceof Date ? dt.startedAt.toISOString() : String(dt.startedAt),
-        durationMinutes: dt.durationMinutes,
-        isPlanned: dt.isPlanned,
-        famille: dt.famille,
-        reason: dt.reason,
-        batchNumber: lot.batchNumber,
-        equipment: equipment?.name ?? "",
-        comment: dt.comment,
-      });
-    }
-  }
-
-  log.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+  const log = rows.map((r: any) => ({ ...r, startedAt: r.startedAt.toISOString() }));
 
   res.json({ period: { from, to, equipmentId }, log });
 }));

@@ -46799,49 +46799,21 @@ dashboardRouter.get("/downtime-log", asyncHandler(async (req, res) => {
     res.status(400).json({ error: "equipmentId, from, to requis" });
     return;
   }
-  const [equipment] = await db2.select().from(equipments).where(eq(equipments.id, equipmentId));
-  const closedSessions = await db2.select().from(sessions).where(and(
+  const rows = await db2.select({
+    id: downtimeEvents.id,
+    startedAt: downtimeEvents.startedAt,
+    durationMinutes: downtimeEvents.durationMinutes,
+    famille: downtimeCategories.famille,
+    reason: downtimeCategories.label,
+    isPlanned: downtimeCategories.isPlanned,
+    batchNumber: lotEntries.batchNumber
+  }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).innerJoin(sessions, eq(lotEntries.sessionId, sessions.id)).where(and(
     eq(sessions.equipmentId, equipmentId),
     eq(sessions.status, "closed"),
     gte(sessions.sessionDate, from),
     lte(sessions.sessionDate, to)
-  ));
-  const sessionIds = closedSessions.map((s) => s.id);
-  if (sessionIds.length === 0) {
-    res.json({ period: { from, to, equipmentId }, log: [] });
-    return;
-  }
-  const allLots = [];
-  for (const sid of sessionIds) {
-    const lots = await db2.select().from(lotEntries).where(eq(lotEntries.sessionId, sid));
-    allLots.push(...lots);
-  }
-  const log = [];
-  for (const lot of allLots) {
-    const dts = await db2.select({
-      id: downtimeEvents.id,
-      startedAt: downtimeEvents.startedAt,
-      durationMinutes: downtimeEvents.durationMinutes,
-      comment: downtimeEvents.comment,
-      famille: downtimeCategories.famille,
-      reason: downtimeCategories.label,
-      isPlanned: downtimeCategories.isPlanned
-    }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(eq(downtimeEvents.lotEntryId, lot.id));
-    for (const dt of dts) {
-      log.push({
-        id: dt.id,
-        startedAt: dt.startedAt instanceof Date ? dt.startedAt.toISOString() : String(dt.startedAt),
-        durationMinutes: dt.durationMinutes,
-        isPlanned: dt.isPlanned,
-        famille: dt.famille,
-        reason: dt.reason,
-        batchNumber: lot.batchNumber,
-        equipment: equipment?.name ?? "",
-        comment: dt.comment
-      });
-    }
-  }
-  log.sort((a, b2) => new Date(b2.startedAt).getTime() - new Date(a.startedAt).getTime());
+  )).orderBy(desc(downtimeEvents.startedAt));
+  const log = rows.map((r) => ({ ...r, startedAt: r.startedAt.toISOString() }));
   res.json({ period: { from, to, equipmentId }, log });
 }));
 dashboardRouter.get("/pending-lots", asyncHandler(async (req, res) => {

@@ -234,5 +234,5 @@ export interface HeatmapDataPoint { date: string; TRS: number; DO: number; TP: n
 export interface HeatmapResponse { period: { from: string; to: string; equipmentId: string }; heatmap: HeatmapDataPoint[] }
 
 // Chronological downtime log
-export interface DowntimeLogEntry { id: string; startedAt: string; durationMinutes: number; isPlanned: boolean; famille: string; reason: string; batchNumber: string; equipment: string; comment: string | null }
+export interface DowntimeLogEntry { id: string; startedAt: string; durationMinutes: number; isPlanned: boolean; famille: string; reason: string; batchNumber: string }
 export interface DowntimeLogResponse { period: { from: string; to: string; equipmentId: string }; log: DowntimeLogEntry[] }
