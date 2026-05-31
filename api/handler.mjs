@@ -25225,7 +25225,7 @@ var require_bcrypt = __commonJS({
         (global2["dcodeIO"] = global2["dcodeIO"] || {})["bcrypt"] = factory();
     })(exports, function() {
       "use strict";
-      var bcrypt3 = {};
+      var bcrypt4 = {};
       var randomFallback = null;
       function random(len) {
         if (typeof module !== "undefined" && module && module["exports"])
@@ -25250,10 +25250,10 @@ var require_bcrypt = __commonJS({
       } catch (e) {
       }
       randomFallback = null;
-      bcrypt3.setRandomFallback = function(random2) {
+      bcrypt4.setRandomFallback = function(random2) {
         randomFallback = random2;
       };
-      bcrypt3.genSaltSync = function(rounds, seed_length) {
+      bcrypt4.genSaltSync = function(rounds, seed_length) {
         rounds = rounds || GENSALT_DEFAULT_LOG2_ROUNDS;
         if (typeof rounds !== "number")
           throw Error("Illegal arguments: " + typeof rounds + ", " + typeof seed_length);
@@ -25270,7 +25270,7 @@ var require_bcrypt = __commonJS({
         salt.push(base64_encode(random(BCRYPT_SALT_LEN), BCRYPT_SALT_LEN));
         return salt.join("");
       };
-      bcrypt3.genSalt = function(rounds, seed_length, callback) {
+      bcrypt4.genSalt = function(rounds, seed_length, callback) {
         if (typeof seed_length === "function")
           callback = seed_length, seed_length = void 0;
         if (typeof rounds === "function")
@@ -25282,7 +25282,7 @@ var require_bcrypt = __commonJS({
         function _async(callback2) {
           nextTick(function() {
             try {
-              callback2(null, bcrypt3.genSaltSync(rounds));
+              callback2(null, bcrypt4.genSaltSync(rounds));
             } catch (err) {
               callback2(err);
             }
@@ -25303,19 +25303,19 @@ var require_bcrypt = __commonJS({
             });
           });
       };
-      bcrypt3.hashSync = function(s, salt) {
+      bcrypt4.hashSync = function(s, salt) {
         if (typeof salt === "undefined")
           salt = GENSALT_DEFAULT_LOG2_ROUNDS;
         if (typeof salt === "number")
-          salt = bcrypt3.genSaltSync(salt);
+          salt = bcrypt4.genSaltSync(salt);
         if (typeof s !== "string" || typeof salt !== "string")
           throw Error("Illegal arguments: " + typeof s + ", " + typeof salt);
         return _hash(s, salt);
       };
-      bcrypt3.hash = function(s, salt, callback, progressCallback) {
+      bcrypt4.hash = function(s, salt, callback, progressCallback) {
         function _async(callback2) {
           if (typeof s === "string" && typeof salt === "number")
-            bcrypt3.genSalt(salt, function(err, salt2) {
+            bcrypt4.genSalt(salt, function(err, salt2) {
               _hash(s, salt2, callback2, progressCallback);
             });
           else if (typeof s === "string" && typeof salt === "string")
@@ -25350,14 +25350,14 @@ var require_bcrypt = __commonJS({
           return false;
         return wrong === 0;
       }
-      bcrypt3.compareSync = function(s, hash) {
+      bcrypt4.compareSync = function(s, hash) {
         if (typeof s !== "string" || typeof hash !== "string")
           throw Error("Illegal arguments: " + typeof s + ", " + typeof hash);
         if (hash.length !== 60)
           return false;
-        return safeStringCompare(bcrypt3.hashSync(s, hash.substr(0, hash.length - 31)), hash);
+        return safeStringCompare(bcrypt4.hashSync(s, hash.substr(0, hash.length - 31)), hash);
       };
-      bcrypt3.compare = function(s, hash, callback, progressCallback) {
+      bcrypt4.compare = function(s, hash, callback, progressCallback) {
         function _async(callback2) {
           if (typeof s !== "string" || typeof hash !== "string") {
             nextTick(callback2.bind(this, Error("Illegal arguments: " + typeof s + ", " + typeof hash)));
@@ -25367,7 +25367,7 @@ var require_bcrypt = __commonJS({
             nextTick(callback2.bind(this, null, false));
             return;
           }
-          bcrypt3.hash(s, hash.substr(0, 29), function(err, comp) {
+          bcrypt4.hash(s, hash.substr(0, 29), function(err, comp) {
             if (err)
               callback2(err);
             else
@@ -25389,12 +25389,12 @@ var require_bcrypt = __commonJS({
             });
           });
       };
-      bcrypt3.getRounds = function(hash) {
+      bcrypt4.getRounds = function(hash) {
         if (typeof hash !== "string")
           throw Error("Illegal arguments: " + typeof hash);
         return parseInt(hash.split("$")[2], 10);
       };
-      bcrypt3.getSalt = function(hash) {
+      bcrypt4.getSalt = function(hash) {
         if (typeof hash !== "string")
           throw Error("Illegal arguments: " + typeof hash);
         if (hash.length !== 60)
@@ -27017,9 +27017,9 @@ var require_bcrypt = __commonJS({
           }, progressCallback);
         }
       }
-      bcrypt3.encodeBase64 = base64_encode;
-      bcrypt3.decodeBase64 = base64_decode;
-      return bcrypt3;
+      bcrypt4.encodeBase64 = base64_encode;
+      bcrypt4.decodeBase64 = base64_decode;
+      return bcrypt4;
     });
   }
 });
@@ -46012,6 +46012,21 @@ var createCadenceSchema = external_exports.object({
   cadenceUnit: cadenceUnit.optional(),
   trsObjective: external_exports.number().min(0).max(100).optional()
 });
+var userRole = external_exports.enum(["operator", "supervisor", "admin"]);
+var createUserSchema = external_exports.object({
+  email: external_exports.string().email("Email invalide"),
+  displayName: external_exports.string().min(1, "Nom requis"),
+  password: external_exports.string().min(6, "Mot de passe : 6 caract\xE8res minimum"),
+  role: userRole
+});
+var updateUserSchema = external_exports.object({
+  displayName: external_exports.string().min(1).optional(),
+  role: userRole.optional(),
+  isActive: external_exports.boolean().optional()
+});
+var resetPasswordSchema = external_exports.object({
+  password: external_exports.string().min(6, "Mot de passe : 6 caract\xE8res minimum")
+});
 
 // packages/api/src/routes/auth.ts
 var authRouter = (0, import_express.Router)();
@@ -46186,9 +46201,9 @@ sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (re
   res.status(201).json(session);
 }));
 sessionsRouter.post("/:id/close", asyncHandler(async (req, res) => {
-  const { db: db2, userId, userRole } = req;
+  const { db: db2, userId, userRole: userRole2 } = req;
   const now = /* @__PURE__ */ new Date();
-  if (userRole === "operator") {
+  if (userRole2 === "operator") {
     const [session2] = await db2.select({ operatorId: sessions.operatorId }).from(sessions).where(eq(sessions.id, String(req.params.id))).limit(1);
     if (!session2) {
       res.status(404).json({ error: "Session introuvable" });
@@ -46326,9 +46341,9 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
   res.status(201).json(lot);
 }));
 lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req, res) => {
-  const { db: db2, userId, userRole } = req;
+  const { db: db2, userId, userRole: userRole2 } = req;
   const { quantityProduced, quantityConforming, quantityRejected } = req.body;
-  if (userRole === "operator") {
+  if (userRole2 === "operator") {
     const [existing] = await db2.select({ operatorId: lotEntries.operatorId }).from(lotEntries).where(eq(lotEntries.id, String(req.params.id))).limit(1);
     if (!existing) {
       res.status(404).json({ error: "Lot introuvable" });
@@ -46853,6 +46868,7 @@ dashboardRouter.get("/pending-lots", asyncHandler(async (req, res) => {
 
 // packages/api/src/routes/admin.ts
 var import_express6 = __toESM(require_express2(), 1);
+var import_bcryptjs3 = __toESM(require_bcryptjs(), 1);
 var adminRouter = (0, import_express6.Router)();
 adminRouter.use(authenticate);
 adminRouter.use(requireRole("admin", "supervisor"));
@@ -47101,6 +47117,47 @@ adminRouter.delete("/cadences/:id", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "Cadence introuvable" });
     return;
   }
+  res.json(row);
+}));
+var adminOnly = requireRole("admin");
+var publicUser2 = {
+  id: users.id,
+  email: users.email,
+  displayName: users.displayName,
+  role: users.role,
+  isActive: users.isActive,
+  createdAt: users.createdAt
+};
+adminRouter.get("/users", adminOnly, asyncHandler(async (req, res) => {
+  const rows = await req.db.select(publicUser2).from(users).orderBy(users.createdAt);
+  res.json(rows);
+}));
+adminRouter.post("/users", adminOnly, validate(createUserSchema), asyncHandler(async (req, res) => {
+  const { email, displayName, password, role } = req.body;
+  const [existing] = await req.db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+  if (existing) throw new HttpError(409, "Cet email est d\xE9j\xE0 utilis\xE9");
+  const passwordHash = await import_bcryptjs3.default.hash(password, 10);
+  const [row] = await req.db.insert(users).values({ email, displayName, passwordHash, role }).returning(publicUser2);
+  await audit(req.db, req, "CREATE_USER", "user", row.id, { email, role });
+  res.status(201).json(row);
+}));
+adminRouter.patch("/users/:id", adminOnly, validate(updateUserSchema), asyncHandler(async (req, res) => {
+  const id = String(req.params.id);
+  if (id === req.userId) {
+    if (req.body.isActive === false) throw new HttpError(400, "Vous ne pouvez pas d\xE9sactiver votre propre compte");
+    if (req.body.role && req.body.role !== "admin") throw new HttpError(400, "Vous ne pouvez pas changer votre propre r\xF4le");
+  }
+  const [row] = await req.db.update(users).set(req.body).where(eq(users.id, id)).returning(publicUser2);
+  if (!row) throw new HttpError(404, "Utilisateur introuvable");
+  await audit(req.db, req, "UPDATE_USER", "user", id, req.body);
+  res.json(row);
+}));
+adminRouter.post("/users/:id/password", adminOnly, validate(resetPasswordSchema), asyncHandler(async (req, res) => {
+  const id = String(req.params.id);
+  const passwordHash = await import_bcryptjs3.default.hash(req.body.password, 10);
+  const [row] = await req.db.update(users).set({ passwordHash }).where(eq(users.id, id)).returning(publicUser2);
+  if (!row) throw new HttpError(404, "Utilisateur introuvable");
+  await audit(req.db, req, "RESET_PASSWORD", "user", id, {});
   res.json(row);
 }));
 

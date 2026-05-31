@@ -176,6 +176,15 @@ export const api = {
       request<ProductEquipmentCadence>("/admin/cadences", { method: "POST", body: JSON.stringify(data) }),
     deleteCadence: (id: string) =>
       request<ProductEquipmentCadence>(`/admin/cadences/${id}`, { method: "DELETE" }),
+
+    // Users (admin-only)
+    listUsers: () => request<AdminUser[]>("/admin/users"),
+    createUser: (data: { email: string; displayName: string; password: string; role: string }) =>
+      request<AdminUser>("/admin/users", { method: "POST", body: JSON.stringify(data) }),
+    updateUser: (id: string, data: Partial<{ displayName: string; role: string; isActive: boolean }>) =>
+      request<AdminUser>(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    resetUserPassword: (id: string, password: string) =>
+      request<AdminUser>(`/admin/users/${id}/password`, { method: "POST", body: JSON.stringify({ password }) }),
   },
 };
 
@@ -215,6 +224,7 @@ export interface CloseLotInput { quantityProduced: number; quantityConforming: n
 export interface AddDowntimeInput { categoryId: string; durationMinutes: number; isShortStop?: boolean; comment?: string }
 
 // Admin types (include all fields, not just active)
+export interface AdminUser { id: string; email: string; displayName: string; role: string; isActive: boolean; createdAt: string }
 export interface AdminRoom { id: string; code: string; name: string; description: string | null; isActive: boolean; createdAt: string }
 export interface AdminEquipment { id: string; roomId: string; code: string; name: string; equipmentType: string | null; trsObjective: string; defaultCadenceUnit: string; microStopThresholdMin: number; isActive: boolean; createdAt: string }
 export interface AdminProduct { id: string; code: string; name: string; defaultCadence: string | null; cadenceUnit: string; unit: string; isActive: boolean; createdAt: string }

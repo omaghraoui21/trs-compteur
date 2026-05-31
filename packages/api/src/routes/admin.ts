@@ -1,8 +1,10 @@
 import { Router } from "express";
 import { eq, and } from "drizzle-orm";
-import { rooms, equipments, products, downtimeCategories, productEquipmentCadences, phaseTemplates } from "@trs/db";
+import bcrypt from "bcryptjs";
+import { rooms, equipments, products, downtimeCategories, productEquipmentCadences, phaseTemplates, users } from "@trs/db";
 import { authenticate, requireRole } from "../middleware";
-import { asyncHandler, validate } from "../lib/http";
+import { asyncHandler, validate, HttpError } from "../lib/http";
+import { audit } from "../lib/audit";
 import {
   createRoomSchema, updateRoomSchema,
   createEquipmentSchema, updateEquipmentSchema,
@@ -10,6 +12,7 @@ import {
   createDowntimeCategorySchema, updateDowntimeCategorySchema,
   createPhaseTemplateSchema, updatePhaseTemplateSchema,
   createCadenceSchema,
+  createUserSchema, updateUserSchema, resetPasswordSchema,
 } from "../schemas";
 
 export const adminRouter = Router();
@@ -238,5 +241,52 @@ adminRouter.post("/cadences", validate(createCadenceSchema), asyncHandler(async 
 adminRouter.delete("/cadences/:id", asyncHandler(async (req, res) => {
   const [row] = await req.db.delete(productEquipmentCadences).where(eq(productEquipmentCadences.id, String(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Cadence introuvable" }); return; }
+  res.json(row);
+}));
+
+// ─── Users (admin-only) ─────────────────────────────────
+// The router already requires admin|supervisor; user management is stricter
+// (admin only). Passwords are never returned. Self-lockout is prevented.
+
+const adminOnly = requireRole("admin");
+const publicUser = {
+  id: users.id, email: users.email, displayName: users.displayName,
+  role: users.role, isActive: users.isActive, createdAt: users.createdAt,
+};
+
+adminRouter.get("/users", adminOnly, asyncHandler(async (req, res) => {
+  const rows = await req.db.select(publicUser).from(users).orderBy(users.createdAt);
+  res.json(rows);
+}));
+
+adminRouter.post("/users", adminOnly, validate(createUserSchema), asyncHandler(async (req, res) => {
+  const { email, displayName, password, role } = req.body;
+  const [existing] = await req.db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+  if (existing) throw new HttpError(409, "Cet email est déjà utilisé");
+  const passwordHash = await bcrypt.hash(password, 10);
+  const [row] = await req.db.insert(users).values({ email, displayName, passwordHash, role }).returning(publicUser);
+  await audit(req.db, req, "CREATE_USER", "user", row.id, { email, role });
+  res.status(201).json(row);
+}));
+
+adminRouter.patch("/users/:id", adminOnly, validate(updateUserSchema), asyncHandler(async (req, res) => {
+  const id = String(req.params.id);
+  // Guard against self-lockout: an admin cannot demote or deactivate themselves.
+  if (id === req.userId) {
+    if (req.body.isActive === false) throw new HttpError(400, "Vous ne pouvez pas désactiver votre propre compte");
+    if (req.body.role && req.body.role !== "admin") throw new HttpError(400, "Vous ne pouvez pas changer votre propre rôle");
+  }
+  const [row] = await req.db.update(users).set(req.body).where(eq(users.id, id)).returning(publicUser);
+  if (!row) throw new HttpError(404, "Utilisateur introuvable");
+  await audit(req.db, req, "UPDATE_USER", "user", id, req.body);
+  res.json(row);
+}));
+
+adminRouter.post("/users/:id/password", adminOnly, validate(resetPasswordSchema), asyncHandler(async (req, res) => {
+  const id = String(req.params.id);
+  const passwordHash = await bcrypt.hash(req.body.password, 10);
+  const [row] = await req.db.update(users).set({ passwordHash }).where(eq(users.id, id)).returning(publicUser);
+  if (!row) throw new HttpError(404, "Utilisateur introuvable");
+  await audit(req.db, req, "RESET_PASSWORD", "user", id, {});
   res.json(row);
 }));

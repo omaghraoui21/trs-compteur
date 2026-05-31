@@ -162,3 +162,23 @@ export const createCadenceSchema = z.object({
   cadenceUnit: cadenceUnit.optional(),
   trsObjective: z.number().min(0).max(100).optional(),
 });
+
+// ─── Users (admin-only management) ──────────────────────────────
+const userRole = z.enum(["operator", "supervisor", "admin"]);
+
+export const createUserSchema = z.object({
+  email: z.string().email("Email invalide"),
+  displayName: z.string().min(1, "Nom requis"),
+  password: z.string().min(6, "Mot de passe : 6 caractères minimum"),
+  role: userRole,
+});
+
+export const updateUserSchema = z.object({
+  displayName: z.string().min(1).optional(),
+  role: userRole.optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const resetPasswordSchema = z.object({
+  password: z.string().min(6, "Mot de passe : 6 caractères minimum"),
+});

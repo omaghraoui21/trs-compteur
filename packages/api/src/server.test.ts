@@ -29,6 +29,7 @@ let app: any;
 let sql: ReturnType<typeof postgres>;
 let opToken: string;
 let supToken: string;
+let admToken: string;
 
 async function login(email: string, password: string): Promise<string> {
   const res = await request(app).post("/api/auth/login").send({ email, password });
@@ -61,6 +62,7 @@ beforeAll(async () => {
 
   opToken = await login("operateur@dpi.local", "oper123");
   supToken = await login("superviseur@dpi.local", "super123");
+  admToken = await login("admin@dpi.local", "admin123");
 }, 60_000);
 
 afterAll(async () => {
@@ -209,6 +211,81 @@ describe("audit trail (21 CFR-style traceability)", () => {
 
   it("blocks DELETE on audit_log (immutability trigger)", async () => {
     await expect(sql`DELETE FROM audit_log WHERE true`).rejects.toThrow(/append-only/i);
+  });
+});
+
+describe("user management (admin-only)", () => {
+  const adm = () => ({ Authorization: `Bearer ${admToken}` });
+  let createdUserId: string;
+  let selfId: string;
+
+  it("forbids a supervisor from listing users (403)", async () => {
+    const res = await request(app).get("/api/admin/users").set({ Authorization: `Bearer ${supToken}` });
+    expect(res.status).toBe(403);
+  });
+
+  it("lets an admin list users without exposing password hashes", async () => {
+    const res = await request(app).get("/api/admin/users").set(adm());
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBeGreaterThanOrEqual(3);
+    expect(res.body[0]).not.toHaveProperty("passwordHash");
+    selfId = res.body.find((u: any) => u.email === "admin@dpi.local").id;
+  });
+
+  it("creates a new user (201) who can then log in", async () => {
+    const res = await request(app).post("/api/admin/users").set(adm()).send({
+      email: "nouveau@dpi.local", displayName: "Nouveau", password: "secret123", role: "operator",
+    });
+    expect(res.status).toBe(201);
+    createdUserId = res.body.id;
+    const loginRes = await request(app).post("/api/auth/login").send({ email: "nouveau@dpi.local", password: "secret123" });
+    expect(loginRes.status).toBe(200);
+  });
+
+  it("rejects a duplicate email (409)", async () => {
+    const res = await request(app).post("/api/admin/users").set(adm()).send({
+      email: "nouveau@dpi.local", displayName: "Dup", password: "secret123", role: "operator",
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("rejects a too-short password (400 Zod)", async () => {
+    const res = await request(app).post("/api/admin/users").set(adm()).send({
+      email: "x@dpi.local", displayName: "X", password: "123", role: "operator",
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("deactivates a user, blocking their login (401)", async () => {
+    const res = await request(app).patch(`/api/admin/users/${createdUserId}`).set(adm()).send({ isActive: false });
+    expect(res.status).toBe(200);
+    const loginRes = await request(app).post("/api/auth/login").send({ email: "nouveau@dpi.local", password: "secret123" });
+    expect(loginRes.status).toBe(401);
+  });
+
+  it("resets a user's password (new password works)", async () => {
+    await request(app).patch(`/api/admin/users/${createdUserId}`).set(adm()).send({ isActive: true });
+    const res = await request(app).post(`/api/admin/users/${createdUserId}/password`).set(adm()).send({ password: "changed123" });
+    expect(res.status).toBe(200);
+    const loginRes = await request(app).post("/api/auth/login").send({ email: "nouveau@dpi.local", password: "changed123" });
+    expect(loginRes.status).toBe(200);
+  });
+
+  it("prevents an admin from deactivating their own account (400)", async () => {
+    const res = await request(app).patch(`/api/admin/users/${selfId}`).set(adm()).send({ isActive: false });
+    expect(res.status).toBe(400);
+  });
+
+  it("prevents an admin from demoting their own role (400)", async () => {
+    const res = await request(app).patch(`/api/admin/users/${selfId}`).set(adm()).send({ role: "operator" });
+    expect(res.status).toBe(400);
+  });
+
+  it("writes audit rows for user actions", async () => {
+    const rows = await sql`SELECT action FROM audit_log WHERE entity_type = 'user'`;
+    const actions = rows.map((r: any) => r.action);
+    expect(actions).toContain("CREATE_USER");
+    expect(actions).toContain("RESET_PASSWORD");
   });
 });
 

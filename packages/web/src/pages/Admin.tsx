@@ -1,18 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
-import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type AdminPhaseTemplate, type ProductEquipmentCadence } from "@/lib/api";
+import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type AdminPhaseTemplate, type ProductEquipmentCadence, type AdminUser } from "@/lib/api";
 import { PHASE_CATEGORY_KEYS, PHASE_CATEGORY_LABELS, PHASE_EVENT_TYPES } from "@trs/engine";
-import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, Clock, List, Network, ChevronDown, ChevronRight } from "lucide-react";
+import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, Clock, List, Network, ChevronDown, ChevronRight, Users, KeyRound } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
+import { useAuth } from "@/lib/auth";
+import { useToast } from "@/components/Toast";
 
-type Tab = "rooms" | "equipments" | "products" | "phases" | "downtimes" | "cadences";
+type Tab = "rooms" | "equipments" | "products" | "phases" | "downtimes" | "cadences" | "users";
 
-const TABS: { key: Tab; label: string; icon: typeof Building2 }[] = [
+const TABS: { key: Tab; label: string; icon: typeof Building2; adminOnly?: boolean }[] = [
   { key: "rooms", label: "Locaux", icon: Building2 },
   { key: "equipments", label: "Équipements", icon: Cpu },
   { key: "products", label: "Produits", icon: Package },
   { key: "cadences", label: "Cadences", icon: Gauge },
   { key: "phases", label: "Phases", icon: Clock },
   { key: "downtimes", label: "Arrêts", icon: AlertTriangle },
+  { key: "users", label: "Utilisateurs", icon: Users, adminOnly: true },
 ];
 
 // Phase category keys, labels, and selectable event types come from @trs/engine
@@ -29,7 +32,9 @@ const FAMILLES = [
 ];
 
 export default function AdminPage() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("rooms");
+  const visibleTabs = TABS.filter((t) => !t.adminOnly || user?.role === "admin");
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -39,7 +44,7 @@ export default function AdminPage() {
       </div>
 
       <div className="flex overflow-x-auto border-b mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
-        {TABS.map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
@@ -61,6 +66,154 @@ export default function AdminPage() {
       {activeTab === "cadences" && <CadencesPanel />}
       {activeTab === "phases" && <PhasesPanel />}
       {activeTab === "downtimes" && <DowntimesPanel />}
+      {activeTab === "users" && user?.role === "admin" && <UsersPanel currentUserId={user.id} />}
+    </div>
+  );
+}
+
+// ─── Users panel (admin-only) ───────────────────────────────────
+
+const ROLE_LABELS: Record<string, string> = { operator: "Opérateur", supervisor: "Superviseur", admin: "Admin" };
+const ROLE_BADGE: Record<string, string> = {
+  operator: "bg-gray-100 text-gray-600", supervisor: "bg-blue-100 text-blue-700", admin: "bg-purple-100 text-purple-700",
+};
+
+function UsersPanel({ currentUserId }: { currentUserId: string }) {
+  const toast = useToast();
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({ email: "", displayName: "", password: "", role: "operator" });
+  const [pwFor, setPwFor] = useState<AdminUser | null>(null);
+  const [newPw, setNewPw] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setUsers(await api.admin.listUsers()); }
+    catch (e: any) { toast.error(e.message || "Chargement des utilisateurs échoué"); }
+    finally { setLoading(false); }
+  }, [toast]);
+  useEffect(() => { load(); }, [load]);
+
+  const create = async () => {
+    try {
+      await api.admin.createUser(form);
+      toast.success("Utilisateur créé");
+      setCreating(false);
+      setForm({ email: "", displayName: "", password: "", role: "operator" });
+      load();
+    } catch (e: any) { toast.error(e.message || "Création échouée"); }
+  };
+
+  const toggleActive = async (u: AdminUser) => {
+    try { await api.admin.updateUser(u.id, { isActive: !u.isActive }); load(); }
+    catch (e: any) { toast.error(e.message || "Mise à jour échouée"); }
+  };
+
+  const changeRole = async (u: AdminUser, role: string) => {
+    try { await api.admin.updateUser(u.id, { role }); load(); }
+    catch (e: any) { toast.error(e.message || "Changement de rôle échoué"); }
+  };
+
+  const resetPassword = async () => {
+    if (!pwFor) return;
+    try {
+      await api.admin.resetUserPassword(pwFor.id, newPw);
+      toast.success(`Mot de passe réinitialisé pour ${pwFor.displayName}`);
+      setPwFor(null); setNewPw("");
+    } catch (e: any) { toast.error(e.message || "Réinitialisation échouée"); }
+  };
+
+  if (loading) return <TableSkeleton />;
+
+  return (
+    <div>
+      <div className="flex justify-end mb-3">
+        {!creating && (
+          <button onClick={() => setCreating(true)} className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+            <Plus className="h-4 w-4" /> Ajouter
+          </button>
+        )}
+      </div>
+
+      {creating && (
+        <FormCard title="Nouvel utilisateur" onCancel={() => setCreating(false)} onSave={create}>
+          <Field label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} placeholder="prenom@dpi.local" />
+          <Field label="Nom affiché" value={form.displayName} onChange={(v) => setForm({ ...form, displayName: v })} placeholder="Jean Dupont" />
+          <Field label="Mot de passe" type="password" value={form.password} onChange={(v) => setForm({ ...form, password: v })} placeholder="6 caractères min." />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
+            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="input-field">
+              <option value="operator">Opérateur</option>
+              <option value="supervisor">Superviseur</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </FormCard>
+      )}
+
+      <div className="bg-white border rounded-lg overflow-hidden">
+        <table className="rtable w-full text-sm">
+          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+            <tr>
+              <th className="text-left px-4 py-2">Nom</th>
+              <th className="text-left px-4 py-2">Email</th>
+              <th className="text-left px-4 py-2">Rôle</th>
+              <th className="text-left px-4 py-2">Statut</th>
+              <th className="text-right px-4 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((u) => {
+              const isSelf = u.id === currentUserId;
+              return (
+                <tr key={u.id} className="border-t">
+                  <td data-label="Nom" className="px-4 py-2 font-medium">{u.displayName}{isSelf && <span className="ml-1 text-xs text-gray-400">(vous)</span>}</td>
+                  <td data-label="Email" className="px-4 py-2 text-gray-500">{u.email}</td>
+                  <td data-label="Rôle" className="px-4 py-2">
+                    <select
+                      value={u.role}
+                      disabled={isSelf}
+                      onChange={(e) => changeRole(u, e.target.value)}
+                      className={`text-xs px-2 py-1 rounded ${ROLE_BADGE[u.role]} disabled:opacity-60`}
+                    >
+                      <option value="operator">{ROLE_LABELS.operator}</option>
+                      <option value="supervisor">{ROLE_LABELS.supervisor}</option>
+                      <option value="admin">{ROLE_LABELS.admin}</option>
+                    </select>
+                  </td>
+                  <td data-label="Statut" className="px-4 py-2">
+                    <button onClick={() => toggleActive(u)} disabled={isSelf} className="inline-flex items-center gap-1 disabled:opacity-40">
+                      {u.isActive
+                        ? <><ToggleRight className="h-4 w-4 text-green-600" /> <span className="text-green-700 text-xs">Actif</span></>
+                        : <><ToggleLeft className="h-4 w-4 text-gray-400" /> <span className="text-gray-400 text-xs">Inactif</span></>}
+                    </button>
+                  </td>
+                  <td data-label="Actions" className="px-4 py-2 text-right">
+                    <button onClick={() => { setPwFor(u); setNewPw(""); }} title="Réinitialiser le mot de passe" className="p-1.5 rounded text-gray-500 hover:bg-gray-100">
+                      <KeyRound className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {pwFor && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={() => setPwFor(null)}>
+          <div className="bg-white rounded-xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-semibold mb-1">Réinitialiser le mot de passe</h3>
+            <p className="text-sm text-gray-500 mb-3">{pwFor.displayName} · {pwFor.email}</p>
+            <Field label="Nouveau mot de passe" type="password" value={newPw} onChange={setNewPw} placeholder="6 caractères min." />
+            <div className="flex gap-2 justify-end mt-4">
+              <button onClick={() => setPwFor(null)} className="px-3 py-1.5 text-sm text-gray-600 border rounded hover:bg-gray-50">Annuler</button>
+              <button onClick={resetPassword} disabled={newPw.length < 6} className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">Réinitialiser</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
