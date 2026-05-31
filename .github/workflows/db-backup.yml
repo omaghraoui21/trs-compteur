@@ -52,8 +52,22 @@ jobs:
           echo "BACKUP_FILE=$FILENAME" >> "$GITHUB_ENV"
           ls -lh "$FILENAME"
 
+      # The `secrets` context is NOT available in step-level `if:` conditions,
+      # so detect configuration here and expose it as an output to gate on.
+      - name: Detect durable-storage config
+        id: s3cfg
+        env:
+          BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+        run: |
+          if [ -n "${BUCKET:-}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::BACKUP_S3_BUCKET is not set — backup kept only as a 90-day GitHub artifact. Set the BACKUP_S3_* secrets for durable multi-year retention (required for pharma GxP)."
+          fi
+
       - name: Upload to durable object storage (S3-compatible)
-        if: ${{ secrets.BACKUP_S3_BUCKET != '' }}
+        if: steps.s3cfg.outputs.enabled == 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -66,13 +80,6 @@ jobs:
           if [ -n "${ENDPOINT:-}" ]; then ENDPOINT_FLAG="--endpoint-url ${ENDPOINT}"; fi
           aws s3 cp "$BACKUP_FILE" "${BUCKET%/}/${BACKUP_FILE}" $ENDPOINT_FLAG
           echo "Uploaded $BACKUP_FILE to ${BUCKET%/}/"
-
-      - name: Warn if durable storage is not configured
-        if: ${{ secrets.BACKUP_S3_BUCKET == '' }}
-        run: |
-          echo "::warning::BACKUP_S3_BUCKET is not set — backup kept only as a" \
-               "90-day GitHub artifact. Set the BACKUP_S3_* secrets for durable" \
-               "multi-year retention (required for pharma GxP)."
 
       # Short-term convenience copy. Durable retention is the S3 step above.
       - name: Upload backup artifact (short-term copy)
