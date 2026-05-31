@@ -13,16 +13,11 @@ type View = "pick-room" | "pick-equip" | "timeline" | "new-lot" | "add-phase" | 
 const BTN_PRIMARY = "min-h-[48px] text-base font-semibold rounded-xl px-4 py-3 flex items-center justify-center gap-2 transition active:scale-95";
 const BTN_ICON = "h-6 w-6";
 
-// Machine-specific accent palette — blue for Blistereuse, violet for Géluleuse.
-// Keeps operator context clear when both machines are in the same room.
-function equipmentAccent(type?: string | null) {
-  if (type === "geluleuse") return {
-    badge: "bg-violet-100 text-violet-700",
-    btnOpen: "bg-violet-600 text-white hover:bg-violet-700",
-    timerText: "text-violet-700",
-    timerBg: "bg-violet-50 border-violet-200",
-    cardBorder: "hover:border-violet-400",
-  };
+// Unified accent palette — one consistent visual language for every machine
+// (Blistereuse, Géluleuse, …). The machine is identified by its NAME/badge text,
+// not by colour, so the shop-floor UI reads the same on every line.
+// Kept as a function (rather than a const) so all existing call sites are unchanged.
+function equipmentAccent(_type?: string | null) {
   return {
     badge: "bg-blue-100 text-blue-700",
     btnOpen: "bg-blue-600 text-white hover:bg-blue-700",
