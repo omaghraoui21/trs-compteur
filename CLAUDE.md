@@ -134,7 +134,7 @@ All routes require JWT (set in `middleware.ts`). Role-based access: `operator`, 
 - **Vercel**: `scripts/build-api.mjs` bundles the API via esbuild into `api/handler.mjs` (serverless function). Frontend builds to `packages/web/dist`. `vercel.json` sets `buildCommand`, `outputDirectory`, function config, and SPA rewrite.
   - **Important:** `api/handler.mjs` is committed to git. After any backend source change, rebuild it with `node scripts/build-api.mjs` and commit the result before merging to the production branch — otherwise the stale bundle will be served until Vercel's build step regenerates it.
 - **Docker**: Runs `tsx packages/api/src/server.ts` directly on Node 20-slim.
-- **CI**: `.github/workflows/db-backup.yml` runs daily `pg_dump` at 02:00 UTC.
+- **CI**: `.github/workflows/db-backup.yml` runs a daily verified `pg_dump` at 02:00 UTC. For durable multi-year (pharma GxP) retention it uploads each dump to S3-compatible storage when the `BACKUP_S3_*` secrets are set (AWS S3 / Backblaze B2 / Cloudflare R2 / MinIO); otherwise it keeps a 90-day GitHub artifact and emits a warning. Configure the bucket with a ≥1825-day lifecycle + Object Lock (WORM).
 - **Production branch**: `devin/1779664896-initial-app` — this is what Vercel deploys. Merge feature branches here (not `main`; there is no `main`).
 
 ## Seeded Test Credentials

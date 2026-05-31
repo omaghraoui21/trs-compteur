@@ -1,5 +1,23 @@
 name: DB Backup (pg_dump)
 
+# Daily logical backup of the production database.
+#
+# Durable retention (pharma GxP / 21 CFR Part 11 typically require multi-year
+# retention) is achieved by uploading each dump to S3-compatible object storage.
+# That step activates automatically once the BACKUP_S3_* secrets are set; until
+# then the workflow still runs and keeps a short-term GitHub artifact copy.
+#
+# To enable durable 4-year+ retention, set these repository secrets:
+#   DATABASE_URL              postgres connection string (required)
+#   BACKUP_S3_BUCKET          e.g. s3://my-pharma-db-backups/trs
+#   AWS_ACCESS_KEY_ID         storage access key
+#   AWS_SECRET_ACCESS_KEY     storage secret key
+#   AWS_DEFAULT_REGION        e.g. eu-west-3 (default: us-east-1)
+#   BACKUP_S3_ENDPOINT        (optional) custom endpoint for Backblaze B2 /
+#                             Cloudflare R2 / MinIO — omit for AWS S3
+# Then configure the bucket with a >=1825-day lifecycle and Object Lock (WORM)
+# so backups cannot be deleted or overwritten within the retention window.
+
 on:
   schedule:
     # Daily at 02:00 UTC
@@ -10,22 +28,54 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-
-      - name: Create backup
+      - name: Create + verify backup
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          set -euo pipefail
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "FATAL: DATABASE_URL secret is not set"; exit 1
+          fi
+          TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
           FILENAME="backup_${TIMESTAMP}.sql.gz"
-          pg_dump "$DATABASE_URL" --no-owner --no-privileges | gzip > "$FILENAME"
-          echo "BACKUP_FILE=$FILENAME" >> $GITHUB_ENV
+          # Run pg_dump from a pinned modern client image so the client version
+          # is always >= the server version (Neon tracks recent PostgreSQL).
+          docker run --rm -e DATABASE_URL postgres:17-alpine \
+            pg_dump "$DATABASE_URL" --no-owner --no-privileges \
+            | gzip > "$FILENAME"
+          # Integrity check — a backup that fails to decompress is worthless.
+          gzip -t "$FILENAME"
+          SIZE=$(stat -c%s "$FILENAME")
+          if [ "$SIZE" -lt 100 ]; then
+            echo "FATAL: backup suspiciously small (${SIZE} bytes)"; exit 1
+          fi
+          echo "BACKUP_FILE=$FILENAME" >> "$GITHUB_ENV"
           ls -lh "$FILENAME"
 
-      - name: Upload backup artifact
+      - name: Upload to durable object storage (S3-compatible)
+        if: ${{ secrets.BACKUP_S3_BUCKET != '' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
+          BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          ENDPOINT_FLAG=""
+          if [ -n "${ENDPOINT:-}" ]; then ENDPOINT_FLAG="--endpoint-url ${ENDPOINT}"; fi
+          aws s3 cp "$BACKUP_FILE" "${BUCKET%/}/${BACKUP_FILE}" $ENDPOINT_FLAG
+          echo "Uploaded $BACKUP_FILE to ${BUCKET%/}/"
+
+      - name: Warn if durable storage is not configured
+        if: ${{ secrets.BACKUP_S3_BUCKET == '' }}
+        run: |
+          echo "::warning::BACKUP_S3_BUCKET is not set — backup kept only as a" \
+               "90-day GitHub artifact. Set the BACKUP_S3_* secrets for durable" \
+               "multi-year retention (required for pharma GxP)."
+
+      # Short-term convenience copy. Durable retention is the S3 step above.
+      - name: Upload backup artifact (short-term copy)
         uses: actions/upload-artifact@v4
         with:
           name: db-backup-${{ github.run_id }}
