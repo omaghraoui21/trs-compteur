@@ -41549,6 +41549,30 @@ function validate(schema) {
   };
 }
 
+// packages/api/src/lib/audit.ts
+async function audit(db2, req, action, entityType, entityId, payload) {
+  const actor = req;
+  try {
+    await db2.insert(auditLog).values({
+      actorId: actor.userId ?? null,
+      actorEmail: actor.userEmail ?? "unknown",
+      action,
+      entityType,
+      entityId: entityId ?? null,
+      payload: payload ? JSON.stringify(payload) : null,
+      ipAddress: req.ip ?? null
+    });
+  } catch (err) {
+    console.error("[AUDIT FAILURE] write failed \u2014 investigate immediately", {
+      action,
+      entityType,
+      entityId,
+      actor: req.userEmail,
+      error: err instanceof Error ? err.message : String(err)
+    });
+  }
+}
+
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/external.js
 var external_exports = {};
 __export(external_exports, {
@@ -45922,6 +45946,10 @@ var loginSchema = external_exports.object({
 var refreshSchema = external_exports.object({
   refreshToken: external_exports.string().min(1, "refreshToken requis")
 });
+var changePasswordSchema = external_exports.object({
+  oldPassword: external_exports.string().min(1, "Mot de passe actuel requis"),
+  newPassword: external_exports.string().min(6, "Nouveau mot de passe : 6 caract\xE8res minimum")
+});
 var openSessionSchema = external_exports.object({
   equipmentId: external_exports.string().uuid("equipmentId invalide"),
   roomId: external_exports.string().uuid("roomId invalide")
@@ -46146,35 +46174,31 @@ authRouter.get("/me", authenticate, asyncHandler(async (req, res) => {
   }
   res.json(publicUser(user));
 }));
+authRouter.post("/change-password", authenticate, validate(changePasswordSchema), asyncHandler(async (req, res) => {
+  const { db: db2, userId } = req;
+  const { oldPassword, newPassword } = req.body;
+  if (!userId) {
+    res.status(401).json({ error: "Non authentifi\xE9" });
+    return;
+  }
+  const [user] = await db2.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) {
+    res.status(404).json({ error: "Utilisateur introuvable" });
+    return;
+  }
+  const valid = await import_bcryptjs2.default.compare(oldPassword, user.passwordHash);
+  if (!valid) {
+    res.status(401).json({ error: "Mot de passe actuel incorrect" });
+    return;
+  }
+  const passwordHash = await import_bcryptjs2.default.hash(newPassword, 10);
+  await db2.update(users).set({ passwordHash }).where(eq(users.id, userId));
+  await audit(db2, req, "CHANGE_PASSWORD", "user", userId, {});
+  res.json({ ok: true });
+}));
 
 // packages/api/src/routes/sessions.ts
 var import_express2 = __toESM(require_express2(), 1);
-
-// packages/api/src/lib/audit.ts
-async function audit(db2, req, action, entityType, entityId, payload) {
-  const actor = req;
-  try {
-    await db2.insert(auditLog).values({
-      actorId: actor.userId ?? null,
-      actorEmail: actor.userEmail ?? "unknown",
-      action,
-      entityType,
-      entityId: entityId ?? null,
-      payload: payload ? JSON.stringify(payload) : null,
-      ipAddress: req.ip ?? null
-    });
-  } catch (err) {
-    console.error("[AUDIT FAILURE] write failed \u2014 investigate immediately", {
-      action,
-      entityType,
-      entityId,
-      actor: req.userEmail,
-      error: err instanceof Error ? err.message : String(err)
-    });
-  }
-}
-
-// packages/api/src/routes/sessions.ts
 var sessionsRouter = (0, import_express2.Router)();
 sessionsRouter.use(authenticate);
 sessionsRouter.get("/", asyncHandler(async (req, res) => {
@@ -46212,7 +46236,8 @@ sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (re
     return;
   }
   const now = /* @__PURE__ */ new Date();
-  const sessionDate = now.toISOString().slice(0, 10);
+  const tz = process.env.APP_TIMEZONE || "Europe/Paris";
+  const sessionDate = now.toLocaleDateString("en-CA", { timeZone: tz });
   const [session] = await db2.insert(sessions).values({
     equipmentId,
     roomId,

@@ -1,7 +1,9 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { Timer, ClipboardCheck, BarChart3, Settings, LogOut } from "lucide-react";
+import { api } from "@/lib/api";
+import { useToast } from "@/components/Toast";
+import { Timer, ClipboardCheck, BarChart3, Settings, LogOut, KeyRound } from "lucide-react";
 
 const navItems = [
   { to: "/", label: "Session", short: "Session", icon: Timer },
@@ -12,6 +14,7 @@ const navItems = [
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
+  const [pwOpen, setPwOpen] = useState(false);
   const items = navItems.filter(item => !item.roles || item.roles.includes(user?.role || ""));
 
   return (
@@ -23,11 +26,16 @@ export default function Layout({ children }: { children: ReactNode }) {
         </div>
         <div className="flex items-center gap-4">
           <span className="hidden sm:inline text-sm opacity-80">{user?.displayName}</span>
+          <button onClick={() => setPwOpen(true)} className="p-1.5 rounded hover:bg-blue-600 transition" title="Changer mon mot de passe">
+            <KeyRound className="h-4 w-4" />
+          </button>
           <button onClick={logout} className="p-1.5 rounded hover:bg-blue-600 transition" title="Déconnexion">
             <LogOut className="h-4 w-4" />
           </button>
         </div>
       </header>
+
+      {pwOpen && <ChangePasswordModal onClose={() => setPwOpen(false)} />}
 
       <div className="flex-1 flex">
         {/* ── Desktop sidebar (lg+) ── */}
@@ -72,6 +80,48 @@ export default function Layout({ children }: { children: ReactNode }) {
           </NavLink>
         ))}
       </nav>
+    </div>
+  );
+}
+
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const toast = useToast();
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    if (newPassword !== confirm) { toast.error("Les mots de passe ne correspondent pas"); return; }
+    setSaving(true);
+    try {
+      await api.changePassword(oldPassword, newPassword);
+      toast.success("Mot de passe modifié");
+      onClose();
+    } catch (e: any) {
+      toast.error(e.message || "Échec du changement de mot de passe");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 text-gray-800" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-semibold mb-3 flex items-center gap-2"><KeyRound className="h-5 w-5 text-blue-600" /> Changer mon mot de passe</h3>
+        <div className="space-y-3">
+          <input type="password" autoFocus value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} placeholder="Mot de passe actuel" className="w-full border rounded-lg px-3 py-2 text-sm" />
+          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nouveau mot de passe (6 car. min.)" className="w-full border rounded-lg px-3 py-2 text-sm" />
+          <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Confirmer le nouveau mot de passe" className="w-full border rounded-lg px-3 py-2 text-sm" />
+        </div>
+        <div className="flex gap-2 justify-end mt-4">
+          <button onClick={onClose} className="px-3 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50">Annuler</button>
+          <button onClick={submit} disabled={saving || !oldPassword || newPassword.length < 6}
+            className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            {saving ? "Enregistrement…" : "Changer"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -5,7 +5,8 @@ import { eq, and, isNull } from "drizzle-orm";
 import { users, refreshTokens } from "@trs/db";
 import { signToken, authenticate } from "../middleware";
 import { asyncHandler, validate } from "../lib/http";
-import { loginSchema, refreshSchema } from "../schemas";
+import { audit } from "../lib/audit";
+import { loginSchema, refreshSchema, changePasswordSchema } from "../schemas";
 
 export const authRouter = Router();
 
@@ -124,4 +125,19 @@ authRouter.get("/me", authenticate, asyncHandler(async (req, res) => {
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) { res.status(404).json({ error: "Utilisateur introuvable" }); return; }
   res.json(publicUser(user));
+}));
+
+// Self-service password change — verifies the current password, then rotates.
+authRouter.post("/change-password", authenticate, validate(changePasswordSchema), asyncHandler(async (req, res) => {
+  const { db, userId } = req;
+  const { oldPassword, newPassword } = req.body;
+  if (!userId) { res.status(401).json({ error: "Non authentifié" }); return; }
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) { res.status(404).json({ error: "Utilisateur introuvable" }); return; }
+  const valid = await bcrypt.compare(oldPassword, user.passwordHash);
+  if (!valid) { res.status(401).json({ error: "Mot de passe actuel incorrect" }); return; }
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+  await audit(db, req, "CHANGE_PASSWORD", "user", userId, {});
+  res.json({ ok: true });
 }));

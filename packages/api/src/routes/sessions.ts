@@ -65,7 +65,11 @@ sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (re
   }
 
   const now = new Date();
-  const sessionDate = now.toISOString().slice(0, 10);
+  // Shift date must follow the plant's local calendar day, not UTC — otherwise a
+  // night shift opened just after local midnight is misdated. en-CA yields
+  // YYYY-MM-DD. Configure the plant timezone via APP_TIMEZONE (default Paris).
+  const tz = process.env.APP_TIMEZONE || "Europe/Paris";
+  const sessionDate = now.toLocaleDateString("en-CA", { timeZone: tz });
 
   const [session] = await db.insert(sessions).values({
     equipmentId,

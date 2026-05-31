@@ -339,6 +339,30 @@ describe("user management (admin-only)", () => {
   });
 });
 
+describe("self-service password change", () => {
+  const auth = () => ({ Authorization: `Bearer ${opToken}` });
+
+  it("rejects a wrong current password (401)", async () => {
+    const res = await request(app).post("/api/auth/change-password").set(auth()).send({ oldPassword: "nope", newPassword: "whatever123" });
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects a too-short new password (400)", async () => {
+    const res = await request(app).post("/api/auth/change-password").set(auth()).send({ oldPassword: "oper123", newPassword: "123" });
+    expect(res.status).toBe(400);
+  });
+
+  it("changes the password (new one works), then reverts", async () => {
+    const r1 = await request(app).post("/api/auth/change-password").set(auth()).send({ oldPassword: "oper123", newPassword: "newpass123" });
+    expect(r1.status).toBe(200);
+    const login1 = await request(app).post("/api/auth/login").send({ email: "operateur@dpi.local", password: "newpass123" });
+    expect(login1.status).toBe(200);
+    // revert so seed credentials stay consistent for any later runs
+    const r2 = await request(app).post("/api/auth/change-password").set({ Authorization: `Bearer ${login1.body.token}` }).send({ oldPassword: "newpass123", newPassword: "oper123" });
+    expect(r2.status).toBe(200);
+  });
+});
+
 describe("DB hardening constraints", () => {
   it("rejects an out-of-range role at the DB boundary", async () => {
     await expect(

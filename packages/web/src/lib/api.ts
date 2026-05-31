@@ -68,6 +68,8 @@ export const api = {
   logout: (refreshToken: string) =>
     request<{ ok: boolean }>("/auth/logout", { method: "POST", body: JSON.stringify({ refreshToken }) }),
   me: () => request<User>("/auth/me"),
+  changePassword: (oldPassword: string, newPassword: string) =>
+    request<{ ok: boolean }>("/auth/change-password", { method: "POST", body: JSON.stringify({ oldPassword, newPassword }) }),
 
   // Ref data
   rooms: () => request<Room[]>("/ref/rooms"),

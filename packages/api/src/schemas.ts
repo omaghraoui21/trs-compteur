@@ -26,6 +26,11 @@ export const refreshSchema = z.object({
   refreshToken: z.string().min(1, "refreshToken requis"),
 });
 
+export const changePasswordSchema = z.object({
+  oldPassword: z.string().min(1, "Mot de passe actuel requis"),
+  newPassword: z.string().min(6, "Nouveau mot de passe : 6 caractères minimum"),
+});
+
 export const openSessionSchema = z.object({
   equipmentId: z.string().uuid("equipmentId invalide"),
   roomId: z.string().uuid("roomId invalide"),
