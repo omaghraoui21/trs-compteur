@@ -9,6 +9,7 @@ import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, Chev
 import TrsChart from "@/components/dashboard/TrsChart";
 import ParetoChart from "@/components/dashboard/ParetoChart";
 import WaterfallChart from "@/components/dashboard/WaterfallChart";
+import TrsVerificationPanel from "@/components/dashboard/TrsVerificationPanel";
 import ByProductChart from "@/components/dashboard/ByProductChart";
 import SixLossesChart from "@/components/dashboard/SixLossesChart";
 import HeatmapChart from "@/components/dashboard/HeatmapChart";
@@ -308,9 +309,16 @@ export default function DashboardPage() {
             {sixLossesData ? <SixLossesChart data={sixLossesData.total} /> : <ChartUnavailable label="Six grandes pertes" />}
           </div>
 
-          {/* ─── Waterfall + Heatmap row ─────────────────────── */}
+          {/* ─── Cascade + Verification row ──────────────────── */}
+          {!showComparison && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              <WaterfallChart metrics={data.total} />
+              <TrsVerificationPanel metrics={data.total} />
+            </div>
+          )}
+
+          {/* ─── Heatmap row ─────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            <WaterfallChart metrics={data.total} />
             {heatmapData ? <HeatmapChart heatmap={heatmapData.heatmap} /> : <ChartUnavailable label="Heatmap horaire" />}
           </div>
 
