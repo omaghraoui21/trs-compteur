@@ -4,7 +4,7 @@ import { fmtPct, fmtDuration, trsColor, familleToNorme, computeOeeBenchmark } fr
 import type { BenchmarkRating } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { DashboardSkeleton } from "@/components/Skeleton";
-import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, ChevronUp, AlertTriangle, Info, FileText } from "lucide-react";
+import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, ChevronUp, AlertTriangle, Info, FileText, RefreshCw } from "lucide-react";
 // PDF is lazy-loaded on demand to reduce bundle size
 import TrsChart from "@/components/dashboard/TrsChart";
 import ParetoChart from "@/components/dashboard/ParetoChart";
@@ -54,6 +54,7 @@ export default function DashboardPage() {
   const [heatmapData, setHeatmapData] = useState<HeatmapResponse | null>(null);
   const [downtimeLog, setDowntimeLog] = useState<DowntimeLogResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const toast = useToast();
@@ -73,6 +74,7 @@ export default function DashboardPage() {
   const fetchData = useCallback(async () => {
     if (!selectedEquipment || !from || !to) return;
     setLoading(true);
+    setLoadFailed(false);
     try {
       const [trsRes, paretoRes, prodRes, lossesRes, heatRes, logRes] = await Promise.all([
         api.dashboardTrs(selectedEquipment, from, to),
@@ -99,6 +101,7 @@ export default function DashboardPage() {
       }
     } catch (err: any) {
       toast.error(err.message || "Chargement du tableau de bord échoué");
+      setLoadFailed(true);
       setData(null);
       setParetoData(null);
       setByProductData(null);
@@ -238,6 +241,17 @@ export default function DashboardPage() {
       </div>
 
       {loading && <DashboardSkeleton />}
+
+      {!loading && !data && loadFailed && (
+        <div className="bg-white rounded-xl border p-8 text-center text-gray-500">
+          <p className="font-medium text-gray-700">Impossible de charger le tableau de bord.</p>
+          <p className="text-sm mt-1 mb-4">Vérifiez votre connexion, puis réessayez.</p>
+          <button onClick={fetchData}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition">
+            <RefreshCw className="h-4 w-4" /> Réessayer
+          </button>
+        </div>
+      )}
 
       {!loading && data && (
         <>

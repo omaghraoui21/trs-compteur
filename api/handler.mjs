@@ -41401,7 +41401,7 @@ async function seedIfEmpty(db2) {
     { code: "AG-DOSAGE", label: "Probl\xE8me de dosage", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
     { code: "AG-FERMETURE", label: "Probl\xE8me fermeture g\xE9lules", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
     { code: "AG-ALIMENTATION", label: "Alimentation g\xE9lules", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
-    { code: "IM-PREVENTIVE", label: "Maintenance pr\xE9ventive", famille: "Intervention maintenance", isPlanned: false, appliesToEquipmentType: null },
+    { code: "IM-PREVENTIVE", label: "Maintenance pr\xE9ventive", famille: "Intervention maintenance", isPlanned: true, appliesToEquipmentType: null },
     { code: "IM-CORRECTIVE", label: "Maintenance corrective", famille: "Intervention maintenance", isPlanned: false, appliesToEquipmentType: null },
     { code: "IM-DI", label: "Demande d'intervention (DI)", famille: "Intervention maintenance", isPlanned: false, appliesToEquipmentType: null },
     { code: "AI-MATIERE", label: "Attente mati\xE8re/article", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
@@ -41415,13 +41415,20 @@ async function seedIfEmpty(db2) {
     { code: "UE-HVAC", label: "HVAC/Climatisation", famille: "Utilit\xE9s", isPlanned: false, appliesToEquipmentType: null },
     { code: "CQ-IPC", label: "Contr\xF4le en cours (IPC)", famille: "Contr\xF4le qualit\xE9", isPlanned: false, appliesToEquipmentType: null },
     { code: "CQ-RESERVE", label: "R\xE9serve conditionnement secondaire", famille: "Contr\xF4le qualit\xE9", isPlanned: false, appliesToEquipmentType: null },
-    { code: "CQ-RECONDITIONNEMENT", label: "Reconditionnement", famille: "Contr\xF4le qualit\xE9", isPlanned: false, appliesToEquipmentType: null }
+    { code: "CQ-RECONDITIONNEMENT", label: "Reconditionnement", famille: "Contr\xF4le qualit\xE9", isPlanned: false, appliesToEquipmentType: null },
+    // Arrêts planifiés (affectent tAP — alimentent la branche « Planifié »)
+    { code: "AP-NETT-PARTIEL", label: "Nettoyage planifi\xE9 partiel", famille: "Nettoyage planifi\xE9", isPlanned: true, appliesToEquipmentType: null },
+    { code: "AP-NETT-COMPLET", label: "Nettoyage planifi\xE9 complet", famille: "Nettoyage planifi\xE9", isPlanned: true, appliesToEquipmentType: null },
+    { code: "CH-CHSB", label: "Changement de s\xE9rie (CHSB)", famille: "Changement de s\xE9rie", isPlanned: true, appliesToEquipmentType: "blistereuse" },
+    { code: "CH-CHSG", label: "Changement de s\xE9rie (CHSG)", famille: "Changement de s\xE9rie", isPlanned: true, appliesToEquipmentType: "geluleuse" },
+    { code: "AP-PAUSE", label: "Pause r\xE9glementaire", famille: "Arr\xEAt planifi\xE9", isPlanned: true, appliesToEquipmentType: null },
+    { code: "AP-APR", label: "Arr\xEAt programm\xE9 r\xE9glementaire (APR)", famille: "Arr\xEAt planifi\xE9", isPlanned: true, appliesToEquipmentType: null }
   ];
   for (const c of categories) {
     await db2.insert(downtimeCategories).values(c).onConflictDoNothing();
   }
   await seedPhaseTemplates(db2);
-  console.log("[seed] \u2713 Initial data loaded (3 users \xB7 2 salles \xB7 2 \xE9quipements \xB7 5 produits \xB7 23 cat\xE9gories \xB7 12 phases)");
+  console.log(`[seed] \u2713 Initial data loaded (3 users \xB7 2 salles \xB7 2 \xE9quipements \xB7 5 produits \xB7 ${categories.length} cat\xE9gories \xB7 12 phases)`);
   return true;
 }
 async function seedPhaseTemplates(db2) {
@@ -47129,8 +47136,12 @@ var app = (0, import_express8.default)();
 app.set("trust proxy", 1);
 app.use(helmet());
 var allowedOrigin = process.env.ALLOWED_ORIGIN;
-app.use((0, import_cors.default)({ origin: allowedOrigin || "*" }));
-app.use(import_express8.default.json());
+var isProd = process.env.NODE_ENV === "production";
+if (isProd && !allowedOrigin) {
+  console.warn("[cors] ALLOWED_ORIGIN not set in production \u2014 CORS restricted to same-origin only.");
+}
+app.use((0, import_cors.default)({ origin: allowedOrigin || (isProd ? false : "*") }));
+app.use(import_express8.default.json({ limit: "1mb" }));
 var authLimiter = rate_limit_default({
   windowMs: 15 * 60 * 1e3,
   max: 10,

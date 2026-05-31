@@ -948,14 +948,22 @@ function IconBtn({ icon: Icon, onClick, title, className = "text-gray-500 hover:
   return <button onClick={onClick} title={title} className={`p-1.5 rounded transition ${className}`}><Icon className="h-3.5 w-3.5" /></button>;
 }
 
-function FormCard({ title, children, onCancel, onSave }: { title: string; children: React.ReactNode; onCancel: () => void; onSave: () => void }) {
+function FormCard({ title, children, onCancel, onSave }: { title: string; children: React.ReactNode; onCancel: () => void; onSave: () => void | Promise<void> }) {
+  // Guards against double-submit centrally for every admin panel: the button is
+  // disabled while the (possibly async) onSave is in flight.
+  const [saving, setSaving] = useState(false);
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    try { await onSave(); } finally { setSaving(false); }
+  };
   return (
     <div className="mb-6 p-4 bg-white border rounded-lg shadow-sm">
       <h3 className="text-sm font-semibold text-gray-700 mb-3">{title}</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">{children}</div>
       <div className="flex gap-2 justify-end">
-        <button onClick={onCancel} className="px-3 py-1.5 text-sm text-gray-600 border rounded hover:bg-gray-50">Annuler</button>
-        <button onClick={onSave} className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700">Enregistrer</button>
+        <button onClick={onCancel} disabled={saving} className="px-3 py-1.5 text-sm text-gray-600 border rounded hover:bg-gray-50 disabled:opacity-50">Annuler</button>
+        <button onClick={handleSave} disabled={saving} className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">{saving ? "Enregistrement…" : "Enregistrer"}</button>
       </div>
     </div>
   );

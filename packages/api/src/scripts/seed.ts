@@ -138,7 +138,7 @@ async function seed() {
     { code: "AG-ALIMENTATION", label: "Problème alimentation gélules", famille: "Panne équipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
 
     // Intervention maintenance (IM)
-    { code: "IM-PREVENTIVE", label: "Maintenance préventive", famille: "Intervention maintenance", isPlanned: false },
+    { code: "IM-PREVENTIVE", label: "Maintenance préventive", famille: "Intervention maintenance", isPlanned: true },
     { code: "IM-CORRECTIVE", label: "Maintenance corrective", famille: "Intervention maintenance", isPlanned: false },
     { code: "IM-DI", label: "Demande d'intervention (DI)", famille: "Intervention maintenance", isPlanned: false },
 
@@ -159,6 +159,14 @@ async function seed() {
     { code: "CQ-IPC", label: "Contrôle en cours (IPC)", famille: "Contrôle qualité", isPlanned: false },
     { code: "CQ-RESERVE", label: "Réserve conditionnement secondaire", famille: "Contrôle qualité", isPlanned: false },
     { code: "CQ-RECONDITIONNEMENT", label: "Reconditionnement", famille: "Contrôle qualité", isPlanned: false },
+
+    // Arrêts planifiés (affectent tAP — alimentent la branche « Planifié »)
+    { code: "AP-NETT-PARTIEL", label: "Nettoyage planifié partiel", famille: "Nettoyage planifié", isPlanned: true },
+    { code: "AP-NETT-COMPLET", label: "Nettoyage planifié complet", famille: "Nettoyage planifié", isPlanned: true },
+    { code: "CH-CHSB", label: "Changement de série (CHSB)", famille: "Changement de série", isPlanned: true, appliesToEquipmentType: "blistereuse" },
+    { code: "CH-CHSG", label: "Changement de série (CHSG)", famille: "Changement de série", isPlanned: true, appliesToEquipmentType: "geluleuse" },
+    { code: "AP-PAUSE", label: "Pause réglementaire", famille: "Arrêt planifié", isPlanned: true },
+    { code: "AP-APR", label: "Arrêt programmé réglementaire (APR)", famille: "Arrêt planifié", isPlanned: true },
   ];
 
   for (const cat of categories) {

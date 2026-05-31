@@ -90,7 +90,7 @@ export async function seedIfEmpty(db: Db): Promise<boolean> {
     { code: "AG-DOSAGE", label: "Problème de dosage", famille: "Panne équipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
     { code: "AG-FERMETURE", label: "Problème fermeture gélules", famille: "Panne équipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
     { code: "AG-ALIMENTATION", label: "Alimentation gélules", famille: "Panne équipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
-    { code: "IM-PREVENTIVE", label: "Maintenance préventive", famille: "Intervention maintenance", isPlanned: false, appliesToEquipmentType: null },
+    { code: "IM-PREVENTIVE", label: "Maintenance préventive", famille: "Intervention maintenance", isPlanned: true, appliesToEquipmentType: null },
     { code: "IM-CORRECTIVE", label: "Maintenance corrective", famille: "Intervention maintenance", isPlanned: false, appliesToEquipmentType: null },
     { code: "IM-DI", label: "Demande d'intervention (DI)", famille: "Intervention maintenance", isPlanned: false, appliesToEquipmentType: null },
     { code: "AI-MATIERE", label: "Attente matière/article", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
@@ -105,6 +105,13 @@ export async function seedIfEmpty(db: Db): Promise<boolean> {
     { code: "CQ-IPC", label: "Contrôle en cours (IPC)", famille: "Contrôle qualité", isPlanned: false, appliesToEquipmentType: null },
     { code: "CQ-RESERVE", label: "Réserve conditionnement secondaire", famille: "Contrôle qualité", isPlanned: false, appliesToEquipmentType: null },
     { code: "CQ-RECONDITIONNEMENT", label: "Reconditionnement", famille: "Contrôle qualité", isPlanned: false, appliesToEquipmentType: null },
+    // Arrêts planifiés (affectent tAP — alimentent la branche « Planifié »)
+    { code: "AP-NETT-PARTIEL", label: "Nettoyage planifié partiel", famille: "Nettoyage planifié", isPlanned: true, appliesToEquipmentType: null },
+    { code: "AP-NETT-COMPLET", label: "Nettoyage planifié complet", famille: "Nettoyage planifié", isPlanned: true, appliesToEquipmentType: null },
+    { code: "CH-CHSB", label: "Changement de série (CHSB)", famille: "Changement de série", isPlanned: true, appliesToEquipmentType: "blistereuse" },
+    { code: "CH-CHSG", label: "Changement de série (CHSG)", famille: "Changement de série", isPlanned: true, appliesToEquipmentType: "geluleuse" },
+    { code: "AP-PAUSE", label: "Pause réglementaire", famille: "Arrêt planifié", isPlanned: true, appliesToEquipmentType: null },
+    { code: "AP-APR", label: "Arrêt programmé réglementaire (APR)", famille: "Arrêt planifié", isPlanned: true, appliesToEquipmentType: null },
   ];
   for (const c of categories) {
     await db.insert(downtimeCategories).values(c).onConflictDoNothing();
@@ -112,7 +119,7 @@ export async function seedIfEmpty(db: Db): Promise<boolean> {
 
   await seedPhaseTemplates(db);
 
-  console.log("[seed] ✓ Initial data loaded (3 users · 2 salles · 2 équipements · 5 produits · 23 catégories · 12 phases)");
+  console.log(`[seed] ✓ Initial data loaded (3 users · 2 salles · 2 équipements · 5 produits · ${categories.length} catégories · 12 phases)`);
   return true;
 }
 

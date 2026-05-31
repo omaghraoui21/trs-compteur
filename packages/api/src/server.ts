@@ -28,11 +28,18 @@ app.set("trust proxy", 1);
 // H5: Security headers
 app.use(helmet());
 
-// C3: Restrict CORS to the declared frontend origin in production
+// C3: Restrict CORS to the declared frontend origin. In production we never
+// fall back to "*": an unset ALLOWED_ORIGIN means same-origin only (the SPA is
+// served by this same server), which is the safe default for pharma data.
 const allowedOrigin = process.env.ALLOWED_ORIGIN;
-app.use(cors({ origin: allowedOrigin || "*" }));
+const isProd = process.env.NODE_ENV === "production";
+if (isProd && !allowedOrigin) {
+  console.warn("[cors] ALLOWED_ORIGIN not set in production — CORS restricted to same-origin only.");
+}
+app.use(cors({ origin: allowedOrigin || (isProd ? false : "*") }));
 
-app.use(express.json());
+// Explicit body-size limit (defends against oversized-payload abuse)
+app.use(express.json({ limit: "1mb" }));
 
 // H3: Brute-force protection on auth (10 attempts / 15 min per IP)
 const authLimiter = rateLimit({
