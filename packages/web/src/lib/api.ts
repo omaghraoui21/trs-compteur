@@ -103,8 +103,10 @@ export const api = {
   addDowntime: (lotId: string, data: AddDowntimeInput) =>
     request<any>(`/lots/${lotId}/downtimes`, { method: "POST", body: JSON.stringify(data) }),
   lotDowntimes: (lotId: string) => request<LotDowntime[]>(`/lots/${lotId}/downtimes`),
-  validateLot: (id: string, action: "validate" | "reject", comment?: string) =>
-    request<LotEntry>(`/lots/${id}/validate`, { method: "POST", body: JSON.stringify({ action, comment }) }),
+  // 21 CFR Part 11: validation/rejection requires re-authentication (password).
+  validateLot: (id: string, action: "validate" | "reject", password: string, comment?: string) =>
+    request<LotEntry & { signature: ElectronicSignature }>(`/lots/${id}/validate`, { method: "POST", body: JSON.stringify({ action, comment, password }) }),
+  lotSignatures: (id: string) => request<ElectronicSignature[]>(`/lots/${id}/signatures`),
 
   // Dashboard
   dashboardTrs: (equipmentId: string, from: string, to: string) =>
@@ -224,6 +226,7 @@ export interface CloseLotInput { quantityProduced: number; quantityConforming: n
 export interface AddDowntimeInput { categoryId: string; durationMinutes: number; isShortStop?: boolean; comment?: string }
 
 // Admin types (include all fields, not just active)
+export interface ElectronicSignature { id: string; userId: string | null; userEmail: string; userName: string; entityType: string; entityId: string; meaning: string; action: string; comment: string | null; ipAddress: string | null; signedAt: string }
 export interface AdminUser { id: string; email: string; displayName: string; role: string; isActive: boolean; createdAt: string }
 export interface AdminRoom { id: string; code: string; name: string; description: string | null; isActive: boolean; createdAt: string }
 export interface AdminEquipment { id: string; roomId: string; code: string; name: string; equipmentType: string | null; trsObjective: string; defaultCadenceUnit: string; microStopThresholdMin: number; isActive: boolean; createdAt: string }

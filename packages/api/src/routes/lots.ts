@@ -1,9 +1,10 @@
 import { Router } from "express";
-import { eq, and } from "drizzle-orm";
-import { lotEntries, downtimeEvents, sessionEvents, downtimeCategories } from "@trs/db";
+import { eq, and, desc } from "drizzle-orm";
+import bcrypt from "bcryptjs";
+import { lotEntries, downtimeEvents, sessionEvents, downtimeCategories, users, electronicSignatures } from "@trs/db";
 import { diffMinutes } from "@trs/engine";
 import { authenticate, requireRole } from "../middleware";
-import { asyncHandler, validate } from "../lib/http";
+import { asyncHandler, validate, HttpError } from "../lib/http";
 import { audit } from "../lib/audit";
 import { startLotSchema, closeLotSchema, updateLotSchema, addDowntimeSchema, validateLotSchema } from "../schemas";
 
@@ -184,17 +185,41 @@ lotsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
 
 lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(validateLotSchema), asyncHandler(async (req, res) => {
   const { db, userId } = req;
-  const { action, comment } = req.body; // action: "validate" | "reject"
+  const { action, comment, password } = req.body; // action: "validate" | "reject"
   const status = action === "reject" ? "rejected" : "validated";
+  const lotId = String(req.params.id);
+
+  // ── 21 CFR Part 11: re-authenticate the signer at the moment of signing. ──
+  const [signer] = await db.select().from(users).where(eq(users.id, userId!)).limit(1);
+  if (!signer || !signer.isActive) throw new HttpError(401, "Signataire invalide");
+  const ok = await bcrypt.compare(password, signer.passwordHash);
+  if (!ok) throw new HttpError(401, "Signature électronique invalide : mot de passe incorrect");
 
   const [lot] = await db.update(lotEntries).set({
     status,
     supervisorId: userId,
     supervisorComment: comment,
     validatedAt: new Date(),
-  }).where(eq(lotEntries.id, String(req.params.id))).returning();
+  }).where(eq(lotEntries.id, lotId)).returning();
 
   if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
-  await audit(db, req, action === "reject" ? "REJECT_LOT" : "VALIDATE_LOT", "lot", lot.id, { action, comment });
-  res.json(lot);
+
+  const meaning = action === "reject" ? "Rejet du lot" : "Validation du lot";
+  const [signature] = await db.insert(electronicSignatures).values({
+    userId: signer.id, userEmail: signer.email, userName: signer.displayName,
+    entityType: "lot", entityId: lot.id, meaning, action, comment: comment ?? null,
+    ipAddress: req.ip ?? null,
+  }).returning();
+
+  await audit(db, req, action === "reject" ? "REJECT_LOT" : "VALIDATE_LOT", "lot", lot.id, { action, comment, signatureId: signature.id });
+  res.json({ ...lot, signature });
+}));
+
+// ─── Electronic signatures for a lot (Part 11 manifestation) ──
+lotsRouter.get("/:id/signatures", asyncHandler(async (req, res) => {
+  const { db } = req;
+  const rows = await db.select().from(electronicSignatures)
+    .where(and(eq(electronicSignatures.entityType, "lot"), eq(electronicSignatures.entityId, String(req.params.id))))
+    .orderBy(desc(electronicSignatures.signedAt));
+  res.json(rows);
 }));

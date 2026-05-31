@@ -177,12 +177,41 @@ describe("golden path + validation + RBAC", () => {
     expect(res.status).toBe(403);
   });
 
-  it("allows a supervisor to validate a lot (200)", async () => {
+  it("requires a password to validate — 400 without it (Part 11 re-auth)", async () => {
     const res = await request(app)
       .post(`/api/lots/${lotId}/validate`)
       .set({ Authorization: `Bearer ${supToken}` })
       .send({ action: "validate" });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects a wrong signing password with 401", async () => {
+    const res = await request(app)
+      .post(`/api/lots/${lotId}/validate`)
+      .set({ Authorization: `Bearer ${supToken}` })
+      .send({ action: "validate", password: "wrong-password" });
+    expect(res.status).toBe(401);
+  });
+
+  it("allows a supervisor to validate with re-auth (200) and records a signature", async () => {
+    const res = await request(app)
+      .post(`/api/lots/${lotId}/validate`)
+      .set({ Authorization: `Bearer ${supToken}` })
+      .send({ action: "validate", password: "super123" });
     expect(res.status).toBe(200);
+    expect(res.body.signature).toBeTruthy();
+    expect(res.body.signature.meaning).toBe("Validation du lot");
+    expect(res.body.signature.userEmail).toBe("superviseur@dpi.local");
+  });
+
+  it("exposes the lot's electronic signatures (Part 11 manifestation)", async () => {
+    const res = await request(app)
+      .get(`/api/lots/${lotId}/signatures`)
+      .set({ Authorization: `Bearer ${supToken}` });
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBeGreaterThanOrEqual(1);
+    expect(res.body[0]).toHaveProperty("signedAt");
+    expect(res.body[0].meaning).toBe("Validation du lot");
   });
 
   it("closes the session (200)", async () => {
@@ -211,6 +240,27 @@ describe("audit trail (21 CFR-style traceability)", () => {
 
   it("blocks DELETE on audit_log (immutability trigger)", async () => {
     await expect(sql`DELETE FROM audit_log WHERE true`).rejects.toThrow(/append-only/i);
+  });
+});
+
+describe("electronic signatures (21 CFR Part 11)", () => {
+  it("blocks UPDATE on electronic_signatures (immutability trigger)", async () => {
+    await expect(
+      sql`UPDATE electronic_signatures SET meaning = 'TAMPERED' WHERE true`,
+    ).rejects.toThrow(/append-only/i);
+  });
+
+  it("blocks DELETE on electronic_signatures (immutability trigger)", async () => {
+    await expect(sql`DELETE FROM electronic_signatures WHERE true`).rejects.toThrow(/append-only/i);
+  });
+
+  it("captured the three Part 11 components (who / meaning / when)", async () => {
+    const rows = await sql`SELECT user_email, user_name, meaning, signed_at FROM electronic_signatures LIMIT 1`;
+    expect(rows.length).toBe(1);
+    expect(rows[0].user_email).toBeTruthy();
+    expect(rows[0].user_name).toBeTruthy();
+    expect(rows[0].meaning).toBeTruthy();
+    expect(rows[0].signed_at).toBeTruthy();
   });
 });
 

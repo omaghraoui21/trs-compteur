@@ -300,6 +300,29 @@ export const auditLog = pgTable("audit_log", {
   index("idx_audit_log_action").on(t.action),
 ]);
 
+// ─── Electronic Signatures (21 CFR Part 11) ────────────
+// Append-only. Each row is a signing event that required re-authentication.
+// Captures the three Part 11 components: signer identity (denormalised so it
+// survives), the *meaning* of the signature, and the timestamp.
+
+export const electronicSignatures = pgTable("electronic_signatures", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id),
+  userEmail: text("user_email").notNull(),   // denormalised — survives user changes
+  userName: text("user_name").notNull(),
+  entityType: text("entity_type").notNull(), // lot | ...
+  entityId: uuid("entity_id").notNull(),
+  meaning: text("meaning").notNull(),        // human-readable: "Validation du lot" | "Rejet du lot"
+  action: text("action").notNull(),          // machine: validate | reject
+  comment: text("comment"),
+  ipAddress: text("ip_address"),
+  signedAt: timestamp("signed_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_esign_entity").on(t.entityType, t.entityId),
+  index("idx_esign_user").on(t.userId),
+  index("idx_esign_signed").on(t.signedAt),
+]);
+
 // ─── Product × Equipment Cadences ──────────────────────
 
 export const productEquipmentCadences = pgTable("product_equipment_cadences", {

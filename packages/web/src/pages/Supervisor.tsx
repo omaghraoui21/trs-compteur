@@ -3,7 +3,7 @@ import { api, type LotEntry, type Product, type LotDowntime } from "@/lib/api";
 import { fmtPct, trsColor, diffMinutes, fmtDuration as fmtMinutes } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton, Skeleton } from "@/components/Skeleton";
-import { ClipboardCheck, Check, X, ChevronDown, ChevronUp, RefreshCw, Clock, AlertOctagon } from "lucide-react";
+import { ClipboardCheck, Check, X, ChevronDown, ChevronUp, RefreshCw, Clock, AlertOctagon, ShieldCheck } from "lucide-react";
 
 const PULL_THRESHOLD = 60;
 
@@ -32,6 +32,8 @@ export default function SupervisorPage() {
   const [lotDowntimes, setLotDowntimes] = useState<Record<string, LotDowntime[]>>({});
   const [loadingDowntimesId, setLoadingDowntimesId] = useState<string | null>(null);
   const [comment, setComment] = useState("");
+  const [pendingSign, setPendingSign] = useState<{ lotId: string; action: "validate" | "reject" } | null>(null);
+  const [signPassword, setSignPassword] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
@@ -82,16 +84,18 @@ export default function SupervisorPage() {
     else setPullDistance(0);
   };
 
-  const handleAction = async (lotId: string, action: "validate" | "reject") => {
+  const handleAction = async (lotId: string, action: "validate" | "reject", password: string) => {
     setSubmitting(true);
     try {
-      await api.validateLot(lotId, action, comment || undefined);
+      await api.validateLot(lotId, action, password, comment || undefined);
       setLots(prev => prev.filter(l => l.id !== lotId));
       setExpanded(null);
       setComment("");
-      toast.success(action === "validate" ? "Lot validé" : "Lot rejeté");
+      setPendingSign(null);
+      setSignPassword("");
+      toast.success(action === "validate" ? "Lot validé et signé" : "Lot rejeté et signé");
     } catch (err: any) {
-      toast.error(err.message || "Échec de la validation du lot");
+      toast.error(err.message || "Échec de la signature");
     } finally {
       setSubmitting(false);
     }
@@ -268,14 +272,14 @@ export default function SupervisorPage() {
 
                   <div className="flex gap-2">
                     <button
-                      onClick={() => handleAction(lot.id, "validate")}
+                      onClick={() => { setPendingSign({ lotId: lot.id, action: "validate" }); setSignPassword(""); }}
                       disabled={submitting || errors.length > 0}
                       className="flex-1 bg-green-600 text-white rounded-lg py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-green-700 transition disabled:opacity-40 disabled:pointer-events-none"
                     >
                       <Check className="h-4 w-4" /> Valider
                     </button>
                     <button
-                      onClick={() => handleAction(lot.id, "reject")}
+                      onClick={() => { setPendingSign({ lotId: lot.id, action: "reject" }); setSignPassword(""); }}
                       disabled={submitting}
                       className="flex-1 bg-red-100 text-red-700 rounded-lg py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-red-200 transition disabled:opacity-40 disabled:pointer-events-none"
                     >
@@ -291,6 +295,44 @@ export default function SupervisorPage() {
           );
         })}
       </div>
+
+      {/* 21 CFR Part 11 — electronic signature dialog (re-authentication) */}
+      {pendingSign && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setPendingSign(null)}>
+          <div className="bg-white rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldCheck className="h-5 w-5 text-blue-600" />
+              <h3 className="font-semibold">Signature électronique</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-1">
+              {pendingSign.action === "validate" ? "Validation du lot" : "Rejet du lot"}
+            </p>
+            <p className="text-xs text-gray-400 mb-4">
+              Conformément au 21 CFR Part 11, saisissez votre mot de passe pour signer cette décision. Votre nom et l'horodatage seront enregistrés de façon inaltérable.
+            </p>
+            <input
+              type="password"
+              autoFocus
+              value={signPassword}
+              onChange={(e) => setSignPassword(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && signPassword) handleAction(pendingSign.lotId, pendingSign.action, signPassword); }}
+              placeholder="Mot de passe"
+              className="w-full border rounded-lg px-3 py-2 text-sm mb-4"
+            />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setPendingSign(null)} disabled={submitting}
+                className="px-3 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50">Annuler</button>
+              <button
+                onClick={() => handleAction(pendingSign.lotId, pendingSign.action, signPassword)}
+                disabled={submitting || !signPassword}
+                className={`px-4 py-2 text-sm text-white rounded-lg disabled:opacity-50 ${pendingSign.action === "validate" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}
+              >
+                {submitting ? "Signature…" : "Signer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

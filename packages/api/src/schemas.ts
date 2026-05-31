@@ -89,6 +89,8 @@ export const addDowntimeSchema = z.object({
 export const validateLotSchema = z.object({
   action: z.enum(["validate", "reject"]),
   comment: z.string().optional(),
+  // 21 CFR Part 11: signing requires re-authentication with the signer's password.
+  password: z.string().min(1, "Mot de passe requis pour signer"),
 });
 
 // ─── Admin schemas (M3) ─────────────────────────────────────────

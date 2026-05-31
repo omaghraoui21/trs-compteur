@@ -25225,7 +25225,7 @@ var require_bcrypt = __commonJS({
         (global2["dcodeIO"] = global2["dcodeIO"] || {})["bcrypt"] = factory();
     })(exports, function() {
       "use strict";
-      var bcrypt4 = {};
+      var bcrypt5 = {};
       var randomFallback = null;
       function random(len) {
         if (typeof module !== "undefined" && module && module["exports"])
@@ -25250,10 +25250,10 @@ var require_bcrypt = __commonJS({
       } catch (e) {
       }
       randomFallback = null;
-      bcrypt4.setRandomFallback = function(random2) {
+      bcrypt5.setRandomFallback = function(random2) {
         randomFallback = random2;
       };
-      bcrypt4.genSaltSync = function(rounds, seed_length) {
+      bcrypt5.genSaltSync = function(rounds, seed_length) {
         rounds = rounds || GENSALT_DEFAULT_LOG2_ROUNDS;
         if (typeof rounds !== "number")
           throw Error("Illegal arguments: " + typeof rounds + ", " + typeof seed_length);
@@ -25270,7 +25270,7 @@ var require_bcrypt = __commonJS({
         salt.push(base64_encode(random(BCRYPT_SALT_LEN), BCRYPT_SALT_LEN));
         return salt.join("");
       };
-      bcrypt4.genSalt = function(rounds, seed_length, callback) {
+      bcrypt5.genSalt = function(rounds, seed_length, callback) {
         if (typeof seed_length === "function")
           callback = seed_length, seed_length = void 0;
         if (typeof rounds === "function")
@@ -25282,7 +25282,7 @@ var require_bcrypt = __commonJS({
         function _async(callback2) {
           nextTick(function() {
             try {
-              callback2(null, bcrypt4.genSaltSync(rounds));
+              callback2(null, bcrypt5.genSaltSync(rounds));
             } catch (err) {
               callback2(err);
             }
@@ -25303,19 +25303,19 @@ var require_bcrypt = __commonJS({
             });
           });
       };
-      bcrypt4.hashSync = function(s, salt) {
+      bcrypt5.hashSync = function(s, salt) {
         if (typeof salt === "undefined")
           salt = GENSALT_DEFAULT_LOG2_ROUNDS;
         if (typeof salt === "number")
-          salt = bcrypt4.genSaltSync(salt);
+          salt = bcrypt5.genSaltSync(salt);
         if (typeof s !== "string" || typeof salt !== "string")
           throw Error("Illegal arguments: " + typeof s + ", " + typeof salt);
         return _hash(s, salt);
       };
-      bcrypt4.hash = function(s, salt, callback, progressCallback) {
+      bcrypt5.hash = function(s, salt, callback, progressCallback) {
         function _async(callback2) {
           if (typeof s === "string" && typeof salt === "number")
-            bcrypt4.genSalt(salt, function(err, salt2) {
+            bcrypt5.genSalt(salt, function(err, salt2) {
               _hash(s, salt2, callback2, progressCallback);
             });
           else if (typeof s === "string" && typeof salt === "string")
@@ -25350,14 +25350,14 @@ var require_bcrypt = __commonJS({
           return false;
         return wrong === 0;
       }
-      bcrypt4.compareSync = function(s, hash) {
+      bcrypt5.compareSync = function(s, hash) {
         if (typeof s !== "string" || typeof hash !== "string")
           throw Error("Illegal arguments: " + typeof s + ", " + typeof hash);
         if (hash.length !== 60)
           return false;
-        return safeStringCompare(bcrypt4.hashSync(s, hash.substr(0, hash.length - 31)), hash);
+        return safeStringCompare(bcrypt5.hashSync(s, hash.substr(0, hash.length - 31)), hash);
       };
-      bcrypt4.compare = function(s, hash, callback, progressCallback) {
+      bcrypt5.compare = function(s, hash, callback, progressCallback) {
         function _async(callback2) {
           if (typeof s !== "string" || typeof hash !== "string") {
             nextTick(callback2.bind(this, Error("Illegal arguments: " + typeof s + ", " + typeof hash)));
@@ -25367,7 +25367,7 @@ var require_bcrypt = __commonJS({
             nextTick(callback2.bind(this, null, false));
             return;
           }
-          bcrypt4.hash(s, hash.substr(0, 29), function(err, comp) {
+          bcrypt5.hash(s, hash.substr(0, 29), function(err, comp) {
             if (err)
               callback2(err);
             else
@@ -25389,12 +25389,12 @@ var require_bcrypt = __commonJS({
             });
           });
       };
-      bcrypt4.getRounds = function(hash) {
+      bcrypt5.getRounds = function(hash) {
         if (typeof hash !== "string")
           throw Error("Illegal arguments: " + typeof hash);
         return parseInt(hash.split("$")[2], 10);
       };
-      bcrypt4.getSalt = function(hash) {
+      bcrypt5.getSalt = function(hash) {
         if (typeof hash !== "string")
           throw Error("Illegal arguments: " + typeof hash);
         if (hash.length !== 60)
@@ -27017,9 +27017,9 @@ var require_bcrypt = __commonJS({
           }, progressCallback);
         }
       }
-      bcrypt4.encodeBase64 = base64_encode;
-      bcrypt4.decodeBase64 = base64_decode;
-      return bcrypt4;
+      bcrypt5.encodeBase64 = base64_encode;
+      bcrypt5.decodeBase64 = base64_decode;
+      return bcrypt5;
     });
   }
 });
@@ -41014,6 +41014,7 @@ __export(schema_exports, {
   downtimeCategories: () => downtimeCategories,
   downtimeEvents: () => downtimeEvents,
   downtimeStatusEnum: () => downtimeStatusEnum,
+  electronicSignatures: () => electronicSignatures,
   equipments: () => equipments,
   eventTypeEnum: () => eventTypeEnum,
   lotEntries: () => lotEntries,
@@ -41276,6 +41277,27 @@ var auditLog = pgTable("audit_log", {
   index("idx_audit_log_entity").on(t.entityType, t.entityId),
   index("idx_audit_log_created").on(t.createdAt),
   index("idx_audit_log_action").on(t.action)
+]);
+var electronicSignatures = pgTable("electronic_signatures", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id),
+  userEmail: text("user_email").notNull(),
+  // denormalised — survives user changes
+  userName: text("user_name").notNull(),
+  entityType: text("entity_type").notNull(),
+  // lot | ...
+  entityId: uuid("entity_id").notNull(),
+  meaning: text("meaning").notNull(),
+  // human-readable: "Validation du lot" | "Rejet du lot"
+  action: text("action").notNull(),
+  // machine: validate | reject
+  comment: text("comment"),
+  ipAddress: text("ip_address"),
+  signedAt: timestamp("signed_at", { withTimezone: true }).notNull().defaultNow()
+}, (t) => [
+  index("idx_esign_entity").on(t.entityType, t.entityId),
+  index("idx_esign_user").on(t.userId),
+  index("idx_esign_signed").on(t.signedAt)
 ]);
 var productEquipmentCadences = pgTable("product_equipment_cadences", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -45948,7 +45970,9 @@ var addDowntimeSchema = external_exports.object({
 });
 var validateLotSchema = external_exports.object({
   action: external_exports.enum(["validate", "reject"]),
-  comment: external_exports.string().optional()
+  comment: external_exports.string().optional(),
+  // 21 CFR Part 11: signing requires re-authentication with the signer's password.
+  password: external_exports.string().min(1, "Mot de passe requis pour signer")
 });
 var equipmentType = external_exports.enum(["blistereuse", "geluleuse"]);
 var createRoomSchema = external_exports.object({
@@ -46299,6 +46323,7 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
 
 // packages/api/src/routes/lots.ts
 var import_express3 = __toESM(require_express2(), 1);
+var import_bcryptjs3 = __toESM(require_bcryptjs(), 1);
 var lotsRouter = (0, import_express3.Router)();
 lotsRouter.use(authenticate);
 lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => {
@@ -46436,20 +46461,42 @@ lotsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
 }));
 lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(validateLotSchema), asyncHandler(async (req, res) => {
   const { db: db2, userId } = req;
-  const { action, comment } = req.body;
+  const { action, comment, password } = req.body;
   const status = action === "reject" ? "rejected" : "validated";
+  const lotId = String(req.params.id);
+  const [signer] = await db2.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!signer || !signer.isActive) throw new HttpError(401, "Signataire invalide");
+  const ok = await import_bcryptjs3.default.compare(password, signer.passwordHash);
+  if (!ok) throw new HttpError(401, "Signature \xE9lectronique invalide : mot de passe incorrect");
   const [lot] = await db2.update(lotEntries).set({
     status,
     supervisorId: userId,
     supervisorComment: comment,
     validatedAt: /* @__PURE__ */ new Date()
-  }).where(eq(lotEntries.id, String(req.params.id))).returning();
+  }).where(eq(lotEntries.id, lotId)).returning();
   if (!lot) {
     res.status(404).json({ error: "Lot introuvable" });
     return;
   }
-  await audit(db2, req, action === "reject" ? "REJECT_LOT" : "VALIDATE_LOT", "lot", lot.id, { action, comment });
-  res.json(lot);
+  const meaning = action === "reject" ? "Rejet du lot" : "Validation du lot";
+  const [signature] = await db2.insert(electronicSignatures).values({
+    userId: signer.id,
+    userEmail: signer.email,
+    userName: signer.displayName,
+    entityType: "lot",
+    entityId: lot.id,
+    meaning,
+    action,
+    comment: comment ?? null,
+    ipAddress: req.ip ?? null
+  }).returning();
+  await audit(db2, req, action === "reject" ? "REJECT_LOT" : "VALIDATE_LOT", "lot", lot.id, { action, comment, signatureId: signature.id });
+  res.json({ ...lot, signature });
+}));
+lotsRouter.get("/:id/signatures", asyncHandler(async (req, res) => {
+  const { db: db2 } = req;
+  const rows = await db2.select().from(electronicSignatures).where(and(eq(electronicSignatures.entityType, "lot"), eq(electronicSignatures.entityId, String(req.params.id)))).orderBy(desc(electronicSignatures.signedAt));
+  res.json(rows);
 }));
 
 // packages/api/src/routes/ref.ts
@@ -46868,7 +46915,7 @@ dashboardRouter.get("/pending-lots", asyncHandler(async (req, res) => {
 
 // packages/api/src/routes/admin.ts
 var import_express6 = __toESM(require_express2(), 1);
-var import_bcryptjs3 = __toESM(require_bcryptjs(), 1);
+var import_bcryptjs4 = __toESM(require_bcryptjs(), 1);
 var adminRouter = (0, import_express6.Router)();
 adminRouter.use(authenticate);
 adminRouter.use(requireRole("admin", "supervisor"));
@@ -47136,7 +47183,7 @@ adminRouter.post("/users", adminOnly, validate(createUserSchema), asyncHandler(a
   const { email, displayName, password, role } = req.body;
   const [existing] = await req.db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   if (existing) throw new HttpError(409, "Cet email est d\xE9j\xE0 utilis\xE9");
-  const passwordHash = await import_bcryptjs3.default.hash(password, 10);
+  const passwordHash = await import_bcryptjs4.default.hash(password, 10);
   const [row] = await req.db.insert(users).values({ email, displayName, passwordHash, role }).returning(publicUser2);
   await audit(req.db, req, "CREATE_USER", "user", row.id, { email, role });
   res.status(201).json(row);
@@ -47154,7 +47201,7 @@ adminRouter.patch("/users/:id", adminOnly, validate(updateUserSchema), asyncHand
 }));
 adminRouter.post("/users/:id/password", adminOnly, validate(resetPasswordSchema), asyncHandler(async (req, res) => {
   const id = String(req.params.id);
-  const passwordHash = await import_bcryptjs3.default.hash(req.body.password, 10);
+  const passwordHash = await import_bcryptjs4.default.hash(req.body.password, 10);
   const [row] = await req.db.update(users).set({ passwordHash }).where(eq(users.id, id)).returning(publicUser2);
   if (!row) throw new HttpError(404, "Utilisateur introuvable");
   await audit(req.db, req, "RESET_PASSWORD", "user", id, {});
