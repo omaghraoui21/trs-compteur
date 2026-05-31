@@ -1,30 +1,25 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { api, type LotEntry, type Product, type DowntimeCategory, type DowntimeEvent } from "@/lib/api";
-import { fmtPct, trsColor } from "@trs/engine";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { api, type LotEntry, type Product, type LotDowntime } from "@/lib/api";
+import { fmtPct, trsColor, diffMinutes, fmtDuration as fmtMinutes } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton } from "@/components/Skeleton";
 import { ClipboardCheck, Check, X, ChevronDown, ChevronUp, RefreshCw, Clock, AlertOctagon } from "lucide-react";
 
 const PULL_THRESHOLD = 60;
 
-function fmtDuration(start: string, end: string | null): string {
-  if (!end) return "En cours";
-  const mins = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
-  if (mins < 60) return `${mins} min`;
-  return `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}`;
+function fmtLotDuration(start: string, end: string | null): string {
+  return end ? fmtMinutes(diffMinutes(start, end)) : "En cours";
 }
 
-function QualityBar({ produced, conforming }: { produced: number; conforming: number }) {
-  const tq = produced > 0 ? conforming / produced : 0;
-  const color = produced > 0 ? trsColor(tq) : "#9ca3af";
-  const pct = (tq * 100).toFixed(1);
+function QualityBar({ tq }: { tq: number | null }) {
+  const color = tq !== null ? trsColor(tq) : "#9ca3af";
   return (
     <div className="flex items-center gap-2 mt-1.5">
       <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all" style={{ width: `${tq * 100}%`, backgroundColor: color }} />
+        <div className="h-full rounded-full transition-all" style={{ width: `${(tq ?? 0) * 100}%`, backgroundColor: color }} />
       </div>
       <span className="text-xs font-semibold shrink-0" style={{ color }}>
-        {produced > 0 ? `${pct}% conf.` : "—"}
+        {tq !== null ? `${(tq * 100).toFixed(1)}% conf.` : "—"}
       </span>
     </div>
   );
@@ -33,10 +28,9 @@ function QualityBar({ produced, conforming }: { produced: number; conforming: nu
 export default function SupervisorPage() {
   const [lots, setLots] = useState<LotEntry[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<DowntimeCategory[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [lotDowntimes, setLotDowntimes] = useState<Record<string, DowntimeEvent[]>>({});
-  const [loadingDowntimes, setLoadingDowntimes] = useState<Set<string>>(new Set());
+  const [lotDowntimes, setLotDowntimes] = useState<Record<string, LotDowntime[]>>({});
+  const [loadingDowntimesId, setLoadingDowntimesId] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -48,14 +42,9 @@ export default function SupervisorPage() {
   const loadData = useCallback(async (showLoader = false) => {
     if (showLoader) setLoading(true);
     try {
-      const [l, p, cats] = await Promise.all([
-        api.pendingLots(),
-        api.products(),
-        api.downtimeCategories(),
-      ]);
+      const [l, p] = await Promise.all([api.pendingLots(), api.products()]);
       setLots(l);
       setProducts(p);
-      setCategories(cats);
     } catch (err: any) {
       toast.error(err.message || "Chargement des lots échoué");
     } finally {
@@ -69,15 +58,15 @@ export default function SupervisorPage() {
   const expandLot = useCallback(async (lotId: string) => {
     if (expanded === lotId) { setExpanded(null); return; }
     setExpanded(lotId);
-    if (lotDowntimes[lotId] !== undefined) return;
-    setLoadingDowntimes(prev => new Set(prev).add(lotId));
+    if (lotDowntimes[lotId] !== undefined) return; // cached
+    setLoadingDowntimesId(lotId);
     try {
       const dts = await api.lotDowntimes(lotId);
       setLotDowntimes(prev => ({ ...prev, [lotId]: dts }));
     } catch {
       setLotDowntimes(prev => ({ ...prev, [lotId]: [] }));
     } finally {
-      setLoadingDowntimes(prev => { const n = new Set(prev); n.delete(lotId); return n; });
+      setLoadingDowntimesId(null);
     }
   }, [expanded, lotDowntimes]);
 
@@ -108,11 +97,7 @@ export default function SupervisorPage() {
     }
   };
 
-  const getProduct = (id: string) => products.find(p => p.id === id);
-  const getCategoryLabel = (categoryId: string) => {
-    const cat = categories.find(c => c.id === categoryId);
-    return cat ? { label: cat.label, famille: cat.famille, isPlanned: cat.isPlanned } : { label: "—", famille: "—", isPlanned: false };
-  };
+  const productMap = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
 
   return (
     <div
@@ -149,9 +134,10 @@ export default function SupervisorPage() {
 
       <div className="space-y-3">
         {lots.map(lot => {
-          const product = getProduct(lot.productId);
+          const product = productMap.get(lot.productId);
           const isExpanded = expanded === lot.id;
           const rejectRate = lot.quantityProduced > 0 ? lot.quantityRejected / lot.quantityProduced : 0;
+          const tq = lot.quantityProduced > 0 ? lot.quantityConforming / lot.quantityProduced : null;
 
           const errors: string[] = [];
           const warnings: string[] = [];
@@ -187,11 +173,11 @@ export default function SupervisorPage() {
                       {product?.name} · Lot #{lot.lotOrder}
                       {lot.endedAt && (
                         <span className="ml-2 inline-flex items-center gap-0.5">
-                          <Clock className="h-3 w-3" />{fmtDuration(lot.startedAt, lot.endedAt)}
+                          <Clock className="h-3 w-3" />{fmtLotDuration(lot.startedAt, lot.endedAt)}
                         </span>
                       )}
                     </div>
-                    <QualityBar produced={lot.quantityProduced} conforming={lot.quantityConforming} />
+                    <QualityBar tq={tq} />
                   </div>
                   {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400 shrink-0 mt-1" /> : <ChevronDown className="h-4 w-4 text-gray-400 shrink-0 mt-1" />}
                 </div>
@@ -216,12 +202,10 @@ export default function SupervisorPage() {
 
                   <div className="flex gap-4 text-sm flex-wrap">
                     <span><span className="text-gray-500">Cadence:</span> {lot.cadenceUsed} {lot.cadenceUnit}</span>
-                    {lot.quantityProduced > 0 && (
+                    {tq !== null && (
                       <span>
                         <span className="text-gray-500">TQ:</span>{" "}
-                        <span style={{ color: trsColor(lot.quantityConforming / lot.quantityProduced) }} className="font-semibold">
-                          {fmtPct(lot.quantityConforming / lot.quantityProduced)}
-                        </span>
+                        <span style={{ color: trsColor(tq) }} className="font-semibold">{fmtPct(tq)}</span>
                       </span>
                     )}
                   </div>
@@ -234,7 +218,7 @@ export default function SupervisorPage() {
                         <span className="ml-1 font-normal text-gray-400">— {totalDowntimeMin} min total</span>
                       )}
                     </div>
-                    {loadingDowntimes.has(lot.id) && (
+                    {loadingDowntimesId === lot.id && (
                       <div className="text-xs text-gray-400 py-2">Chargement…</div>
                     )}
                     {dts && dts.length === 0 && (
@@ -242,20 +226,17 @@ export default function SupervisorPage() {
                     )}
                     {dts && dts.length > 0 && (
                       <div className="space-y-1">
-                        {dts.map(dt => {
-                          const cat = getCategoryLabel(dt.categoryId);
-                          return (
-                            <div key={dt.id} className="flex items-center gap-2 text-xs py-1 border-b border-gray-50 last:border-0">
-                              <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${cat.isPlanned ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
-                                {cat.isPlanned ? "P" : "NP"}
-                              </span>
-                              <span className="text-gray-400 shrink-0">{cat.famille}</span>
-                              <span className="text-gray-300">›</span>
-                              <span className="font-medium text-gray-700 flex-1">{cat.label}</span>
-                              <span className="shrink-0 font-mono text-gray-500">{dt.durationMinutes} min</span>
-                            </div>
-                          );
-                        })}
+                        {dts.map(dt => (
+                          <div key={dt.id} className="flex items-center gap-2 text-xs py-1 border-b border-gray-50 last:border-0">
+                            <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${dt.isPlanned ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
+                              {dt.isPlanned ? "P" : "NP"}
+                            </span>
+                            <span className="text-gray-400 shrink-0">{dt.famille}</span>
+                            <span className="text-gray-300">›</span>
+                            <span className="font-medium text-gray-700 flex-1">{dt.reason}</span>
+                            <span className="shrink-0 font-mono text-gray-500">{dt.durationMinutes} min</span>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>

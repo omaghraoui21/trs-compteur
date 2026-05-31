@@ -102,7 +102,7 @@ export const api = {
     request<LotEntry>(`/lots/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   addDowntime: (lotId: string, data: AddDowntimeInput) =>
     request<any>(`/lots/${lotId}/downtimes`, { method: "POST", body: JSON.stringify(data) }),
-  lotDowntimes: (lotId: string) => request<DowntimeEvent[]>(`/lots/${lotId}/downtimes`),
+  lotDowntimes: (lotId: string) => request<LotDowntime[]>(`/lots/${lotId}/downtimes`),
   validateLot: (id: string, action: "validate" | "reject", comment?: string) =>
     request<LotEntry>(`/lots/${id}/validate`, { method: "POST", body: JSON.stringify({ action, comment }) }),
 
@@ -192,6 +192,8 @@ export interface Session { id: string; equipmentId: string; roomId: string; oper
 export interface SessionEvent { id: string; sessionId: string; eventType: string; label: string | null; startedAt: string; endedAt: string | null; durationMinutes: number | null; isPlanned: boolean; lotEntryId: string | null; sortOrder: number; comment: string | null }
 export interface LotEntry { id: string; sessionId: string; productId: string; batchNumber: string; lotOrder: number; cadenceUsed: string; cadenceUnit: string; quantityProduced: number; quantityConforming: number; quantityRejected: number; startedAt: string; endedAt: string | null; status: string }
 export interface DowntimeEvent { id: string; lotEntryId: string; categoryId: string; startedAt: string; endedAt: string | null; durationMinutes: number; comment: string | null }
+// Returned by GET /lots/:id/downtimes — category joined server-side (famille/reason/isPlanned).
+export interface LotDowntime extends DowntimeEvent { famille: string; reason: string; isPlanned: boolean }
 
 export interface SessionDetail { session: Session; events: SessionEvent[]; lots: LotEntry[]; downtimes: DowntimeEvent[] }
 export interface TrsWarning { code: string; level: "error" | "warning"; message: string; field: string; value?: number }

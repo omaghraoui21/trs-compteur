@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, and } from "drizzle-orm";
-import { lotEntries, downtimeEvents, sessionEvents } from "@trs/db";
+import { lotEntries, downtimeEvents, sessionEvents, downtimeCategories } from "@trs/db";
 import { diffMinutes } from "@trs/engine";
 import { authenticate, requireRole } from "../middleware";
 import { asyncHandler, validate } from "../lib/http";
@@ -158,10 +158,24 @@ lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(asyn
 }));
 
 // ─── Get lot downtimes ────────────────────────────────────────
+// Joins the category so consumers get famille/reason/isPlanned without a
+// second request — same shape convention as GET /dashboard/downtime-log.
 
 lotsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
   const { db } = req;
-  const data = await db.select().from(downtimeEvents)
+  const data = await db.select({
+    id: downtimeEvents.id,
+    lotEntryId: downtimeEvents.lotEntryId,
+    categoryId: downtimeEvents.categoryId,
+    startedAt: downtimeEvents.startedAt,
+    endedAt: downtimeEvents.endedAt,
+    durationMinutes: downtimeEvents.durationMinutes,
+    comment: downtimeEvents.comment,
+    famille: downtimeCategories.famille,
+    reason: downtimeCategories.label,
+    isPlanned: downtimeCategories.isPlanned,
+  }).from(downtimeEvents)
+    .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
     .where(eq(downtimeEvents.lotEntryId, String(req.params.id)));
   res.json(data);
 }));

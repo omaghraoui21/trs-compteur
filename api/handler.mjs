@@ -46398,7 +46398,18 @@ lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(asyn
 }));
 lotsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
-  const data = await db2.select().from(downtimeEvents).where(eq(downtimeEvents.lotEntryId, String(req.params.id)));
+  const data = await db2.select({
+    id: downtimeEvents.id,
+    lotEntryId: downtimeEvents.lotEntryId,
+    categoryId: downtimeEvents.categoryId,
+    startedAt: downtimeEvents.startedAt,
+    endedAt: downtimeEvents.endedAt,
+    durationMinutes: downtimeEvents.durationMinutes,
+    comment: downtimeEvents.comment,
+    famille: downtimeCategories.famille,
+    reason: downtimeCategories.label,
+    isPlanned: downtimeCategories.isPlanned
+  }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(eq(downtimeEvents.lotEntryId, String(req.params.id)));
   res.json(data);
 }));
 lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(validateLotSchema), asyncHandler(async (req, res) => {
