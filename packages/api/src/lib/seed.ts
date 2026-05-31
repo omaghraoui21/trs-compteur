@@ -4,6 +4,9 @@ import {
   users, rooms, equipments, products, downtimeCategories, productEquipmentCadences,
   phaseTemplates,
 } from "@trs/db";
+import {
+  roomData, equipmentData, productData, cadenceData, downtimeCategoryData,
+} from "./referenceData";
 
 export async function seedIfEmpty(db: Db): Promise<boolean> {
   const existing = await db.select().from(users).limit(1);
@@ -21,111 +24,59 @@ export async function seedIfEmpty(db: Db): Promise<boolean> {
     { email: "admin@dpi.local", passwordHash: admHash, displayName: "Admin DPI", role: "admin" },
   ]).onConflictDoNothing();
 
-  const [roomBli] = await db.insert(rooms).values({
-    code: "LOCAL-BLI", name: "Local Blistereuse", description: "Salle de conditionnement sous blisters",
-  }).onConflictDoNothing().returning();
+  await seedReferenceData(db);
 
-  const [roomGel] = await db.insert(rooms).values({
-    code: "LOCAL-GEL", name: "Local Géluleuse", description: "Salle de remplissage gélules",
-  }).onConflictDoNothing().returning();
+  console.log(`[seed] ✓ Initial data loaded (3 users · ${roomData.length} salles · ${equipmentData.length} équipements · ${productData.length} produits · ${downtimeCategoryData.length} catégories)`);
+  return true;
+}
 
-  let eqBliId: string | undefined;
-  let eqGelId: string | undefined;
-
-  if (roomBli) {
-    const [r] = await db.insert(equipments).values({
-      roomId: roomBli.id, code: "BLI-IMA-TR135S", name: "Blistereuse IMA TR135S",
-      equipmentType: "blistereuse", trsObjective: "75", defaultCadenceUnit: "u/min",
-    }).onConflictDoNothing().returning();
-    eqBliId = r?.id;
-  }
-  if (roomGel) {
-    const [r] = await db.insert(equipments).values({
-      roomId: roomGel.id, code: "GEL-HH-MODUC", name: "Géluleuse Harro Höfliger Modu-C",
-      equipmentType: "geluleuse", trsObjective: "75", defaultCadenceUnit: "u/min",
-    }).onConflictDoNothing().returning();
-    eqGelId = r?.id;
+// Seeds the shared reference data (rooms, equipment, products, cadences,
+// reason codes, legacy phase templates). Idempotent — safe on every boot.
+// Used by both seedIfEmpty() and the CLI seeder so the two never drift.
+export async function seedReferenceData(db: Db): Promise<void> {
+  const roomIds: Record<string, string> = {};
+  for (const r of roomData) {
+    const [row] = await db.insert(rooms).values(r).onConflictDoNothing().returning();
+    if (row) roomIds[r.code] = row.id;
   }
 
-  const productData = [
-    { code: "AEROFOR-12", name: "Aerofor 12µg", defaultCadence: "100", cadenceUnit: "u/min", unit: "blisters" },
-    { code: "AERONIDE-200", name: "Aeronide 200µg", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" },
-    { code: "AERONIDE-400", name: "Aeronide 400µg", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" },
-    { code: "COMBIFOR-12-200", name: "Combifor 12/200µg", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" },
-    { code: "COMBIFOR-12-400", name: "Combifor 12/400µg", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" },
-  ];
-  const insertedIds: Record<string, string> = {};
+  const equipmentIds: Record<string, string> = {};
+  for (const e of equipmentData) {
+    const roomId = roomIds[e.roomCode];
+    if (!roomId) continue;
+    const [row] = await db.insert(equipments).values({
+      roomId, code: e.code, name: e.name, equipmentType: e.equipmentType,
+      trsObjective: e.trsObjective, defaultCadenceUnit: e.defaultCadenceUnit,
+    }).onConflictDoNothing().returning();
+    if (row) equipmentIds[e.code] = row.id;
+  }
+
+  const productIds: Record<string, string> = {};
   for (const p of productData) {
-    const [r] = await db.insert(products).values(p).onConflictDoNothing().returning();
-    if (r) insertedIds[p.code] = r.id;
+    const [row] = await db.insert(products).values(p).onConflictDoNothing().returning();
+    if (row) productIds[p.code] = row.id;
   }
 
-  const cadences: { productCode: string; eqId?: string; cadence: string }[] = [
-    { productCode: "AEROFOR-12", eqId: eqBliId, cadence: "100" },
-    { productCode: "AERONIDE-200", eqId: eqBliId, cadence: "120" },
-    { productCode: "AERONIDE-400", eqId: eqBliId, cadence: "120" },
-    { productCode: "COMBIFOR-12-200", eqId: eqBliId, cadence: "107" },
-    { productCode: "COMBIFOR-12-400", eqId: eqBliId, cadence: "50" },
-    { productCode: "AEROFOR-12", eqId: eqGelId, cadence: "1020" },
-    { productCode: "AERONIDE-200", eqId: eqGelId, cadence: "1020" },
-    { productCode: "AERONIDE-400", eqId: eqGelId, cadence: "1020" },
-    { productCode: "COMBIFOR-12-200", eqId: eqGelId, cadence: "1020" },
-    { productCode: "COMBIFOR-12-400", eqId: eqGelId, cadence: "1020" },
-  ];
-  for (const c of cadences) {
-    const productId = insertedIds[c.productCode];
-    if (productId && c.eqId) {
+  for (const c of cadenceData) {
+    const productId = productIds[c.productCode];
+    const equipmentId = equipmentIds[c.equipmentCode];
+    if (productId && equipmentId) {
       await db.insert(productEquipmentCadences).values({
-        productId, equipmentId: c.eqId, cadenceValue: c.cadence, cadenceUnit: "u/min",
+        productId, equipmentId, cadenceValue: c.cadence, cadenceUnit: c.unit,
       }).onConflictDoNothing();
     }
   }
 
-  const categories = [
-    { code: "AB-BOUCHAGE", label: "Bouchage", famille: "Panne équipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
-    { code: "AB-FORMAGE", label: "Problème de formage", famille: "Panne équipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
-    { code: "AB-DECOUPE", label: "Mauvaise découpe", famille: "Panne équipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
-    { code: "AB-SCELLAGE", label: "Problème de scellage", famille: "Panne équipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
-    { code: "AB-ENCODEUR", label: "Anomalie encodeur", famille: "Panne équipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
-    { code: "AG-DOSAGE", label: "Problème de dosage", famille: "Panne équipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
-    { code: "AG-FERMETURE", label: "Problème fermeture gélules", famille: "Panne équipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
-    { code: "AG-ALIMENTATION", label: "Alimentation gélules", famille: "Panne équipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
-    { code: "IM-PREVENTIVE", label: "Maintenance préventive", famille: "Intervention maintenance", isPlanned: true, appliesToEquipmentType: null },
-    { code: "IM-CORRECTIVE", label: "Maintenance corrective", famille: "Intervention maintenance", isPlanned: false, appliesToEquipmentType: null },
-    { code: "IM-DI", label: "Demande d'intervention (DI)", famille: "Intervention maintenance", isPlanned: false, appliesToEquipmentType: null },
-    { code: "AI-MATIERE", label: "Attente matière/article", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
-    { code: "AI-PERSONNEL", label: "Absence/manque effectif", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
-    { code: "AI-VALIDATION", label: "Attente validation CQ", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
-    { code: "AI-LIBERATION", label: "Libération AC", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
-    { code: "AI-SAGE", label: "Problème connexion SAGE", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
-    { code: "AI-TEST", label: "Test machinabilité", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
-    { code: "UE-PURIFIEE", label: "Eau purifiée", famille: "Utilités", isPlanned: false, appliesToEquipmentType: null },
-    { code: "UE-AIR", label: "Air comprimé", famille: "Utilités", isPlanned: false, appliesToEquipmentType: null },
-    { code: "UE-HVAC", label: "HVAC/Climatisation", famille: "Utilités", isPlanned: false, appliesToEquipmentType: null },
-    { code: "CQ-IPC", label: "Contrôle en cours (IPC)", famille: "Contrôle qualité", isPlanned: false, appliesToEquipmentType: null },
-    { code: "CQ-RESERVE", label: "Réserve conditionnement secondaire", famille: "Contrôle qualité", isPlanned: false, appliesToEquipmentType: null },
-    { code: "CQ-RECONDITIONNEMENT", label: "Reconditionnement", famille: "Contrôle qualité", isPlanned: false, appliesToEquipmentType: null },
-    // Arrêts planifiés (affectent tAP — alimentent la branche « Planifié »)
-    { code: "AP-NETT-PARTIEL", label: "Nettoyage planifié partiel", famille: "Nettoyage planifié", isPlanned: true, appliesToEquipmentType: null },
-    { code: "AP-NETT-COMPLET", label: "Nettoyage planifié complet", famille: "Nettoyage planifié", isPlanned: true, appliesToEquipmentType: null },
-    { code: "CH-CHSB", label: "Changement de série (CHSB)", famille: "Changement de série", isPlanned: true, appliesToEquipmentType: "blistereuse" },
-    { code: "CH-CHSG", label: "Changement de série (CHSG)", famille: "Changement de série", isPlanned: true, appliesToEquipmentType: "geluleuse" },
-    { code: "AP-PAUSE", label: "Pause réglementaire", famille: "Arrêt planifié", isPlanned: true, appliesToEquipmentType: null },
-    { code: "AP-APR", label: "Arrêt programmé réglementaire (APR)", famille: "Arrêt planifié", isPlanned: true, appliesToEquipmentType: null },
-  ];
-  for (const c of categories) {
-    await db.insert(downtimeCategories).values(c).onConflictDoNothing();
+  for (const cat of downtimeCategoryData) {
+    await db.insert(downtimeCategories).values(cat).onConflictDoNothing();
   }
 
   await seedPhaseTemplates(db);
-
-  console.log(`[seed] ✓ Initial data loaded (3 users · 2 salles · 2 équipements · 5 produits · ${categories.length} catégories · 12 phases)`);
-  return true;
 }
 
-// Idempotent — safe to call on every boot. Mirrors the inserts in migration
-// 0003 so fresh local DBs (created via `db:push`, which skips SQL migrations)
-// also get the default phases.
+// Legacy phase templates — DEPRECATED (the app no longer creates phases; every
+// stop is now a downtime classified planned/unplanned). Kept idempotently so
+// existing data and any transitional reads keep working. Safe to remove later.
 export async function seedPhaseTemplates(db: Db): Promise<void> {
   const phases = [
     { code: "PH-REMPLISSAGE", label: "Remplissage", category: "production", eventType: "remplissage" as const, isPlanned: true, requiresComment: false, appliesToEquipmentType: null, sortOrder: 10 },
