@@ -55,16 +55,23 @@ export default function DashboardPage() {
   const [downtimeLog, setDowntimeLog] = useState<DowntimeLogResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [equipFailed, setEquipFailed] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const toast = useToast();
 
-  useEffect(() => {
+  const loadEquipments = useCallback(() => {
+    setEquipFailed(false);
     api.equipments().then(list => {
       setEquipmentsList(list);
       if (list.length > 0) setSelectedEquipment(list[0].id);
-    }).catch((err) => toast.error(err.message || "Chargement des équipements échoué"));
-  }, []);
+    }).catch((err) => {
+      setEquipFailed(true);
+      toast.error(err.message || "Chargement des équipements échoué");
+    });
+  }, [toast]);
+
+  useEffect(() => { loadEquipments(); }, [loadEquipments]);
 
   const { from, to } = useMemo(() => {
     if (zoom === "custom" && customFrom && customTo) return { from: customFrom, to: customTo };
@@ -240,6 +247,17 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {equipFailed && equipmentsList.length === 0 && (
+        <div className="bg-white rounded-xl border p-8 text-center text-gray-500">
+          <p className="font-medium text-gray-700">Impossible de charger la liste des équipements.</p>
+          <p className="text-sm mt-1 mb-4">Vérifiez votre connexion, puis réessayez.</p>
+          <button onClick={loadEquipments}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition">
+            <RefreshCw className="h-4 w-4" /> Réessayer
+          </button>
+        </div>
+      )}
+
       {loading && <DashboardSkeleton />}
 
       {!loading && !data && loadFailed && (
@@ -281,19 +299,19 @@ export default function DashboardPage() {
           {/* ─── Charts row ──────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
             <TrsChart daily={data.daily} objective={objective} />
-            {paretoData && <ParetoChart pareto={paretoData.pareto} totalMin={paretoData.totalMin} />}
+            {paretoData ? <ParetoChart pareto={paretoData.pareto} totalMin={paretoData.totalMin} /> : <ChartUnavailable label="Pareto des arrêts" />}
           </div>
 
           {/* ─── By-Product + Six Losses row ───────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            {byProductData && <ByProductChart byProduct={byProductData.byProduct} />}
-            {sixLossesData && <SixLossesChart data={sixLossesData.total} />}
+            {byProductData ? <ByProductChart byProduct={byProductData.byProduct} /> : <ChartUnavailable label="TRS par produit" />}
+            {sixLossesData ? <SixLossesChart data={sixLossesData.total} /> : <ChartUnavailable label="Six grandes pertes" />}
           </div>
 
           {/* ─── Waterfall + Heatmap row ─────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
             <WaterfallChart metrics={data.total} />
-            {heatmapData && <HeatmapChart heatmap={heatmapData.heatmap} />}
+            {heatmapData ? <HeatmapChart heatmap={heatmapData.heatmap} /> : <ChartUnavailable label="Heatmap horaire" />}
           </div>
 
           {/* ─── Daily breakdown table ───────────────────────── */}
@@ -433,6 +451,18 @@ function DowntimeLog({ log }: { log: DowntimeLogEntry[] }) {
 // Line-Performance-style headline strip: six at-a-glance numbers above the
 // detailed KPI card. All values come straight off the period total already
 // fetched — no extra request.
+// Placeholder for an optional chart whose data failed to load (the fetch uses
+// .catch(() => null) so one failing chart never blanks the whole dashboard).
+function ChartUnavailable({ label }: { label: string }) {
+  return (
+    <div className="bg-white rounded-xl border p-6 flex flex-col items-center justify-center text-center text-gray-400 min-h-[200px]">
+      <BarChart3 className="h-7 w-7 mb-2 text-gray-300" />
+      <p className="text-sm font-medium text-gray-500">{label}</p>
+      <p className="text-xs mt-1">Données indisponibles pour cette période.</p>
+    </div>
+  );
+}
+
 function StatStrip({ metrics }: { metrics: TrsMetrics }) {
   if (metrics.lotCount === 0) return null;
   const heldMin = metrics.tAP + metrics.totalUnplannedMin;

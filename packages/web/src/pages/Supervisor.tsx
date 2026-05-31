@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { api, type LotEntry, type Product, type LotDowntime } from "@/lib/api";
 import { fmtPct, trsColor, diffMinutes, fmtDuration as fmtMinutes } from "@trs/engine";
 import { useToast } from "@/components/Toast";
-import { ListSkeleton } from "@/components/Skeleton";
+import { ListSkeleton, Skeleton } from "@/components/Skeleton";
 import { ClipboardCheck, Check, X, ChevronDown, ChevronUp, RefreshCw, Clock, AlertOctagon } from "lucide-react";
 
 const PULL_THRESHOLD = 60;
@@ -219,7 +219,10 @@ export default function SupervisorPage() {
                       )}
                     </div>
                     {loadingDowntimesId === lot.id && (
-                      <div className="text-xs text-gray-400 py-2">Chargement…</div>
+                      <div className="space-y-1 py-1">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-2/3" />
+                      </div>
                     )}
                     {dts && dts.length === 0 && (
                       <div className="text-xs text-gray-400 py-1">Aucun arrêt enregistré sur ce lot.</div>

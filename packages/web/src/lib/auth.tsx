@@ -38,7 +38,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     const refreshToken = localStorage.getItem(REFRESH_KEY);
-    if (refreshToken) api.logout(refreshToken).catch(() => {}); // best-effort server-side revoke
+    // Best-effort server-side revoke; local tokens are cleared regardless, but
+    // log a failed revoke so a still-valid server token isn't lost silently.
+    if (refreshToken) api.logout(refreshToken).catch((err) =>
+      console.warn("[auth] server-side logout failed; tokens cleared locally", err?.message ?? err));
     clearTokens();
     setUser(null);
   };

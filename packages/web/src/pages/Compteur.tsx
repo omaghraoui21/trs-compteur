@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type PhaseTemplate, type ProductEquipmentCadence, type SessionTrsResponse } from "@/lib/api";
+import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type PhaseTemplate, type ProductEquipmentCadence, type SessionTrsResponse, type TrsMetrics, type LotEntry } from "@/lib/api";
 import { fmtDuration, fmtPct, trsColor, PHASE_CATEGORY_KEYS, PHASE_CATEGORY_LABELS } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { Onboarding } from "@/components/Onboarding";
 import { RateGauge } from "@/components/RateGauge";
 import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle, Zap, CheckCircle, XCircle, Wrench, Droplets, RotateCcw, Cpu } from "lucide-react";
+import { ListSkeleton } from "@/components/Skeleton";
 
 type View = "pick-room" | "pick-equip" | "timeline" | "new-lot" | "add-phase" | "add-downtime";
 
@@ -110,6 +111,8 @@ export default function CompteurPage() {
   const [phaseTemplates, setPhaseTemplates] = useState<PhaseTemplate[]>([]);
   const [cadences, setCadences] = useState<ProductEquipmentCadence[]>([]);
   const [trsData, setTrsData] = useState<SessionTrsResponse | null>(null);
+  const [trsStale, setTrsStale] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [prefillProductId, setPrefillProductId] = useState("");
@@ -144,16 +147,28 @@ export default function CompteurPage() {
     const hasActiveLot = detail?.lots.some(l => l.status === "active") ?? false;
     if (!hasActiveLot) return;
     const poll = async () => {
-      try { setTrsData(await api.sessionTrs(activeSession.id)); } catch { /* silent */ }
+      try {
+        setTrsData(await api.sessionTrs(activeSession.id));
+        setTrsStale(false);
+      } catch {
+        // Don't toast on every 30s tick; flag the live badge as stale instead.
+        setTrsStale(true);
+      }
     };
     const iv = setInterval(poll, 30_000);
     return () => clearInterval(iv);
   }, [activeSession, detail]);
 
   const loadDetail = useCallback(async (sessionId: string) => {
-    const [d, t] = await Promise.all([api.session(sessionId), api.sessionTrs(sessionId)]);
-    setDetail(d);
-    setTrsData(t);
+    setDetailLoading(true);
+    try {
+      const [d, t] = await Promise.all([api.session(sessionId), api.sessionTrs(sessionId)]);
+      setDetail(d);
+      setTrsData(t);
+      setTrsStale(false);
+    } finally {
+      setDetailLoading(false);
+    }
   }, []);
 
   // Check for active session on equipment select
@@ -229,7 +244,7 @@ export default function CompteurPage() {
         {bootError ? (
           <RetryError message={bootError} onRetry={loadBootstrap} />
         ) : rooms.length === 0 ? (
-          <div className="text-center text-gray-400 text-sm py-10">Chargement…</div>
+          <ListSkeleton rows={3} />
         ) : (
         <div className="grid gap-3">
           {rooms.map(r => (
@@ -398,6 +413,11 @@ export default function CompteurPage() {
                   TRS {fmtPct(trsData.session.TRS)}
                 </span>
                 <span className="text-xs text-gray-400">en direct</span>
+                {trsStale && (
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-600" title="La mise à jour automatique a échoué — valeur possiblement périmée">
+                    <AlertTriangle className="h-3.5 w-3.5" /> hors ligne
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -486,6 +506,8 @@ export default function CompteurPage() {
         </button>
       )}
 
+      {activeSession && !detail && detailLoading && <ListSkeleton rows={4} />}
+
       {activeSession && detail && (
         <>
           {/* U6: Session Timeline Bar */}
@@ -556,7 +578,7 @@ export default function CompteurPage() {
               <div className="divide-y">
                 {detail.lots.filter(l => l.status !== "active").map(lot => {
                   const product = products.find(p => p.id === lot.productId);
-                  const lotTrs = trsData?.lots?.find((t: any) => t.lotId === lot.id);
+                  const lotTrs = trsData?.lots?.find(t => t.lotId === lot.id);
                   const rejectQty = lot.quantityProduced - lot.quantityConforming;
                   return (
                     <div key={lot.id} className="px-4 py-3">
@@ -713,7 +735,7 @@ function SessionTimelineBar({ detail, session }: { detail: SessionDetail; sessio
 
 // ─── U8: TRS Summary with Historical Reference ──────────
 
-function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs: any; equipmentId: string; trsObjective: number }) {
+function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs: TrsMetrics | undefined; equipmentId: string; trsObjective: number }) {
   const [avg30, setAvg30] = useState<number | null>(null);
   const toast = useToast();
 
@@ -731,6 +753,7 @@ function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs:
       .catch((err) => toast.error(err.message || "Chargement de la moyenne 30j échoué"));
   }, [equipmentId]);
 
+  if (!sessionTrs) return null;
   const currentTRS = sessionTrs.TRS;
   const trend = avg30 != null ? currentTRS - avg30 : null;
 
@@ -786,7 +809,7 @@ function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs:
 // ─── Active Lot Card (U2 touch, U4 real-time validation) ─
 
 function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDowntime }: {
-  lot: any; products: Product[]; categories: DowntimeCategory[]; sessionId: string;
+  lot: LotEntry; products: Product[]; categories: DowntimeCategory[]; sessionId: string;
   onUpdate: () => void; onAddDowntime: () => void;
 }) {
   const product = products.find(p => p.id === lot.productId);
@@ -904,7 +927,7 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
 
 function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUnit, previousLots, prefillProductId, onCreated, onBack }: {
   session: Session; products: Product[]; cadences: ProductEquipmentCadence[];
-  equipmentId: string; defaultCadenceUnit: string; previousLots: any[];
+  equipmentId: string; defaultCadenceUnit: string; previousLots: LotEntry[];
   prefillProductId?: string;
   onCreated: () => void; onBack: () => void;
 }) {

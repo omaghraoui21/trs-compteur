@@ -200,8 +200,9 @@ export interface TrsWarning { code: string; level: "error" | "warning"; message:
 export interface TrsAudit { tF_norme: number; tF_lots: number; tF_delta: number; formula: string }
 export interface ReliabilityMetrics { breakdownCount: number; totalBreakdownMin: number; mtbf: number | null; mttr: number | null; availability: number | null }
 export interface TrsMetrics { tT: number; tO: number; fermeture: number; tAP: number; tR: number; tF: number; tN: number; tU: number; nonQualiteMin: number; ecartCadenceMin: number; totalUnplannedMin: number; DO: number; TP: number; TQ: number; TRS: number; TRG: number; TEEP: number; utilisation: number; lotCount: number; totalProduced: number; totalConforming: number; totalRebut: number; downtimeByFamille: Record<string, number>; downtimeByNorme?: Record<string, number>; warnings?: TrsWarning[]; audit?: TrsAudit; reliability?: ReliabilityMetrics }
-export interface DailyTrs extends TrsMetrics { date: string; notes?: string; lots?: any[] }
-export interface SessionTrsResponse { session: TrsMetrics; lots: any[] }
+export interface LotTrs extends TrsMetrics { lotId: string; batchNumber?: string }
+export interface DailyTrs extends TrsMetrics { date: string; notes?: string; lots?: LotTrs[] }
+export interface SessionTrsResponse { session: TrsMetrics; lots: LotTrs[] }
 export interface DashboardTrsResponse { period: { from: string; to: string; equipmentId: string }; daily: DailyTrs[]; total: TrsMetrics }
 export interface ParetoItem { code: string; label: string; famille: string; isPlanned: boolean; totalMin: number; count: number; pctOfTotal: number; cumulPct: number }
 export interface ParetoResponse { pareto: ParetoItem[]; totalMin: number }
