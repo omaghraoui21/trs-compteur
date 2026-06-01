@@ -1,8 +1,9 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/Toast";
+import { useActiveSession } from "@/lib/sessionContext";
 import { Timer, ClipboardCheck, BarChart3, Settings, LogOut, KeyRound } from "lucide-react";
 
 const navItems = [
@@ -12,9 +13,28 @@ const navItems = [
   { to: "/admin", label: "Configuration", short: "Réglages", icon: Settings, roles: ["admin", "supervisor"] },
 ];
 
+function useElapsed(openedAt: Date | null): string {
+  const [elapsed, setElapsed] = useState("");
+  useEffect(() => {
+    if (!openedAt) { setElapsed(""); return; }
+    const tick = () => {
+      const diff = Math.floor((Date.now() - openedAt.getTime()) / 1000);
+      const h = Math.floor(diff / 3600);
+      const m = Math.floor((diff % 3600) / 60);
+      setElapsed(h > 0 ? `${h}h${String(m).padStart(2, "0")}` : `${m}min`);
+    };
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => clearInterval(id);
+  }, [openedAt]);
+  return elapsed;
+}
+
 export default function Layout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const [pwOpen, setPwOpen] = useState(false);
+  const { equipmentName, openedAt } = useActiveSession();
+  const elapsed = useElapsed(openedAt);
   const items = navItems.filter(item => !item.roles || item.roles.includes(user?.role || ""));
 
   return (
@@ -25,7 +45,14 @@ export default function Layout({ children }: { children: ReactNode }) {
           <h1 className="text-lg font-bold">TRS Compteur</h1>
         </div>
         <div className="flex items-center gap-4">
-          <span className="hidden sm:inline text-sm opacity-80">{user?.displayName}</span>
+          {equipmentName ? (
+            <span className="hidden sm:inline text-sm font-medium bg-green-500/20 text-green-100 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse shrink-0" />
+              {equipmentName}{elapsed ? ` • ${elapsed}` : ""}
+            </span>
+          ) : (
+            <span className="hidden sm:inline text-sm opacity-80">{user?.displayName}</span>
+          )}
           <button onClick={() => setPwOpen(true)} className="p-1.5 rounded hover:bg-blue-600 transition" title="Changer mon mot de passe">
             <KeyRound className="h-4 w-4" />
           </button>
@@ -75,7 +102,12 @@ export default function Layout({ children }: { children: ReactNode }) {
               }`
             }
           >
-            <item.icon className="h-5 w-5" />
+            <div className="relative">
+              <item.icon className="h-5 w-5" />
+              {item.to === "/" && equipmentName && (
+                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              )}
+            </div>
             {item.short}
           </NavLink>
         ))}

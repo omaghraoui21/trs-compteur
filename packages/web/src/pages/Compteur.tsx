@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type ProductEquipmentCadence, type SessionTrsResponse, type TrsMetrics, type LotEntry } from "@/lib/api";
 import { fmtDuration, fmtPct, trsColor } from "@trs/engine";
 import { useToast } from "@/components/Toast";
+import { useActiveSession } from "@/lib/sessionContext";
 import { Onboarding } from "@/components/Onboarding";
 import { RateGauge } from "@/components/RateGauge";
 import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle, Zap, CheckCircle, XCircle, Wrench, Droplets, RotateCcw, Cpu } from "lucide-react";
@@ -113,6 +114,7 @@ export default function CompteurPage() {
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [bootError, setBootError] = useState("");
   const toast = useToast();
+  const sessionCtx = useActiveSession();
 
   // Load reference data (rooms + products) on mount, with a retry path so a
   // transient server/network error shows a "Réessayer" button instead of a
@@ -181,12 +183,14 @@ export default function CompteurPage() {
       const active = allSessions.find(s => s.status === "active");
       if (active) {
         setActiveSession(active);
+        sessionCtx.set(eq.name, new Date(active.openedAt));
         try {
           await loadDetail(active.id);
         } catch {
           // Session detail unavailable (e.g. pending DB migration).
           // Clear stale state so the operator can start a new session.
           setActiveSession(null);
+          sessionCtx.set(null, null);
           toast.error("Session précédente inaccessible — veuillez contacter l'administrateur.");
         }
       }
@@ -201,6 +205,7 @@ export default function CompteurPage() {
     try {
       const session = await api.openSession(selectedEquipment.id, selectedRoom.id);
       setActiveSession(session);
+      sessionCtx.set(selectedEquipment.name, new Date(session.openedAt));
       await loadDetail(session.id);
     } catch (err: any) {
       setError(err.message);
@@ -220,6 +225,7 @@ export default function CompteurPage() {
       setActiveSession(null);
       setDetail(null);
       setTrsData(null);
+      sessionCtx.set(null, null);
       setView("pick-room");
     } catch (err: any) {
       toast.error(err.message || "Fermeture du compteur échouée");
@@ -332,6 +338,7 @@ export default function CompteurPage() {
     return <AddDowntimeForm
       lotId={activeLot?.id}
       sessionId={activeSession.id}
+      equipmentId={selectedEquipment?.id || ""}
       categories={categories}
       onAdded={() => { loadDetail(activeSession.id); setView("timeline"); }}
       onBack={() => setView("timeline")}
@@ -606,22 +613,34 @@ export default function CompteurPage() {
             </div>
           )}
 
+          {/* « À classer » — temps non couvert par un lot ou un arrêt déclaré.
+              ≥ 10 min → bannière rouge urgente en tête ; 1-9 min → rappel amber. */}
+          {trsData?.aClasserMin != null && trsData.aClasserMin > 1 && (() => {
+            const urgent = trsData.aClasserMin >= 10;
+            return (
+              <button onClick={() => setView("add-downtime")}
+                className={`w-full mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${
+                  urgent
+                    ? "border-red-300 bg-red-50 hover:bg-red-100"
+                    : "border-amber-300 bg-amber-50 hover:bg-amber-100"
+                }`}>
+                <span className={`flex items-center gap-2 ${urgent ? "text-red-800" : "text-amber-800"}`}>
+                  <AlertTriangle className={`h-5 w-5 shrink-0 ${urgent ? "text-red-600" : ""}`} />
+                  <span className={`text-sm ${urgent ? "font-bold" : "font-medium"}`}>
+                    {fmtDuration(trsData.aClasserMin)} de temps non classé
+                    {urgent && " — à déclarer avant fermeture"}
+                  </span>
+                </span>
+                <span className={`text-xs shrink-0 ${urgent ? "text-red-700 font-semibold" : "text-amber-700"}`}>
+                  Déclarer →
+                </span>
+              </button>
+            );
+          })()}
+
           {/* Session TRS summary + U8: historical reference */}
           {sessionTrs && sessionTrs.lotCount > 0 && (
             <TrsSummaryCard sessionTrs={sessionTrs} equipmentId={selectedEquipment?.id || ""} trsObjective={Number(selectedEquipment?.trsObjective || 75)} />
-          )}
-
-          {/* « À classer » — temps de session non couvert par un lot ni par un
-              arrêt déclaré. On incite l'opérateur à le qualifier (modèle Reason Codes). */}
-          {trsData?.aClasserMin != null && trsData.aClasserMin > 1 && (
-            <button onClick={() => setView("add-downtime")}
-              className="w-full mb-4 flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-left hover:bg-amber-100 transition">
-              <span className="flex items-center gap-2 text-amber-800">
-                <AlertTriangle className="h-5 w-5 shrink-0" />
-                <span className="text-sm font-medium">{fmtDuration(trsData.aClasserMin)} à classer</span>
-              </span>
-              <span className="text-xs text-amber-700">Déclarer l'arrêt →</span>
-            </button>
           )}
 
           {/* Actions (U2: large touch targets) */}
@@ -658,6 +677,7 @@ export default function CompteurPage() {
         <EndOfShiftModal
           trsData={trsData}
           hasActiveLot={!!activeLot}
+          aClasserMin={trsData?.aClasserMin ?? 0}
           trsObjective={Number(selectedEquipment?.trsObjective || 75)}
           onConfirm={handleConfirmClose}
           onCancel={() => setShowCloseModal(false)}
@@ -1004,6 +1024,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
   const [refCadence, setRefCadence] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [step, setStep] = useState<"form" | "confirm">("form");
   const [flashStart, triggerFlashStart] = useFlash();
 
   // U5: Auto-fill cadence from product×equipment reference
@@ -1036,9 +1057,18 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
     return null;
   }, [cadence, refCadence, cadenceUnit]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!productId || !batch || !cadence) return;
+    // Show confirmation step for first lot or when cadence deviates >20%
+    if (previousLots.length === 0 || cadenceWarning) {
+      setStep("confirm");
+      return;
+    }
+    submitLot();
+  };
+
+  const submitLot = async () => {
     triggerFlashStart();
     setLoading(true);
     setError("");
@@ -1053,9 +1083,53 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
       onCreated();
     } catch (err: any) {
       setError(err.message);
+      setStep("form");
     }
     setLoading(false);
   };
+
+  // ─── Confirmation step (premier lot ou déviation cadence) ────
+  if (step === "confirm") {
+    const selectedProduct = products.find(p => p.id === productId);
+    return (
+      <div className="max-w-lg mx-auto">
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+          <Package className="h-5 w-5" /> Confirmer le démarrage
+        </h2>
+        <div className="bg-white rounded-xl border p-4 mb-4 space-y-3">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Produit</span>
+            <span className="font-semibold">{selectedProduct?.name ?? productId}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">N° de lot</span>
+            <span className="font-semibold font-mono">{batch}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Cadence</span>
+            <span className="font-semibold">{cadence} {cadenceUnit}</span>
+          </div>
+          {cadenceWarning && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+              <p className="text-xs text-amber-700">{cadenceWarning}</p>
+            </div>
+          )}
+        </div>
+        {error && <div className="bg-red-50 text-red-600 rounded-lg p-3 mb-4 text-sm">{error}</div>}
+        <div className="flex gap-3">
+          <button onClick={() => setStep("form")}
+            className={`flex-1 border border-gray-300 text-gray-700 ${BTN_PRIMARY} hover:bg-gray-50`}>
+            <ChevronLeft className="h-4 w-4" /> Modifier
+          </button>
+          <button onClick={submitLot} disabled={loading}
+            className={`flex-1 bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700 disabled:opacity-50 ${flashStart ? "btn-flash" : ""}`}>
+            {loading ? "Démarrage…" : "Démarrer"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-lg mx-auto">
@@ -1129,13 +1203,33 @@ const QUICK_DURATIONS = [5, 10, 15, 30, 60];
 
 // ─── Add Downtime Form (U1: timer auto, U2: large buttons) ─
 
-function AddDowntimeForm({ lotId, sessionId, categories, onAdded, onBack }: {
-  lotId?: string; sessionId: string; categories: DowntimeCategory[]; onAdded: () => void; onBack: () => void;
+const RECENT_DOWNTIMES_MAX = 3;
+
+function getRecentDowntimes(equipmentId: string): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(`recentDowntimes_${equipmentId}`) || "[]");
+  } catch { return []; }
+}
+
+function saveRecentDowntime(equipmentId: string, catId: string) {
+  const prev = getRecentDowntimes(equipmentId);
+  const next = [catId, ...prev.filter(id => id !== catId)].slice(0, RECENT_DOWNTIMES_MAX);
+  localStorage.setItem(`recentDowntimes_${equipmentId}`, JSON.stringify(next));
+}
+
+function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, onBack }: {
+  lotId?: string; sessionId: string; equipmentId: string; categories: DowntimeCategory[]; onAdded: () => void; onBack: () => void;
 }) {
   const [catId, setCatId] = useState("");
   const [flashDowntime, triggerFlashDowntime] = useFlash();
   const toast = useToast();
   const [mode, setMode] = useState<"manual" | "timer">("manual");
+
+  // Raccourcis : 3 dernières catégories utilisées sur cet équipement
+  const recentCats = useMemo(() => {
+    const ids = getRecentDowntimes(equipmentId);
+    return ids.map(id => categories.find(c => c.id === id)).filter(Boolean) as DowntimeCategory[];
+  }, [equipmentId, categories]);
   const [duration, setDuration] = useState("");
   const [comment, setComment] = useState("");
   const [shortStop, setShortStop] = useState(false);
@@ -1200,6 +1294,7 @@ function AddDowntimeForm({ lotId, sessionId, categories, onAdded, onBack }: {
       // During production → attach to the lot; between lots → attach to the session.
       if (lotId) await api.addDowntime(lotId, payload);
       else await api.addSessionDowntime(sessionId, payload);
+      saveRecentDowntime(equipmentId, catId);
       onAdded();
     } catch (err: any) {
       toast.error(err.message || "Échec de l'ajout de l'arrêt");
@@ -1227,6 +1322,29 @@ function AddDowntimeForm({ lotId, sessionId, categories, onAdded, onBack }: {
           : "Hors production — rattaché à la session (inter-lots)."}
       </p>
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border p-4 space-y-4">
+        {/* Raccourcis : 3 derniers arrêts utilisés sur cet équipement */}
+        {recentCats.length > 0 && (
+          <div>
+            <p className="text-xs text-gray-500 mb-1.5 font-medium">Arrêts récents</p>
+            <div className={`grid gap-2 ${recentCats.length === 1 ? "grid-cols-1" : recentCats.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+              {recentCats.map(c => {
+                const sel = catId === c.id;
+                return (
+                  <button key={c.id} type="button" onClick={() => setCatId(c.id)}
+                    className={`border rounded-lg px-2 py-3 text-sm text-center min-h-[48px] transition font-medium ${
+                      sel
+                        ? "border-blue-500 bg-blue-50 text-blue-800"
+                        : "border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700"
+                    }`}>
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="border-t mt-3" />
+          </div>
+        )}
+
         {/* Two clear sections: NON planifié (red) then planifié (orange).
             The famille is a sub-group within each. */}
         {sections.map(section => section.familles.length > 0 && (
@@ -1337,26 +1455,30 @@ function AddDowntimeForm({ lotId, sessionId, categories, onAdded, onBack }: {
 
 // ─── End-of-Shift Summary Modal ──────────────────────────
 
-function EndOfShiftModal({ trsData, hasActiveLot, trsObjective, onConfirm, onCancel }: {
+function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, onConfirm, onCancel }: {
   trsData: SessionTrsResponse | null;
   hasActiveLot: boolean;
+  aClasserMin: number;
   trsObjective: number;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
   const s = trsData?.session;
+  const classifiedOk = aClasserMin < 5;
+  const classifiedBlocking = aClasserMin >= 10;
+
+  const CheckItem = ({ ok, warn, label }: { ok: boolean; warn?: boolean; label: string }) => (
+    <div className={`flex items-center gap-2 text-sm py-1.5 px-3 rounded-lg ${ok ? "text-green-700 bg-green-50" : warn ? "text-amber-700 bg-amber-50" : "text-red-700 bg-red-50"}`}>
+      {ok ? <CheckCircle className="h-4 w-4 shrink-0" /> : warn ? <AlertTriangle className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
+      <span>{label}</span>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
       <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg p-6 shadow-xl">
         <h2 className="text-lg font-bold mb-1">Fermer le compteur ?</h2>
         <p className="text-sm text-gray-500 mb-4">Résumé de la session en cours</p>
-
-        {hasActiveLot && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-            <span className="text-sm text-amber-700">Un lot est en cours — il sera clôturé automatiquement.</span>
-          </div>
-        )}
 
         {s && s.lotCount > 0 ? (
           <>
@@ -1395,13 +1517,36 @@ function EndOfShiftModal({ trsData, hasActiveLot, trsObjective, onConfirm, onCan
           </div>
         )}
 
+        {/* Checklist avant fermeture */}
+        <div className="space-y-1.5 mb-4">
+          <CheckItem
+            ok={!hasActiveLot}
+            warn={false}
+            label={hasActiveLot ? "Un lot est en cours — il sera clôturé automatiquement" : "Tous les lots sont clôturés"}
+          />
+          <CheckItem
+            ok={classifiedOk}
+            warn={!classifiedBlocking && !classifiedOk}
+            label={classifiedOk
+              ? "Temps de session classé"
+              : `${fmtDuration(aClasserMin)} non classés — ${classifiedBlocking ? "déclarez les arrêts avant de fermer" : "pensez à déclarer les arrêts"}`
+            }
+          />
+        </div>
+
+        {classifiedBlocking && (
+          <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-3 font-medium">
+            Fermez ce modal et déclarez les arrêts inter-lots avant de clore la session.
+          </p>
+        )}
+
         <div className="flex gap-3">
           <button onClick={onCancel}
             className={`flex-1 border border-gray-300 text-gray-700 ${BTN_PRIMARY} hover:bg-gray-50`}>
             Annuler
           </button>
-          <button onClick={onConfirm}
-            className={`flex-1 bg-red-600 text-white ${BTN_PRIMARY} hover:bg-red-700`}>
+          <button onClick={onConfirm} disabled={classifiedBlocking}
+            className={`flex-1 bg-red-600 text-white ${BTN_PRIMARY} hover:bg-red-700 disabled:opacity-40 disabled:pointer-events-none`}>
             <Square className="h-4 w-4" /> Fermer
           </button>
         </div>
