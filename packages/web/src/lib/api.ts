@@ -76,7 +76,6 @@ export const api = {
   equipments: (roomId?: string) => roomId ? request<Equipment[]>(`/ref/rooms/${roomId}/equipments`) : request<Equipment[]>("/ref/equipments"),
   products: () => request<Product[]>("/ref/products"),
   downtimeCategories: (eqType?: string) => request<DowntimeCategory[]>(`/ref/downtime-categories${eqType ? `?equipmentType=${eqType}` : ""}`),
-  phaseTemplates: (eqType?: string) => request<PhaseTemplate[]>(`/ref/phase-templates${eqType ? `?equipmentType=${eqType}` : ""}`),
   cadences: (equipmentId?: string) => request<ProductEquipmentCadence[]>(`/ref/cadences${equipmentId ? `?equipmentId=${equipmentId}` : ""}`),
 
   // Sessions
@@ -206,7 +205,6 @@ export interface Room { id: string; code: string; name: string; description: str
 export interface Equipment { id: string; roomId: string; code: string; name: string; equipmentType: string | null; trsObjective: string; defaultCadenceUnit: string }
 export interface Product { id: string; code: string; name: string; defaultCadence: string | null; cadenceUnit: string; unit: string }
 export interface DowntimeCategory { id: string; code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null }
-export interface PhaseTemplate { id: string; code: string; label: string; category: string; eventType: string; isPlanned: boolean; requiresComment: boolean; appliesToEquipmentType: string | null; sortOrder: number }
 
 export interface Session { id: string; equipmentId: string; roomId: string; operatorId: string; sessionDate: string; openedAt: string; closedAt: string | null; status: string; notes: string | null }
 export interface SessionEvent { id: string; sessionId: string; eventType: string; label: string | null; startedAt: string; endedAt: string | null; durationMinutes: number | null; isPlanned: boolean; lotEntryId: string | null; sortOrder: number; comment: string | null }

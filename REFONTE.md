@@ -43,6 +43,14 @@ TRS = tU/tR · DO = tF/tR · TP = tN/tF · TQ = conforme/produite
 4. 1 phase = 1 commit = `typecheck` + tests engine + capture.
 5. Migration de données : ex-phases planifiées → arrêts planifiés (conservés).
 
+## Code hérité conservé (déprécié, non supprimé)
+- **`phase_templates` + `session_events`** : tables et onglet Admin « Phases » **conservés**
+  (migration additive, pas de DROP). Raisons : (a) d'anciennes phases planifiées
+  (`session_events.isPlanned`) alimentent encore tAP pendant la transition ; (b) l'onglet
+  Admin reste pour consulter ces données historiques (libellé « Hérité »). L'opérateur ne crée
+  plus de phases. Le client `api.phaseTemplates` (ref) et le type `PhaseTemplate` ont été retirés
+  (plus aucun appelant). Sunset possible une fois les données historiques purgées.
+
 ## Avancement
 - [x] **Phase 0** — Filet de sécurité (branche + baseline verte : typecheck OK, 50 tests engine)
 - [x] **Phase 1** — Visuel standardisé Géluleuse/Blistéreuse

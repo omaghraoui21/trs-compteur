@@ -711,9 +711,10 @@ function PhasesPanel() {
     <div>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
         <div>
-          <p className="text-sm text-gray-500">{items.length} phases configurées</p>
+          <p className="text-sm text-gray-500">{items.length} phases configurées <span className="ml-1 align-middle text-[10px] font-semibold uppercase bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Hérité</span></p>
           <p className="text-xs text-gray-400 mt-1">
-            Les phases planifiées s'affichent dans « Ajouter une phase » selon l'équipement.
+            Modèle hérité. L'opérateur ne saisit plus de phases : tout est déclaré via
+            « Déclarer un arrêt » (planifié / non planifié). Conservé pour les données historiques.
           </p>
         </div>
         <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary shrink-0"><Plus className="h-4 w-4" /> Ajouter</button>
@@ -788,8 +789,8 @@ function PhasesPanel() {
       ))}
 
       <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200 text-xs text-blue-700">
-        <h4 className="text-sm font-semibold text-blue-800 mb-1">Phases vs Arrêts</h4>
-        <p>Les <strong>phases</strong> (production, nettoyage, changement, arrêt planifié) sont des activités planifiées de la session. Les arrêts planifiés réduisent le temps requis (tR). Les <strong>arrêts non planifiés</strong> (pannes, attentes) se déclarent sur un lot via l'onglet « Arrêts » car ils réduisent le temps de fonctionnement (tF).</p>
+        <h4 className="text-sm font-semibold text-blue-800 mb-1">Modèle actuel : tout est un arrêt</h4>
+        <p>La notion de <strong>phase</strong> est <strong>héritée</strong>. Désormais l'opérateur ne déclare que des <strong>arrêts planifiés</strong> (changement de série, nettoyage, pause, maintenance préventive → réduisent le temps requis tR) et des <strong>arrêts non planifiés</strong> (pannes, attentes → réduisent le temps de fonctionnement tF). Le temps de marche est le reste. Cet onglet ne sert qu'à gérer d'anciennes données de phase et peut rester vide.</p>
       </div>
     </div>
   );
