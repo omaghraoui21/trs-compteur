@@ -50,4 +50,4 @@ TRS = tU/tR · DO = tF/tR · TP = tN/tF · TQ = conforme/produite
 - [x] **Phase 3** — Refonte Arrêts (DB + API + engine + opérateur + migration données)
 - [x] **Phase 4** — Cadence modifiable pendant le lot (+ historique)
 - [x] **Phase 5** — Validation superviseur enrichie
-- [ ] **Phase 6** — Clôture : rebuild handler, typecheck, tests, `/verify`, `/simplify`, `/loop`
+- [x] **Phase 6** — Clôture : rebuild handler, typecheck, tests, `/verify`, `/simplify`, `/loop`
