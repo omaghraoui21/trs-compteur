@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { api, type LotEntry, type Product, type LotDowntime } from "@/lib/api";
+import { api, type LotEntry, type Product, type LotDowntime, type CadenceChange } from "@/lib/api";
 import { fmtPct, trsColor, diffMinutes, fmtDuration as fmtMinutes } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton, Skeleton } from "@/components/Skeleton";
@@ -30,6 +30,7 @@ export default function SupervisorPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [lotDowntimes, setLotDowntimes] = useState<Record<string, LotDowntime[]>>({});
+  const [lotCadence, setLotCadence] = useState<Record<string, CadenceChange[]>>({});
   const [loadingDowntimesId, setLoadingDowntimesId] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [pendingSign, setPendingSign] = useState<{ lotId: string; action: "validate" | "reject" } | null>(null);
@@ -63,10 +64,12 @@ export default function SupervisorPage() {
     if (lotDowntimes[lotId] !== undefined) return; // cached
     setLoadingDowntimesId(lotId);
     try {
-      const dts = await api.lotDowntimes(lotId);
+      const [dts, cad] = await Promise.all([api.lotDowntimes(lotId), api.lotCadenceHistory(lotId)]);
       setLotDowntimes(prev => ({ ...prev, [lotId]: dts }));
+      setLotCadence(prev => ({ ...prev, [lotId]: cad }));
     } catch {
       setLotDowntimes(prev => ({ ...prev, [lotId]: [] }));
+      setLotCadence(prev => ({ ...prev, [lotId]: [] }));
     } finally {
       setLoadingDowntimesId(null);
     }
@@ -152,6 +155,18 @@ export default function SupervisorPage() {
 
           const dts = lotDowntimes[lot.id];
           const totalDowntimeMin = dts ? dts.reduce((s, d) => s + d.durationMinutes, 0) : null;
+          const plannedMin = dts ? dts.filter(d => d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0) : 0;
+          const unplannedMin = dts ? dts.filter(d => !d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0) : 0;
+          const cadChanges = lotCadence[lot.id] ?? [];
+          const lotDurationMin = lot.endedAt ? diffMinutes(lot.startedAt, lot.endedAt) : null;
+
+          // Deeper coherence checks (available once details are loaded).
+          if (lotDurationMin !== null && totalDowntimeMin !== null && totalDowntimeMin > lotDurationMin) {
+            errors.push(`Arrêts (${totalDowntimeMin} min) > durée du lot (${lotDurationMin} min)`);
+          }
+          if (cadChanges.length > 0) {
+            warnings.push(`Cadence modifiée ${cadChanges.length} fois en cours de lot — à vérifier`);
+          }
 
           return (
             <div key={lot.id} className="bg-white rounded-xl border shadow-sm overflow-hidden">
@@ -214,12 +229,30 @@ export default function SupervisorPage() {
                     )}
                   </div>
 
+                  {/* Cadence change history (audit) */}
+                  {cadChanges.length > 0 && (
+                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-2">
+                      <div className="text-xs font-semibold text-blue-800 mb-1">Cadence modifiée {cadChanges.length}×</div>
+                      <div className="space-y-0.5">
+                        {cadChanges.map(c => (
+                          <div key={c.id} className="text-[11px] text-blue-700 flex items-center gap-1.5">
+                            <span className="font-mono">{Number(c.oldCadence)} → {Number(c.newCadence)} {c.cadenceUnit}</span>
+                            {c.reason && <span className="text-blue-400">· {c.reason}</span>}
+                            <span className="text-blue-300 ml-auto">{new Date(c.changedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Downtime events */}
                   <div>
                     <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
                       Arrêts enregistrés
                       {totalDowntimeMin !== null && totalDowntimeMin > 0 && (
-                        <span className="ml-1 font-normal text-gray-400">— {totalDowntimeMin} min total</span>
+                        <span className="ml-1 font-normal text-gray-400">
+                          — {totalDowntimeMin} min · <span className="text-amber-600">planifié {plannedMin}</span> · <span className="text-red-600">non planifié {unplannedMin}</span>
+                        </span>
                       )}
                     </div>
                     {loadingDowntimesId === lot.id && (
