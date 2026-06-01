@@ -106,6 +106,43 @@ export default function SupervisorPage() {
 
   const productMap = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
 
+  // Per-lot derived values + coherence checks, computed once per data change
+  // (not on every render). Keyed by lot id.
+  const lotDerived = useMemo(() => {
+    const m = new Map<string, {
+      tq: number | null; errors: string[]; warnings: string[];
+      dts: LotDowntime[] | undefined; totalDowntimeMin: number | null;
+      plannedMin: number; unplannedMin: number; cadChanges: CadenceChange[]; lotDurationMin: number | null;
+    }>();
+    for (const lot of lots) {
+      const rejectRate = lot.quantityProduced > 0 ? lot.quantityRejected / lot.quantityProduced : 0;
+      const tq = lot.quantityProduced > 0 ? lot.quantityConforming / lot.quantityProduced : null;
+      const errors: string[] = [];
+      const warnings: string[] = [];
+      if (lot.quantityConforming > lot.quantityProduced) errors.push("Conforme > Produit");
+      if (lot.quantityProduced === 0) errors.push("Production nulle");
+      if (Number(lot.cadenceUsed) <= 0) errors.push("Cadence absente");
+      if (rejectRate > 0.05) warnings.push(`Taux rebut élevé: ${(rejectRate * 100).toFixed(1)}%`);
+
+      const dts = lotDowntimes[lot.id];
+      const totalDowntimeMin = dts ? dts.reduce((s, d) => s + d.durationMinutes, 0) : null;
+      const plannedMin = dts ? dts.filter(d => d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0) : 0;
+      const unplannedMin = dts ? dts.filter(d => !d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0) : 0;
+      const cadChanges = lotCadence[lot.id] ?? [];
+      const lotDurationMin = lot.endedAt ? diffMinutes(lot.startedAt, lot.endedAt) : null;
+
+      // Deeper coherence checks (available once details are loaded).
+      if (lotDurationMin !== null && totalDowntimeMin !== null && totalDowntimeMin > lotDurationMin) {
+        errors.push(`Arrêts (${totalDowntimeMin} min) > durée du lot (${lotDurationMin} min)`);
+      }
+      if (cadChanges.length > 0) {
+        warnings.push(`Cadence modifiée ${cadChanges.length} fois en cours de lot — à vérifier`);
+      }
+      m.set(lot.id, { tq, errors, warnings, dts, totalDowntimeMin, plannedMin, unplannedMin, cadChanges, lotDurationMin });
+    }
+    return m;
+  }, [lots, lotDowntimes, lotCadence]);
+
   return (
     <div
       className="max-w-2xl mx-auto"
@@ -143,30 +180,7 @@ export default function SupervisorPage() {
         {lots.map(lot => {
           const product = productMap.get(lot.productId);
           const isExpanded = expanded === lot.id;
-          const rejectRate = lot.quantityProduced > 0 ? lot.quantityRejected / lot.quantityProduced : 0;
-          const tq = lot.quantityProduced > 0 ? lot.quantityConforming / lot.quantityProduced : null;
-
-          const errors: string[] = [];
-          const warnings: string[] = [];
-          if (lot.quantityConforming > lot.quantityProduced) errors.push("Conforme > Produit");
-          if (lot.quantityProduced === 0) errors.push("Production nulle");
-          if (Number(lot.cadenceUsed) <= 0) errors.push("Cadence absente");
-          if (rejectRate > 0.05) warnings.push(`Taux rebut élevé: ${(rejectRate * 100).toFixed(1)}%`);
-
-          const dts = lotDowntimes[lot.id];
-          const totalDowntimeMin = dts ? dts.reduce((s, d) => s + d.durationMinutes, 0) : null;
-          const plannedMin = dts ? dts.filter(d => d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0) : 0;
-          const unplannedMin = dts ? dts.filter(d => !d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0) : 0;
-          const cadChanges = lotCadence[lot.id] ?? [];
-          const lotDurationMin = lot.endedAt ? diffMinutes(lot.startedAt, lot.endedAt) : null;
-
-          // Deeper coherence checks (available once details are loaded).
-          if (lotDurationMin !== null && totalDowntimeMin !== null && totalDowntimeMin > lotDurationMin) {
-            errors.push(`Arrêts (${totalDowntimeMin} min) > durée du lot (${lotDurationMin} min)`);
-          }
-          if (cadChanges.length > 0) {
-            warnings.push(`Cadence modifiée ${cadChanges.length} fois en cours de lot — à vérifier`);
-          }
+          const { tq, errors, warnings, dts, totalDowntimeMin, plannedMin, unplannedMin, cadChanges } = lotDerived.get(lot.id)!;
 
           return (
             <div key={lot.id} className="bg-white rounded-xl border shadow-sm overflow-hidden">
