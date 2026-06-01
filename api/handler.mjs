@@ -32893,10 +32893,10 @@ function pgEnumWithSchema(enumName, values2, schema) {
 // node_modules/.pnpm/drizzle-orm@0.38.4_@types+react@19.2.15_postgres@3.4.9_react@19.2.6/node_modules/drizzle-orm/subquery.js
 var Subquery = class {
   static [entityKind] = "Subquery";
-  constructor(sql3, selection, alias, isWith = false) {
+  constructor(sql2, selection, alias, isWith = false) {
     this._ = {
       brand: "Subquery",
-      sql: sql3,
+      sql: sql2,
       selectedFields: selection,
       alias,
       isWith
@@ -33283,19 +33283,19 @@ function sql(strings, ...params) {
   }
   return new SQL(queryChunks);
 }
-((sql22) => {
+((sql2) => {
   function empty() {
     return new SQL([]);
   }
-  sql22.empty = empty;
+  sql2.empty = empty;
   function fromList(list) {
     return new SQL(list);
   }
-  sql22.fromList = fromList;
+  sql2.fromList = fromList;
   function raw(str) {
     return new SQL([new StringChunk(str)]);
   }
-  sql22.raw = raw;
+  sql2.raw = raw;
   function join(chunks, separator) {
     const result = [];
     for (const [i, chunk] of chunks.entries()) {
@@ -33306,24 +33306,24 @@ function sql(strings, ...params) {
     }
     return new SQL(result);
   }
-  sql22.join = join;
+  sql2.join = join;
   function identifier(value) {
     return new Name(value);
   }
-  sql22.identifier = identifier;
+  sql2.identifier = identifier;
   function placeholder2(name2) {
     return new Placeholder(name2);
   }
-  sql22.placeholder = placeholder2;
+  sql2.placeholder = placeholder2;
   function param2(value, encoder) {
     return new Param(value, encoder);
   }
-  sql22.param = param2;
+  sql2.param = param2;
 })(sql || (sql = {}));
 ((SQL2) => {
   class Aliased {
-    constructor(sql22, fieldAlias) {
-      this.sql = sql22;
+    constructor(sql2, fieldAlias) {
+      this.sql = sql2;
       this.fieldAlias = fieldAlias;
     }
     static [entityKind] = "SQL.Aliased";
@@ -36935,7 +36935,7 @@ var noop2 = () => {
 function Subscribe(postgres2, options) {
   const subscribers = /* @__PURE__ */ new Map(), slot = "postgresjs_" + Math.random().toString(36).slice(2), state = {};
   let connection2, stream, ended = false;
-  const sql3 = subscribe.sql = postgres2({
+  const sql2 = subscribe.sql = postgres2({
     ...options,
     transform: { column: {}, value: {}, row: {} },
     max: 1,
@@ -36951,18 +36951,18 @@ function Subscribe(postgres2, options) {
         return;
       stream = null;
       state.pid = state.secret = void 0;
-      connected(await init(sql3, slot, options.publications));
+      connected(await init(sql2, slot, options.publications));
       subscribers.forEach((event) => event.forEach(({ onsubscribe }) => onsubscribe()));
     },
     no_subscribe: true
   });
-  const end = sql3.end, close = sql3.close;
-  sql3.end = async () => {
+  const end = sql2.end, close = sql2.close;
+  sql2.end = async () => {
     ended = true;
     stream && await new Promise((r) => (stream.once("close", r), stream.end()));
     return end();
   };
-  sql3.close = async () => {
+  sql2.close = async () => {
     stream && await new Promise((r) => (stream.once("close", r), stream.end()));
     return close();
   };
@@ -36970,7 +36970,7 @@ function Subscribe(postgres2, options) {
   async function subscribe(event, fn, onsubscribe = noop2, onerror = noop2) {
     event = parseEvent(event);
     if (!connection2)
-      connection2 = init(sql3, slot, options.publications);
+      connection2 = init(sql2, slot, options.publications);
     const subscriber = { fn, onsubscribe };
     const fns = subscribers.has(event) ? subscribers.get(event).add(subscriber) : subscribers.set(event, /* @__PURE__ */ new Set([subscriber])).get(event);
     const unsubscribe = () => {
@@ -36981,7 +36981,7 @@ function Subscribe(postgres2, options) {
       connected(x);
       onsubscribe();
       stream && stream.on("error", onerror);
-      return { unsubscribe, state, sql: sql3 };
+      return { unsubscribe, state, sql: sql2 };
     });
   }
   function connected(x) {
@@ -36989,14 +36989,14 @@ function Subscribe(postgres2, options) {
     state.pid = x.state.pid;
     state.secret = x.state.secret;
   }
-  async function init(sql4, slot2, publications) {
+  async function init(sql3, slot2, publications) {
     if (!publications)
       throw new Error("Missing publication names");
-    const xs = await sql4.unsafe(
+    const xs = await sql3.unsafe(
       `CREATE_REPLICATION_SLOT ${slot2} TEMPORARY LOGICAL pgoutput NOEXPORT_SNAPSHOT`
     );
     const [x] = xs;
-    const stream2 = await sql4.unsafe(
+    const stream2 = await sql3.unsafe(
       `START_REPLICATION SLOT ${slot2} LOGICAL ${x.consistent_point} (proto_version '1', publication_names '${publications}')`
     ).writable();
     const state2 = {
@@ -37004,14 +37004,14 @@ function Subscribe(postgres2, options) {
     };
     stream2.on("data", data);
     stream2.on("error", error);
-    stream2.on("close", sql4.close);
+    stream2.on("close", sql3.close);
     return { stream: stream2, state: xs.state };
     function error(e) {
       console.error("Unexpected error during logical streaming - reconnecting", e);
     }
     function data(x2) {
       if (x2[0] === 119) {
-        parse(x2.subarray(25), state2, sql4.options.parsers, handle, options.transform);
+        parse(x2.subarray(25), state2, sql3.options.parsers, handle, options.transform);
       } else if (x2[0] === 107 && x2[17]) {
         state2.lsn = x2.subarray(1, 9);
         pong();
@@ -37143,22 +37143,22 @@ function parseEvent(x) {
 
 // node_modules/.pnpm/postgres@3.4.9/node_modules/postgres/src/large.js
 import Stream2 from "stream";
-function largeObject(sql3, oid, mode = 131072 | 262144) {
+function largeObject(sql2, oid, mode = 131072 | 262144) {
   return new Promise(async (resolve, reject) => {
-    await sql3.begin(async (sql4) => {
+    await sql2.begin(async (sql3) => {
       let finish;
-      !oid && ([{ oid }] = await sql4`select lo_creat(-1) as oid`);
-      const [{ fd }] = await sql4`select lo_open(${oid}, ${mode}) as fd`;
+      !oid && ([{ oid }] = await sql3`select lo_creat(-1) as oid`);
+      const [{ fd }] = await sql3`select lo_open(${oid}, ${mode}) as fd`;
       const lo = {
         writable,
         readable,
-        close: () => sql4`select lo_close(${fd})`.then(finish),
-        tell: () => sql4`select lo_tell64(${fd})`,
-        read: (x) => sql4`select loread(${fd}, ${x}) as data`,
-        write: (x) => sql4`select lowrite(${fd}, ${x})`,
-        truncate: (x) => sql4`select lo_truncate64(${fd}, ${x})`,
-        seek: (x, whence = 0) => sql4`select lo_lseek64(${fd}, ${x}, ${whence})`,
-        size: () => sql4`
+        close: () => sql3`select lo_close(${fd})`.then(finish),
+        tell: () => sql3`select lo_tell64(${fd})`,
+        read: (x) => sql3`select loread(${fd}, ${x}) as data`,
+        write: (x) => sql3`select lowrite(${fd}, ${x})`,
+        truncate: (x) => sql3`select lo_truncate64(${fd}, ${x})`,
+        seek: (x, whence = 0) => sql3`select lo_lseek64(${fd}, ${x}, ${whence})`,
+        size: () => sql3`
           select
             lo_lseek64(${fd}, location, 0) as position,
             seek.size
@@ -37233,12 +37233,12 @@ function Postgres(a, b2) {
   let ending = false;
   const queries = queue_default(), connecting = queue_default(), reserved = queue_default(), closed = queue_default(), ended = queue_default(), open = queue_default(), busy = queue_default(), full = queue_default(), queues = { connecting, reserved, closed, ended, open, busy, full };
   const connections = [...Array(options.max)].map(() => connection_default(options, queues, { onopen, onend, onclose }));
-  const sql3 = Sql(handler);
-  Object.assign(sql3, {
+  const sql2 = Sql(handler);
+  Object.assign(sql2, {
     get parameters() {
       return options.parameters;
     },
-    largeObject: largeObject.bind(null, sql3),
+    largeObject: largeObject.bind(null, sql2),
     subscribe,
     CLOSE,
     END: CLOSE,
@@ -37250,14 +37250,14 @@ function Postgres(a, b2) {
     close,
     end
   });
-  return sql3;
+  return sql2;
   function Sql(handler2) {
     handler2.debug = options.debug;
     Object.entries(options.types).reduce((acc, [name, type]) => {
       acc[name] = (x) => new Parameter(x, type.to);
       return acc;
     }, typed);
-    Object.assign(sql4, {
+    Object.assign(sql3, {
       types: typed,
       typed,
       unsafe,
@@ -37266,11 +37266,11 @@ function Postgres(a, b2) {
       json: json2,
       file
     });
-    return sql4;
+    return sql3;
     function typed(value, type) {
       return new Parameter(value, type);
     }
-    function sql4(strings, ...args) {
+    function sql3(strings, ...args) {
       const query = strings && Array.isArray(strings.raw) ? new Query(strings, args, handler2, cancel) : typeof strings === "string" && !args.length ? new Identifier(options.transform.column.to ? options.transform.column.to(strings) : strings) : new Builder(strings, args);
       return query;
     }
@@ -37301,7 +37301,7 @@ function Postgres(a, b2) {
   }
   async function listen(name, fn, onlisten) {
     const listener = { fn, onlisten };
-    const sql4 = listen.sql || (listen.sql = Postgres({
+    const sql3 = listen.sql || (listen.sql = Postgres({
       ...options,
       max: 1,
       idle_timeout: null,
@@ -37325,7 +37325,7 @@ function Postgres(a, b2) {
       listener.onlisten && listener.onlisten();
       return { state: result2.state, unlisten };
     }
-    channels[name] = { result: sql4`listen ${sql4.unsafe('"' + name.replace(/"/g, '""') + '"')}`, listeners: [listener] };
+    channels[name] = { result: sql3`listen ${sql3.unsafe('"' + name.replace(/"/g, '""') + '"')}`, listeners: [listener] };
     const result = await channels[name].result;
     listener.onlisten && listener.onlisten();
     return { state: result.state, unlisten };
@@ -37336,11 +37336,11 @@ function Postgres(a, b2) {
       if (channels[name].listeners.length)
         return;
       delete channels[name];
-      return sql4`unlisten ${sql4.unsafe('"' + name.replace(/"/g, '""') + '"')}`;
+      return sql3`unlisten ${sql3.unsafe('"' + name.replace(/"/g, '""') + '"')}`;
     }
   }
   async function notify(channel, payload) {
-    return await sql3`select pg_notify(${channel}, ${"" + payload})`;
+    return await sql2`select pg_notify(${channel}, ${"" + payload})`;
   }
   async function reserve() {
     const queue = queue_default();
@@ -37352,12 +37352,12 @@ function Postgres(a, b2) {
     move(c, reserved);
     c.reserved = () => queue.length ? c.execute(queue.shift()) : move(c, reserved);
     c.reserved.release = true;
-    const sql4 = Sql(handler2);
-    sql4.release = () => {
+    const sql3 = Sql(handler2);
+    sql3.release = () => {
       c.reserved = null;
       onopen(c);
     };
-    return sql4;
+    return sql3;
     function handler2(q) {
       c.queue === full ? queue.push(q) : c.execute(q) || move(c, full);
     }
@@ -37367,7 +37367,7 @@ function Postgres(a, b2) {
     const queries2 = queue_default();
     let savepoints = 0, connection2, prepare = null;
     try {
-      await sql3.unsafe("begin " + options2.replace(/[^a-z ]/ig, ""), [], { onexecute }).execute();
+      await sql2.unsafe("begin " + options2.replace(/[^a-z ]/ig, ""), [], { onexecute }).execute();
       return await Promise.race([
         scope(connection2, fn),
         new Promise((_, reject) => connection2.onclose = reject)
@@ -37376,29 +37376,29 @@ function Postgres(a, b2) {
       throw error;
     }
     async function scope(c, fn2, name) {
-      const sql4 = Sql(handler2);
-      sql4.savepoint = savepoint;
-      sql4.prepare = (x) => prepare = x.replace(/[^a-z0-9$-_. ]/gi);
+      const sql3 = Sql(handler2);
+      sql3.savepoint = savepoint;
+      sql3.prepare = (x) => prepare = x.replace(/[^a-z0-9$-_. ]/gi);
       let uncaughtError, result;
-      name && await sql4`savepoint ${sql4(name)}`;
+      name && await sql3`savepoint ${sql3(name)}`;
       try {
         result = await new Promise((resolve, reject) => {
-          const x = fn2(sql4);
+          const x = fn2(sql3);
           Promise.resolve(Array.isArray(x) ? Promise.all(x) : x).then(resolve, reject);
         });
         if (uncaughtError)
           throw uncaughtError;
       } catch (e) {
-        await (name ? sql4`rollback to ${sql4(name)}` : sql4`rollback`);
+        await (name ? sql3`rollback to ${sql3(name)}` : sql3`rollback`);
         throw e instanceof PostgresError && e.code === "25P02" && uncaughtError || e;
       }
       if (!name) {
-        prepare ? await sql4`prepare transaction '${sql4.unsafe(prepare)}'` : await sql4`commit`;
+        prepare ? await sql3`prepare transaction '${sql3.unsafe(prepare)}'` : await sql3`commit`;
       }
       return result;
       function savepoint(name2, fn3) {
         if (name2 && Array.isArray(name2.raw))
-          return savepoint((sql5) => sql5.apply(sql5, arguments));
+          return savepoint((sql4) => sql4.apply(sql4, arguments));
         arguments.length === 1 && (fn3 = name2, name2 = null);
         return scope(c, fn3, "s" + savepoints++ + (name2 ? "_" + name2 : ""));
       }
@@ -38129,8 +38129,8 @@ var PgDialect = class {
       return "none";
     }
   }
-  sqlToQuery(sql22, invokeSource) {
-    return sql22.toQuery({
+  sqlToQuery(sql2, invokeSource) {
+    return sql2.toQuery({
       casing: this.casing,
       escapeName: this.escapeName,
       escapeParam: this.escapeParam,
@@ -40321,10 +40321,10 @@ var PgRelationalQuery = class extends QueryPromise {
 
 // node_modules/.pnpm/drizzle-orm@0.38.4_@types+react@19.2.15_postgres@3.4.9_react@19.2.6/node_modules/drizzle-orm/pg-core/query-builders/raw.js
 var PgRaw = class extends QueryPromise {
-  constructor(execute, sql3, query, mapBatchResult) {
+  constructor(execute, sql2, query, mapBatchResult) {
     super();
     this.execute = execute;
-    this.sql = sql3;
+    this.sql = sql2;
     this.query = query;
     this.mapBatchResult = mapBatchResult;
   }
@@ -40778,8 +40778,8 @@ var PgSession = class {
     ).all();
   }
   /** @internal */
-  async count(sql22, token) {
-    const res = await this.execute(sql22, token);
+  async count(sql2, token) {
+    const res = await this.execute(sql2, token);
     return Number(
       res[0]["count"]
     );
@@ -41017,6 +41017,7 @@ __export(schema_exports, {
   electronicSignatures: () => electronicSignatures,
   equipments: () => equipments,
   eventTypeEnum: () => eventTypeEnum,
+  lotCadenceChanges: () => lotCadenceChanges,
   lotEntries: () => lotEntries,
   lotStatusEnum: () => lotStatusEnum,
   phaseTemplates: () => phaseTemplates,
@@ -41211,7 +41212,10 @@ var lotEntries = pgTable("lot_entries", {
 ]);
 var downtimeEvents = pgTable("downtime_events", {
   id: uuid("id").primaryKey().defaultRandom(),
-  lotEntryId: uuid("lot_entry_id").notNull().references(() => lotEntries.id, { onDelete: "cascade" }),
+  // A stop is attached to a lot (during production) OR to the session
+  // (inter-lot: changeover, cleaning, waiting). At least one is set.
+  lotEntryId: uuid("lot_entry_id").references(() => lotEntries.id, { onDelete: "cascade" }),
+  sessionId: uuid("session_id").references(() => sessions.id, { onDelete: "cascade" }),
   categoryId: uuid("category_id").notNull().references(() => downtimeCategories.id),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   endedAt: timestamp("ended_at", { withTimezone: true }),
@@ -41224,7 +41228,20 @@ var downtimeEvents = pgTable("downtime_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 }, (t) => [
   index("idx_downtime_events_lot").on(t.lotEntryId),
+  index("idx_downtime_events_session").on(t.sessionId),
   index("idx_downtime_events_category").on(t.categoryId)
+]);
+var lotCadenceChanges = pgTable("lot_cadence_changes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  lotEntryId: uuid("lot_entry_id").notNull().references(() => lotEntries.id, { onDelete: "cascade" }),
+  oldCadence: numeric("old_cadence", { precision: 10, scale: 2 }).notNull(),
+  newCadence: numeric("new_cadence", { precision: 10, scale: 2 }).notNull(),
+  cadenceUnit: text("cadence_unit").notNull().default("u/min"),
+  reason: text("reason"),
+  changedBy: uuid("changed_by").references(() => users.id),
+  changedAt: timestamp("changed_at", { withTimezone: true }).notNull().defaultNow()
+}, (t) => [
+  index("idx_lot_cadence_changes_lot").on(t.lotEntryId)
 ]);
 var dailySummaries = pgTable("daily_summaries", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -41331,6 +41348,80 @@ function createDb(url = connectionString) {
 
 // packages/api/src/lib/seed.ts
 var import_bcryptjs = __toESM(require_bcryptjs(), 1);
+
+// packages/api/src/lib/referenceData.ts
+var roomData = [
+  { code: "LOCAL-BLI", name: "Local Blistereuse", description: "Salle de conditionnement sous blisters" },
+  { code: "LOCAL-GEL", name: "Local G\xE9luleuse", description: "Salle de remplissage g\xE9lules" }
+];
+var equipmentData = [
+  { roomCode: "LOCAL-BLI", code: "BLI-IMA-TR135S", name: "Blistereuse IMA TR135S", equipmentType: "blistereuse", trsObjective: "75", defaultCadenceUnit: "u/min" },
+  { roomCode: "LOCAL-GEL", code: "GEL-HH-MODUC", name: "G\xE9luleuse Harro H\xF6fliger Modu-C", equipmentType: "geluleuse", trsObjective: "75", defaultCadenceUnit: "u/min" }
+];
+var productData = [
+  { code: "AEROFOR-12", name: "Aerofor 12\xB5g", defaultCadence: "100", cadenceUnit: "u/min", unit: "blisters" },
+  { code: "AERONIDE-200", name: "Aeronide 200\xB5g", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" },
+  { code: "AERONIDE-400", name: "Aeronide 400\xB5g", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" },
+  { code: "COMBIFOR-12-200", name: "Combifor 12/200\xB5g", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" },
+  { code: "COMBIFOR-12-400", name: "Combifor 12/400\xB5g", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" }
+];
+var cadenceData = [
+  { productCode: "AEROFOR-12", equipmentCode: "BLI-IMA-TR135S", cadence: "100", unit: "u/min" },
+  { productCode: "AERONIDE-200", equipmentCode: "BLI-IMA-TR135S", cadence: "120", unit: "u/min" },
+  { productCode: "AERONIDE-400", equipmentCode: "BLI-IMA-TR135S", cadence: "120", unit: "u/min" },
+  { productCode: "COMBIFOR-12-200", equipmentCode: "BLI-IMA-TR135S", cadence: "107", unit: "u/min" },
+  { productCode: "COMBIFOR-12-400", equipmentCode: "BLI-IMA-TR135S", cadence: "50", unit: "u/min" },
+  { productCode: "AEROFOR-12", equipmentCode: "GEL-HH-MODUC", cadence: "1020", unit: "u/min" },
+  { productCode: "AERONIDE-200", equipmentCode: "GEL-HH-MODUC", cadence: "1020", unit: "u/min" },
+  { productCode: "AERONIDE-400", equipmentCode: "GEL-HH-MODUC", cadence: "1020", unit: "u/min" },
+  { productCode: "COMBIFOR-12-200", equipmentCode: "GEL-HH-MODUC", cadence: "1020", unit: "u/min" },
+  { productCode: "COMBIFOR-12-400", equipmentCode: "GEL-HH-MODUC", cadence: "1020", unit: "u/min" }
+];
+var downtimeCategoryData = [
+  // ── NON PLANIFIÉ ──────────────────────────────────────────────────
+  // Panne équipement (Blistereuse AB- / Géluleuse AG-)
+  { code: "AB-BOUCHAGE", label: "Bouchage", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
+  { code: "AB-FORMAGE", label: "Probl\xE8me de formage", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
+  { code: "AB-DECOUPE", label: "Mauvaise d\xE9coupe", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
+  { code: "AB-SCELLAGE", label: "Probl\xE8me de scellage", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
+  { code: "AB-ENCODEUR", label: "Anomalie encodeur", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
+  { code: "AG-DOSAGE", label: "Probl\xE8me de dosage", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
+  { code: "AG-FERMETURE", label: "Probl\xE8me fermeture g\xE9lules", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
+  { code: "AG-ALIMENTATION", label: "Probl\xE8me alimentation g\xE9lules", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
+  // Intervention maintenance (corrective / DI = non planifié)
+  { code: "IM-CORRECTIVE", label: "Maintenance corrective", famille: "Intervention maintenance", isPlanned: false, appliesToEquipmentType: null },
+  { code: "IM-DI", label: "Demande d'intervention (DI)", famille: "Intervention maintenance", isPlanned: false, appliesToEquipmentType: null },
+  // Attente & transition
+  { code: "AI-MATIERE", label: "Attente mati\xE8re/article", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
+  { code: "AI-PERSONNEL", label: "Absence/manque effectif", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
+  { code: "AI-VALIDATION", label: "Attente validation CQ", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
+  { code: "AI-LIBERATION", label: "Lib\xE9ration AC", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
+  { code: "AI-SAGE", label: "Probl\xE8me connexion SAGE", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
+  { code: "AI-TEST", label: "Test machinabilit\xE9", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
+  // Utilités & environnement
+  { code: "UE-PURIFIEE", label: "Eau purifi\xE9e", famille: "Utilit\xE9s", isPlanned: false, appliesToEquipmentType: null },
+  { code: "UE-AIR", label: "Air comprim\xE9", famille: "Utilit\xE9s", isPlanned: false, appliesToEquipmentType: null },
+  { code: "UE-HVAC", label: "HVAC/Climatisation", famille: "Utilit\xE9s", isPlanned: false, appliesToEquipmentType: null },
+  // Contrôle qualité
+  { code: "CQ-IPC", label: "Contr\xF4le en cours (IPC)", famille: "Contr\xF4le qualit\xE9", isPlanned: false, appliesToEquipmentType: null },
+  { code: "CQ-RESERVE", label: "R\xE9serve conditionnement secondaire", famille: "Contr\xF4le qualit\xE9", isPlanned: false, appliesToEquipmentType: null },
+  { code: "CQ-RECONDITIONNEMENT", label: "Reconditionnement", famille: "Contr\xF4le qualit\xE9", isPlanned: false, appliesToEquipmentType: null },
+  // ── PLANIFIÉ (alimente tAP) ───────────────────────────────────────
+  { code: "IM-PREVENTIVE", label: "Maintenance pr\xE9ventive", famille: "Intervention maintenance", isPlanned: true, appliesToEquipmentType: null },
+  // ex-phases nettoyage (fusionnées dans les arrêts planifiés)
+  { code: "AP-NETT-PARTIEL", label: "Nettoyage planifi\xE9 partiel", famille: "Nettoyage planifi\xE9", isPlanned: true, appliesToEquipmentType: null },
+  { code: "AP-NETT-COMPLET", label: "Nettoyage planifi\xE9 complet", famille: "Nettoyage planifi\xE9", isPlanned: true, appliesToEquipmentType: null },
+  { code: "AP-VIDE-LIGNE", label: "Vide de ligne", famille: "Nettoyage planifi\xE9", isPlanned: true, appliesToEquipmentType: null },
+  // ex-phases changement de série
+  { code: "CH-CHSB", label: "Changement de s\xE9rie (CHSB)", famille: "Changement de s\xE9rie", isPlanned: true, appliesToEquipmentType: "blistereuse" },
+  { code: "CH-CHSG", label: "Changement de s\xE9rie (CHSG)", famille: "Changement de s\xE9rie", isPlanned: true, appliesToEquipmentType: "geluleuse" },
+  { code: "CH-FORMAT", label: "Changement de format", famille: "Changement de s\xE9rie", isPlanned: true, appliesToEquipmentType: null },
+  // ex-phases arrêt planifié
+  { code: "AP-PAUSE", label: "Pause r\xE9glementaire", famille: "Arr\xEAt planifi\xE9", isPlanned: true, appliesToEquipmentType: null },
+  { code: "AP-APR", label: "Arr\xEAt programm\xE9 r\xE9glementaire (APR)", famille: "Arr\xEAt planifi\xE9", isPlanned: true, appliesToEquipmentType: null }
+];
+
+// packages/api/src/lib/seed.ts
 async function seedIfEmpty(db2) {
   const existing = await db2.select().from(users).limit(1);
   if (existing.length > 0) return false;
@@ -41345,113 +41436,51 @@ async function seedIfEmpty(db2) {
     { email: "superviseur@dpi.local", passwordHash: supHash, displayName: "Superviseur DPI", role: "supervisor" },
     { email: "admin@dpi.local", passwordHash: admHash, displayName: "Admin DPI", role: "admin" }
   ]).onConflictDoNothing();
-  const [roomBli] = await db2.insert(rooms).values({
-    code: "LOCAL-BLI",
-    name: "Local Blistereuse",
-    description: "Salle de conditionnement sous blisters"
-  }).onConflictDoNothing().returning();
-  const [roomGel] = await db2.insert(rooms).values({
-    code: "LOCAL-GEL",
-    name: "Local G\xE9luleuse",
-    description: "Salle de remplissage g\xE9lules"
-  }).onConflictDoNothing().returning();
-  let eqBliId;
-  let eqGelId;
-  if (roomBli) {
-    const [r] = await db2.insert(equipments).values({
-      roomId: roomBli.id,
-      code: "BLI-IMA-TR135S",
-      name: "Blistereuse IMA TR135S",
-      equipmentType: "blistereuse",
-      trsObjective: "75",
-      defaultCadenceUnit: "u/min"
-    }).onConflictDoNothing().returning();
-    eqBliId = r?.id;
+  await seedReferenceData(db2);
+  console.log(`[seed] \u2713 Initial data loaded (3 users \xB7 ${roomData.length} salles \xB7 ${equipmentData.length} \xE9quipements \xB7 ${productData.length} produits \xB7 ${downtimeCategoryData.length} cat\xE9gories)`);
+  return true;
+}
+async function seedReferenceData(db2) {
+  const roomIds = {};
+  for (const r of roomData) {
+    const [row] = await db2.insert(rooms).values(r).onConflictDoNothing().returning();
+    if (row) roomIds[r.code] = row.id;
   }
-  if (roomGel) {
-    const [r] = await db2.insert(equipments).values({
-      roomId: roomGel.id,
-      code: "GEL-HH-MODUC",
-      name: "G\xE9luleuse Harro H\xF6fliger Modu-C",
-      equipmentType: "geluleuse",
-      trsObjective: "75",
-      defaultCadenceUnit: "u/min"
+  const equipmentIds = {};
+  for (const e of equipmentData) {
+    const roomId = roomIds[e.roomCode];
+    if (!roomId) continue;
+    const [row] = await db2.insert(equipments).values({
+      roomId,
+      code: e.code,
+      name: e.name,
+      equipmentType: e.equipmentType,
+      trsObjective: e.trsObjective,
+      defaultCadenceUnit: e.defaultCadenceUnit
     }).onConflictDoNothing().returning();
-    eqGelId = r?.id;
+    if (row) equipmentIds[e.code] = row.id;
   }
-  const productData = [
-    { code: "AEROFOR-12", name: "Aerofor 12\xB5g", defaultCadence: "100", cadenceUnit: "u/min", unit: "blisters" },
-    { code: "AERONIDE-200", name: "Aeronide 200\xB5g", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" },
-    { code: "AERONIDE-400", name: "Aeronide 400\xB5g", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" },
-    { code: "COMBIFOR-12-200", name: "Combifor 12/200\xB5g", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" },
-    { code: "COMBIFOR-12-400", name: "Combifor 12/400\xB5g", defaultCadence: "120", cadenceUnit: "u/min", unit: "blisters" }
-  ];
-  const insertedIds = {};
+  const productIds = {};
   for (const p of productData) {
-    const [r] = await db2.insert(products).values(p).onConflictDoNothing().returning();
-    if (r) insertedIds[p.code] = r.id;
+    const [row] = await db2.insert(products).values(p).onConflictDoNothing().returning();
+    if (row) productIds[p.code] = row.id;
   }
-  const cadences = [
-    { productCode: "AEROFOR-12", eqId: eqBliId, cadence: "100" },
-    { productCode: "AERONIDE-200", eqId: eqBliId, cadence: "120" },
-    { productCode: "AERONIDE-400", eqId: eqBliId, cadence: "120" },
-    { productCode: "COMBIFOR-12-200", eqId: eqBliId, cadence: "107" },
-    { productCode: "COMBIFOR-12-400", eqId: eqBliId, cadence: "50" },
-    { productCode: "AEROFOR-12", eqId: eqGelId, cadence: "1020" },
-    { productCode: "AERONIDE-200", eqId: eqGelId, cadence: "1020" },
-    { productCode: "AERONIDE-400", eqId: eqGelId, cadence: "1020" },
-    { productCode: "COMBIFOR-12-200", eqId: eqGelId, cadence: "1020" },
-    { productCode: "COMBIFOR-12-400", eqId: eqGelId, cadence: "1020" }
-  ];
-  for (const c of cadences) {
-    const productId = insertedIds[c.productCode];
-    if (productId && c.eqId) {
+  for (const c of cadenceData) {
+    const productId = productIds[c.productCode];
+    const equipmentId = equipmentIds[c.equipmentCode];
+    if (productId && equipmentId) {
       await db2.insert(productEquipmentCadences).values({
         productId,
-        equipmentId: c.eqId,
+        equipmentId,
         cadenceValue: c.cadence,
-        cadenceUnit: "u/min"
+        cadenceUnit: c.unit
       }).onConflictDoNothing();
     }
   }
-  const categories = [
-    { code: "AB-BOUCHAGE", label: "Bouchage", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
-    { code: "AB-FORMAGE", label: "Probl\xE8me de formage", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
-    { code: "AB-DECOUPE", label: "Mauvaise d\xE9coupe", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
-    { code: "AB-SCELLAGE", label: "Probl\xE8me de scellage", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
-    { code: "AB-ENCODEUR", label: "Anomalie encodeur", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "blistereuse" },
-    { code: "AG-DOSAGE", label: "Probl\xE8me de dosage", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
-    { code: "AG-FERMETURE", label: "Probl\xE8me fermeture g\xE9lules", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
-    { code: "AG-ALIMENTATION", label: "Alimentation g\xE9lules", famille: "Panne \xE9quipement", isPlanned: false, appliesToEquipmentType: "geluleuse" },
-    { code: "IM-PREVENTIVE", label: "Maintenance pr\xE9ventive", famille: "Intervention maintenance", isPlanned: true, appliesToEquipmentType: null },
-    { code: "IM-CORRECTIVE", label: "Maintenance corrective", famille: "Intervention maintenance", isPlanned: false, appliesToEquipmentType: null },
-    { code: "IM-DI", label: "Demande d'intervention (DI)", famille: "Intervention maintenance", isPlanned: false, appliesToEquipmentType: null },
-    { code: "AI-MATIERE", label: "Attente mati\xE8re/article", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
-    { code: "AI-PERSONNEL", label: "Absence/manque effectif", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
-    { code: "AI-VALIDATION", label: "Attente validation CQ", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
-    { code: "AI-LIBERATION", label: "Lib\xE9ration AC", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
-    { code: "AI-SAGE", label: "Probl\xE8me connexion SAGE", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
-    { code: "AI-TEST", label: "Test machinabilit\xE9", famille: "Attente et transition", isPlanned: false, appliesToEquipmentType: null },
-    { code: "UE-PURIFIEE", label: "Eau purifi\xE9e", famille: "Utilit\xE9s", isPlanned: false, appliesToEquipmentType: null },
-    { code: "UE-AIR", label: "Air comprim\xE9", famille: "Utilit\xE9s", isPlanned: false, appliesToEquipmentType: null },
-    { code: "UE-HVAC", label: "HVAC/Climatisation", famille: "Utilit\xE9s", isPlanned: false, appliesToEquipmentType: null },
-    { code: "CQ-IPC", label: "Contr\xF4le en cours (IPC)", famille: "Contr\xF4le qualit\xE9", isPlanned: false, appliesToEquipmentType: null },
-    { code: "CQ-RESERVE", label: "R\xE9serve conditionnement secondaire", famille: "Contr\xF4le qualit\xE9", isPlanned: false, appliesToEquipmentType: null },
-    { code: "CQ-RECONDITIONNEMENT", label: "Reconditionnement", famille: "Contr\xF4le qualit\xE9", isPlanned: false, appliesToEquipmentType: null },
-    // Arrêts planifiés (affectent tAP — alimentent la branche « Planifié »)
-    { code: "AP-NETT-PARTIEL", label: "Nettoyage planifi\xE9 partiel", famille: "Nettoyage planifi\xE9", isPlanned: true, appliesToEquipmentType: null },
-    { code: "AP-NETT-COMPLET", label: "Nettoyage planifi\xE9 complet", famille: "Nettoyage planifi\xE9", isPlanned: true, appliesToEquipmentType: null },
-    { code: "CH-CHSB", label: "Changement de s\xE9rie (CHSB)", famille: "Changement de s\xE9rie", isPlanned: true, appliesToEquipmentType: "blistereuse" },
-    { code: "CH-CHSG", label: "Changement de s\xE9rie (CHSG)", famille: "Changement de s\xE9rie", isPlanned: true, appliesToEquipmentType: "geluleuse" },
-    { code: "AP-PAUSE", label: "Pause r\xE9glementaire", famille: "Arr\xEAt planifi\xE9", isPlanned: true, appliesToEquipmentType: null },
-    { code: "AP-APR", label: "Arr\xEAt programm\xE9 r\xE9glementaire (APR)", famille: "Arr\xEAt planifi\xE9", isPlanned: true, appliesToEquipmentType: null }
-  ];
-  for (const c of categories) {
-    await db2.insert(downtimeCategories).values(c).onConflictDoNothing();
+  for (const cat of downtimeCategoryData) {
+    await db2.insert(downtimeCategories).values(cat).onConflictDoNothing();
   }
   await seedPhaseTemplates(db2);
-  console.log(`[seed] \u2713 Initial data loaded (3 users \xB7 2 salles \xB7 2 \xE9quipements \xB7 5 produits \xB7 ${categories.length} cat\xE9gories \xB7 12 phases)`);
-  return true;
 }
 async function seedPhaseTemplates(db2) {
   const phases = [
@@ -45669,6 +45698,23 @@ function computeLotTrs(input) {
   }
   return { lotDurationMin, plannedMin, unplannedMin, tF, tN, tU, nonQualiteMin, TP, TQ, cadencePerMin, ecartCadence, rebut, downtimeByFamille, downtimeByNorme, warnings };
 }
+function timeWeightedCadence(input) {
+  const start = new Date(input.startedAt).getTime();
+  const end = new Date(input.endedAt).getTime();
+  const total = end - start;
+  if (!(total > 0)) return input.initial;
+  const pts = input.changes.map((c) => ({ at: new Date(c.at).getTime(), c: c.cadencePerMin })).filter((p) => p.at > start && p.at < end).sort((a, b2) => a.at - b2.at);
+  let cursor = start;
+  let current = input.initial;
+  let acc = 0;
+  for (const p of pts) {
+    acc += (p.at - cursor) * current;
+    cursor = p.at;
+    current = p.c;
+  }
+  acc += (end - cursor) * current;
+  return acc / total;
+}
 function computeSessionTrs(input) {
   const warnings = [];
   const tO = diffMinutes(input.openedAt, input.closedAt);
@@ -45677,7 +45723,7 @@ function computeSessionTrs(input) {
   const tT = 1440;
   const fermeture = Math.max(0, tT - tO);
   const totalPlannedLotMin = input.lots.reduce((s, l) => s + (l.plannedMin ?? 0), 0);
-  const totalUnplannedMin = input.lots.reduce((s, l) => s + (l.unplannedMin ?? 0), 0);
+  const totalUnplannedMin = input.lots.reduce((s, l) => s + (l.unplannedMin ?? 0), 0) + (input.unplannedStopsMin ?? 0);
   const totalArrets = totalPlannedLotMin + totalUnplannedMin;
   const tF = Math.max(0, tR - totalArrets);
   const tF_lots = input.lots.reduce((s, l) => s + l.tF, 0);
@@ -45996,6 +46042,11 @@ var addDowntimeSchema = external_exports.object({
   isShortStop: external_exports.boolean().optional(),
   comment: external_exports.string().optional()
 });
+var changeCadenceSchema = external_exports.object({
+  newCadence: external_exports.number().positive("Cadence doit \xEAtre positive"),
+  cadenceUnit: external_exports.enum(["u/h", "u/min"]).optional(),
+  reason: external_exports.string().optional()
+});
 var validateLotSchema = external_exports.object({
   action: external_exports.enum(["validate", "reject"]),
   comment: external_exports.string().optional(),
@@ -46199,6 +46250,27 @@ authRouter.post("/change-password", authenticate, validate(changePasswordSchema)
 
 // packages/api/src/routes/sessions.ts
 var import_express2 = __toESM(require_express2(), 1);
+
+// packages/api/src/lib/cadence.ts
+var perMin = (v, unit) => unit === "u/min" ? v : v / 60;
+function effectiveLotCadence(lot, changes, fallbackEnd) {
+  if (!changes || changes.length === 0) {
+    return { cadence: Number(lot.cadenceUsed), cadenceUnit: lot.cadenceUnit };
+  }
+  const sorted = [...changes].sort(
+    (a, b2) => new Date(a.changedAt).getTime() - new Date(b2.changedAt).getTime()
+  );
+  const initial = perMin(Number(sorted[0].oldCadence), sorted[0].cadenceUnit);
+  const cadence = timeWeightedCadence({
+    startedAt: lot.startedAt,
+    endedAt: lot.endedAt ?? fallbackEnd,
+    initial,
+    changes: sorted.map((c) => ({ at: c.changedAt, cadencePerMin: perMin(Number(c.newCadence), c.cadenceUnit) }))
+  });
+  return { cadence, cadenceUnit: "u/min" };
+}
+
+// packages/api/src/routes/sessions.ts
 var sessionsRouter = (0, import_express2.Router)();
 sessionsRouter.use(authenticate);
 sessionsRouter.get("/", asyncHandler(async (req, res) => {
@@ -46220,8 +46292,9 @@ sessionsRouter.get("/:id", asyncHandler(async (req, res) => {
   const events = await db2.select().from(sessionEvents).where(eq(sessionEvents.sessionId, session.id)).orderBy(sessionEvents.sortOrder);
   const lots = await db2.select().from(lotEntries).where(eq(lotEntries.sessionId, session.id)).orderBy(lotEntries.lotOrder);
   const lotIds = lots.map((l) => l.id);
-  const allDowntimes = lotIds.length > 0 ? await db2.select().from(downtimeEvents).where(inArray(downtimeEvents.lotEntryId, lotIds)) : [];
-  res.json({ session, events, lots, downtimes: allDowntimes });
+  const lotDowntimes = lotIds.length > 0 ? await db2.select().from(downtimeEvents).where(inArray(downtimeEvents.lotEntryId, lotIds)) : [];
+  const sessionDowntimes = await db2.select().from(downtimeEvents).where(eq(downtimeEvents.sessionId, session.id));
+  res.json({ session, events, lots, downtimes: [...lotDowntimes, ...sessionDowntimes] });
 }));
 sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (req, res) => {
   const { db: db2, userId } = req;
@@ -46295,6 +46368,32 @@ sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async 
   }).returning();
   res.status(201).json(event);
 }));
+sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
+  const { db: db2, userId } = req;
+  const { categoryId, durationMinutes, isShortStop, comment } = req.body;
+  const sessionId = String(req.params.id);
+  const [session] = await db2.select({ id: sessions.id }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  if (!session) {
+    res.status(404).json({ error: "Session introuvable" });
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  const endedAt = new Date(now.getTime() + durationMinutes * 6e4);
+  const [dt] = await db2.insert(downtimeEvents).values({
+    sessionId,
+    lotEntryId: null,
+    categoryId,
+    startedAt: now,
+    endedAt,
+    durationMinutes,
+    status: "closed",
+    isShortStop: isShortStop ?? null,
+    comment,
+    createdBy: userId
+  }).returning();
+  await audit(db2, req, "ADD_SESSION_DOWNTIME", "downtime", dt.id, { sessionId, categoryId, durationMinutes });
+  res.status(201).json(dt);
+}));
 sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const [session] = await db2.select().from(sessions).where(eq(sessions.id, String(req.params.id))).limit(1);
@@ -46303,8 +46402,15 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
     return;
   }
   const closedAt = session.closedAt ?? /* @__PURE__ */ new Date();
+  const sessionDts = await db2.select({
+    durationMinutes: downtimeEvents.durationMinutes,
+    isPlanned: downtimeCategories.isPlanned
+  }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(and(eq(downtimeEvents.sessionId, session.id), isNull(downtimeEvents.lotEntryId)));
+  const sessionPlannedMin = sessionDts.filter((d) => d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0);
+  const sessionUnplannedMin = sessionDts.filter((d) => !d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0);
   const events = await db2.select().from(sessionEvents).where(and(eq(sessionEvents.sessionId, session.id), eq(sessionEvents.isPlanned, true)));
-  const plannedStopsMin = events.reduce((s, e) => s + (e.durationMinutes ?? 0), 0);
+  const legacyPhasePlannedMin = events.reduce((s, e) => s + (e.durationMinutes ?? 0), 0);
+  const plannedStopsMin = sessionPlannedMin + legacyPhasePlannedMin;
   const lots = await db2.select().from(lotEntries).where(eq(lotEntries.sessionId, session.id)).orderBy(lotEntries.lotOrder);
   const lotIds2 = lots.map((l) => l.id);
   const allDts = lotIds2.length > 0 ? await db2.select({
@@ -46315,14 +46421,20 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
   }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(inArray(downtimeEvents.lotEntryId, lotIds2)) : [];
   const dtsByLot = {};
   for (const dt of allDts) {
+    if (!dt.lotEntryId) continue;
     (dtsByLot[dt.lotEntryId] ??= []).push(dt);
   }
+  const cadenceChanges = lotIds2.length > 0 ? await db2.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds2)) : [];
+  const changesByLot = {};
+  for (const c of cadenceChanges) (changesByLot[c.lotEntryId] ??= []).push(c);
   const lotResults = [];
+  let lotsDurationMin = 0;
   for (const lot of lots) {
     const dts = dtsByLot[lot.id] ?? [];
+    const eff = effectiveLotCadence(lot, changesByLot[lot.id], closedAt);
     const lotTrs = computeLotTrs({
-      cadence: Number(lot.cadenceUsed),
-      cadenceUnit: lot.cadenceUnit,
+      cadence: eff.cadence,
+      cadenceUnit: eff.cadenceUnit,
       produced: lot.quantityProduced,
       conforming: lot.quantityConforming,
       startedAt: lot.startedAt,
@@ -46334,6 +46446,7 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
       }))
     });
     if (lotTrs) {
+      lotsDurationMin += lotTrs.lotDurationMin;
       lotResults.push({ ...lotTrs, produced: lot.quantityProduced, conforming: lot.quantityConforming, lotId: lot.id, batchNumber: lot.batchNumber });
     }
   }
@@ -46341,9 +46454,11 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
     openedAt: session.openedAt,
     closedAt,
     plannedStopsMin,
+    unplannedStopsMin: sessionUnplannedMin,
     lots: lotResults
   });
-  res.json({ session: sessionTrs, lots: lotResults });
+  const aClasserMin = Math.max(0, Math.round(sessionTrs.tO - lotsDurationMin - sessionPlannedMin - sessionUnplannedMin));
+  res.json({ session: sessionTrs, lots: lotResults, aClasserMin });
 }));
 
 // packages/api/src/routes/lots.ts
@@ -46449,6 +46564,38 @@ lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res
     return;
   }
   res.json(lot);
+}));
+lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(async (req, res) => {
+  const { db: db2, userId, userRole: userRole2 } = req;
+  const { newCadence, cadenceUnit: cadenceUnit2, reason } = req.body;
+  const lotId = String(req.params.id);
+  const [lot] = await db2.select().from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  if (!lot) {
+    res.status(404).json({ error: "Lot introuvable" });
+    return;
+  }
+  if (lot.status !== "active") throw new HttpError(409, "La cadence ne peut \xEAtre modifi\xE9e que sur un lot en cours");
+  if (userRole2 === "operator" && lot.operatorId !== userId) {
+    res.status(403).json({ error: "Acc\xE8s interdit" });
+    return;
+  }
+  const unit = cadenceUnit2 ?? lot.cadenceUnit;
+  await db2.insert(lotCadenceChanges).values({
+    lotEntryId: lotId,
+    oldCadence: String(lot.cadenceUsed),
+    newCadence: String(newCadence),
+    cadenceUnit: unit,
+    reason: reason ?? null,
+    changedBy: userId
+  });
+  const [updated] = await db2.update(lotEntries).set({ cadenceUsed: String(newCadence), cadenceUnit: unit }).where(eq(lotEntries.id, lotId)).returning();
+  await audit(db2, req, "CHANGE_CADENCE", "lot", lotId, { from: lot.cadenceUsed, to: newCadence, unit, reason });
+  res.json(updated);
+}));
+lotsRouter.get("/:id/cadence", asyncHandler(async (req, res) => {
+  const { db: db2 } = req;
+  const rows = await db2.select().from(lotCadenceChanges).where(eq(lotCadenceChanges.lotEntryId, String(req.params.id))).orderBy(lotCadenceChanges.changedAt);
+  res.json(rows);
 }));
 lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
   const { db: db2, userId } = req;
@@ -46586,8 +46733,21 @@ async function buildSessionsTrs(db2, sessionList) {
   const sessionIds = sessionList.map((s) => s.id);
   const events = await db2.select().from(sessionEvents).where(and(inArray(sessionEvents.sessionId, sessionIds), eq(sessionEvents.isPlanned, true)));
   const plannedBySession = /* @__PURE__ */ new Map();
+  const unplannedBySession = /* @__PURE__ */ new Map();
   for (const e of events) {
     plannedBySession.set(e.sessionId, (plannedBySession.get(e.sessionId) ?? 0) + (e.durationMinutes ?? 0));
+  }
+  const sessionDts = await db2.select({
+    sessionId: downtimeEvents.sessionId,
+    durationMinutes: downtimeEvents.durationMinutes,
+    isPlanned: downtimeCategories.isPlanned
+  }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(and(inArray(downtimeEvents.sessionId, sessionIds), isNull(downtimeEvents.lotEntryId)));
+  const sessionDtDetails = /* @__PURE__ */ new Map();
+  for (const d of sessionDts) {
+    if (!d.sessionId) continue;
+    const target = d.isPlanned ? plannedBySession : unplannedBySession;
+    target.set(d.sessionId, (target.get(d.sessionId) ?? 0) + d.durationMinutes);
+    (sessionDtDetails.get(d.sessionId) ?? sessionDtDetails.set(d.sessionId, []).get(d.sessionId)).push({ durationMinutes: d.durationMinutes, isPlanned: d.isPlanned });
   }
   const lots = await db2.select().from(lotEntries).where(inArray(lotEntries.sessionId, sessionIds));
   const lotsBySession = /* @__PURE__ */ new Map();
@@ -46614,18 +46774,27 @@ async function buildSessionsTrs(db2, sessionList) {
   }
   const allProducts = await db2.select().from(products);
   const productById = new Map(allProducts.map((p) => [p.id, p]));
+  const changesByLot = /* @__PURE__ */ new Map();
+  if (lotIds.length > 0) {
+    const changes = await db2.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds));
+    for (const c of changes) (changesByLot.get(c.lotEntryId) ?? changesByLot.set(c.lotEntryId, []).get(c.lotEntryId)).push(c);
+  }
   for (const session of sessionList) {
     const plannedStopsMin = plannedBySession.get(session.id) ?? 0;
+    const sessionUnplannedMin = unplannedBySession.get(session.id) ?? 0;
     const sessionLots = lotsBySession.get(session.id) ?? [];
     const lotDetails = [];
     const lotResults = [];
     const productLots = [];
-    const downtimeDetails = [];
+    const downtimeDetails = [
+      ...sessionDtDetails.get(session.id) ?? []
+    ];
     for (const lot of sessionLots) {
       const dts = dtsByLot.get(lot.id) ?? [];
+      const eff = effectiveLotCadence(lot, changesByLot.get(lot.id), session.closedAt);
       const lotTrs = computeLotTrs({
-        cadence: Number(lot.cadenceUsed),
-        cadenceUnit: lot.cadenceUnit,
+        cadence: eff.cadence,
+        cadenceUnit: eff.cadenceUnit,
         produced: lot.quantityProduced,
         conforming: lot.quantityConforming,
         startedAt: lot.startedAt,
@@ -46667,6 +46836,7 @@ async function buildSessionsTrs(db2, sessionList) {
       openedAt: session.openedAt,
       closedAt: session.closedAt,
       plannedStopsMin,
+      unplannedStopsMin: sessionUnplannedMin,
       lots: lotResults
     });
     out.set(session.id, { sessionTrs, lotDetails, productLots, plannedStopsMin, downtimeDetails });
@@ -46735,7 +46905,7 @@ dashboardRouter.get("/pareto", asyncHandler(async (req, res) => {
     categoryLabel: downtimeCategories.label,
     famille: downtimeCategories.famille,
     isPlanned: downtimeCategories.isPlanned
-  }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).where(inArray(lotEntries.sessionId, sessionIds));
+  }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).leftJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).where(or(inArray(lotEntries.sessionId, sessionIds), inArray(downtimeEvents.sessionId, sessionIds)));
   for (const dt of dtRows) {
     const key = dt.categoryCode;
     if (!aggregation[key]) {
@@ -46861,12 +47031,12 @@ dashboardRouter.get("/six-losses", asyncHandler(async (req, res) => {
   const sessionIds = closedSessions.map((s) => s.id);
   if (sessionIds.length > 0) {
     const rows = await db2.select({
-      sessionId: lotEntries.sessionId,
+      sessionId: sql`coalesce(${lotEntries.sessionId}, ${downtimeEvents.sessionId})`.as("session_id"),
       durationMinutes: downtimeEvents.durationMinutes,
       famille: downtimeCategories.famille,
       isPlanned: downtimeCategories.isPlanned,
       isShortStop: downtimeEvents.isShortStop
-    }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).where(inArray(lotEntries.sessionId, sessionIds));
+    }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).leftJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).where(or(inArray(lotEntries.sessionId, sessionIds), inArray(downtimeEvents.sessionId, sessionIds)));
     for (const r of rows) {
       const dt = { durationMinutes: r.durationMinutes, famille: r.famille, isPlanned: r.isPlanned, isShortStop: r.isShortStop };
       (dtsBySession.get(r.sessionId) ?? dtsBySession.set(r.sessionId, []).get(r.sessionId)).push(dt);
@@ -46923,7 +47093,7 @@ dashboardRouter.get("/downtime-log", asyncHandler(async (req, res) => {
     reason: downtimeCategories.label,
     isPlanned: downtimeCategories.isPlanned,
     batchNumber: lotEntries.batchNumber
-  }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).innerJoin(sessions, eq(lotEntries.sessionId, sessions.id)).where(and(
+  }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).leftJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).innerJoin(sessions, sql`${sessions.id} = coalesce(${lotEntries.sessionId}, ${downtimeEvents.sessionId})`).where(and(
     eq(sessions.equipmentId, equipmentId),
     eq(sessions.status, "closed"),
     gte(sessions.sessionDate, from),

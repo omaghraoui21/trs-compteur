@@ -371,3 +371,71 @@ describe("DB hardening constraints", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("session-level stops + cadence changes (refonte arrêts)", () => {
+  const auth = { Authorization: `Bearer ${""}` };
+  let equipmentId: string;
+  let roomId: string;
+  let productId: string;
+  let plannedCatId: string;
+  let sessionId: string;
+
+  it("sets up reference data + a session", async () => {
+    auth.Authorization = `Bearer ${opToken}`;
+    const eqs = await request(app).get("/api/ref/equipments").set(auth);
+    const rooms = await request(app).get("/api/ref/rooms").set(auth);
+    const products = await request(app).get("/api/ref/products").set(auth);
+    const cats = await request(app).get("/api/ref/downtime-categories").set(auth);
+    equipmentId = (eqs.body.equipments ?? eqs.body)[0].id;
+    roomId = (rooms.body.rooms ?? rooms.body)[0].id;
+    productId = (products.body.products ?? products.body)[0].id;
+    plannedCatId = (cats.body.categories ?? cats.body).find((c: any) => c.isPlanned).id;
+    const ses = await request(app).post("/api/sessions/open").set(auth).send({ equipmentId, roomId });
+    expect(ses.status).toBe(201);
+    sessionId = ses.body.id ?? ses.body.session?.id;
+  });
+
+  it("records a SESSION-LEVEL planned stop (no active lot) → counts toward tAP", async () => {
+    const res = await request(app)
+      .post(`/api/sessions/${sessionId}/downtimes`)
+      .set(auth)
+      .send({ categoryId: plannedCatId, durationMinutes: 25 });
+    expect(res.status).toBe(201);
+    expect(res.body.sessionId).toBe(sessionId);
+    expect(res.body.lotEntryId).toBeNull();
+
+    const trs = await request(app).get(`/api/sessions/${sessionId}/trs`).set(auth);
+    expect(trs.status).toBe(200);
+    expect(trs.body.session.tAP).toBe(25);          // planned session stop → tAP
+    expect(trs.body).toHaveProperty("aClasserMin"); // unclassified-time field present
+  });
+
+  it("session detail returns session-level downtimes", async () => {
+    const res = await request(app).get(`/api/sessions/${sessionId}`).set(auth);
+    expect(res.status).toBe(200);
+    expect(res.body.downtimes.some((d: any) => d.sessionId === sessionId && d.lotEntryId === null)).toBe(true);
+  });
+
+  it("logs cadence changes during a lot and exposes the history", async () => {
+    const lot = await request(app).post("/api/lots").set(auth).send({
+      sessionId, productId, batchNumber: "CAD-LOT", cadenceUsed: 120, cadenceUnit: "u/min",
+    });
+    expect(lot.status).toBe(201);
+    const lotId = lot.body.id ?? lot.body.lot?.id;
+
+    const c1 = await request(app).post(`/api/lots/${lotId}/cadence`).set(auth).send({ newCadence: 150, reason: "montée" });
+    expect(c1.status).toBe(200);
+    expect(Number(c1.body.cadenceUsed)).toBe(150);
+
+    const hist = await request(app).get(`/api/lots/${lotId}/cadence`).set(auth);
+    expect(hist.status).toBe(200);
+    expect(hist.body.length).toBe(1);
+    expect(Number(hist.body[0].oldCadence)).toBe(120);
+    expect(Number(hist.body[0].newCadence)).toBe(150);
+
+    // Close the lot, then a cadence change must be refused (409).
+    await request(app).post(`/api/lots/${lotId}/close`).set(auth).send({ quantityProduced: 100, quantityConforming: 100 });
+    const c2 = await request(app).post(`/api/lots/${lotId}/cadence`).set(auth).send({ newCadence: 90 });
+    expect(c2.status).toBe(409);
+  });
+});
