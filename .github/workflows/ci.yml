@@ -45,6 +45,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check migration dirs are in sync
+        run: node scripts/check-migrations-sync.mjs
+
       - name: Typecheck (all packages)
         run: pnpm typecheck
 
