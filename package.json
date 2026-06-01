@@ -10,6 +10,7 @@
     "db:generate": "pnpm --filter @trs/db generate",
     "db:migrate": "pnpm --filter @trs/db migrate",
     "db:seed": "pnpm --filter @trs/api seed",
+    "db:reset": "./packages/api/node_modules/.bin/tsx scripts/reset-operational-data.ts",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint"
