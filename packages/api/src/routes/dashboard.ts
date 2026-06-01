@@ -490,7 +490,16 @@ dashboardRouter.get("/downtime-log", asyncHandler(async (req, res) => {
     return;
   }
 
-  const rows = await db.select({
+  // Two index-friendly queries instead of a coalesce() join condition (which
+  // can't use an index): lot-attached stops (via the lot's session) and
+  // session-level stops (via downtime_events.session_id), merged + sorted in memory.
+  const periodFilter = and(
+    eq(sessions.equipmentId, equipmentId as string),
+    eq(sessions.status, "closed"),
+    gte(sessions.sessionDate, from as string),
+    lte(sessions.sessionDate, to as string),
+  );
+  const cols = {
     id: downtimeEvents.id,
     startedAt: downtimeEvents.startedAt,
     durationMinutes: downtimeEvents.durationMinutes,
@@ -498,19 +507,22 @@ dashboardRouter.get("/downtime-log", asyncHandler(async (req, res) => {
     reason: downtimeCategories.label,
     isPlanned: downtimeCategories.isPlanned,
     batchNumber: lotEntries.batchNumber,
-  }).from(downtimeEvents)
-    .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
-    .leftJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id))
-    .innerJoin(sessions, sql`${sessions.id} = coalesce(${lotEntries.sessionId}, ${downtimeEvents.sessionId})`)
-    .where(and(
-      eq(sessions.equipmentId, equipmentId as string),
-      eq(sessions.status, "closed"),
-      gte(sessions.sessionDate, from as string),
-      lte(sessions.sessionDate, to as string),
-    ))
-    .orderBy(desc(downtimeEvents.startedAt));
+  };
+  const [lotRows, sessionRows] = await Promise.all([
+    db.select(cols).from(downtimeEvents)
+      .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+      .innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id))
+      .innerJoin(sessions, eq(lotEntries.sessionId, sessions.id))
+      .where(periodFilter),
+    db.select({ ...cols, batchNumber: sql<string | null>`null` }).from(downtimeEvents)
+      .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+      .innerJoin(sessions, eq(downtimeEvents.sessionId, sessions.id))
+      .where(and(isNull(downtimeEvents.lotEntryId), periodFilter)),
+  ]);
 
-  const log = rows.map((r: any) => ({ ...r, startedAt: r.startedAt.toISOString() }));
+  const log = [...lotRows, ...sessionRows]
+    .sort((a: any, b: any) => b.startedAt.getTime() - a.startedAt.getTime())
+    .map((r: any) => ({ ...r, startedAt: r.startedAt.toISOString() }));
 
   res.json({ period: { from, to, equipmentId }, log });
 }));

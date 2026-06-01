@@ -47089,7 +47089,13 @@ dashboardRouter.get("/downtime-log", asyncHandler(async (req, res) => {
     res.status(400).json({ error: "equipmentId, from, to requis" });
     return;
   }
-  const rows = await db2.select({
+  const periodFilter = and(
+    eq(sessions.equipmentId, equipmentId),
+    eq(sessions.status, "closed"),
+    gte(sessions.sessionDate, from),
+    lte(sessions.sessionDate, to)
+  );
+  const cols = {
     id: downtimeEvents.id,
     startedAt: downtimeEvents.startedAt,
     durationMinutes: downtimeEvents.durationMinutes,
@@ -47097,13 +47103,12 @@ dashboardRouter.get("/downtime-log", asyncHandler(async (req, res) => {
     reason: downtimeCategories.label,
     isPlanned: downtimeCategories.isPlanned,
     batchNumber: lotEntries.batchNumber
-  }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).leftJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).innerJoin(sessions, sql`${sessions.id} = coalesce(${lotEntries.sessionId}, ${downtimeEvents.sessionId})`).where(and(
-    eq(sessions.equipmentId, equipmentId),
-    eq(sessions.status, "closed"),
-    gte(sessions.sessionDate, from),
-    lte(sessions.sessionDate, to)
-  )).orderBy(desc(downtimeEvents.startedAt));
-  const log = rows.map((r) => ({ ...r, startedAt: r.startedAt.toISOString() }));
+  };
+  const [lotRows, sessionRows] = await Promise.all([
+    db2.select(cols).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).innerJoin(sessions, eq(lotEntries.sessionId, sessions.id)).where(periodFilter),
+    db2.select({ ...cols, batchNumber: sql`null` }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).innerJoin(sessions, eq(downtimeEvents.sessionId, sessions.id)).where(and(isNull(downtimeEvents.lotEntryId), periodFilter))
+  ]);
+  const log = [...lotRows, ...sessionRows].sort((a, b2) => b2.startedAt.getTime() - a.startedAt.getTime()).map((r) => ({ ...r, startedAt: r.startedAt.toISOString() }));
   res.json({ period: { from, to, equipmentId }, log });
 }));
 dashboardRouter.get("/pending-lots", asyncHandler(async (req, res) => {
