@@ -37950,7 +37950,7 @@ var PgDialect = class {
     table,
     joins,
     orderBy,
-    groupBy,
+    groupBy: groupBy2,
     limit,
     offset,
     lockingClause,
@@ -37984,8 +37984,8 @@ var PgDialect = class {
       orderBySql = sql` order by ${sql.join(orderBy, sql`, `)}`;
     }
     let groupBySql;
-    if (groupBy && groupBy.length > 0) {
-      groupBySql = sql` group by ${sql.join(groupBy, sql`, `)}`;
+    if (groupBy2 && groupBy2.length > 0) {
+      groupBySql = sql` group by ${sql.join(groupBy2, sql`, `)}`;
     }
     const limitSql = typeof limit === "object" || typeof limit === "number" && limit >= 0 ? sql` limit ${limit}` : void 0;
     const offsetSql = offset ? sql` offset ${offset}` : void 0;
@@ -39453,13 +39453,13 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
   }
   groupBy(...columns) {
     if (typeof columns[0] === "function") {
-      const groupBy = columns[0](
+      const groupBy2 = columns[0](
         new Proxy(
           this.config.fields,
           new SelectionProxyHandler({ sqlAliasedBehavior: "alias", sqlBehavior: "sql" })
         )
       );
-      this.config.groupBy = Array.isArray(groupBy) ? groupBy : [groupBy];
+      this.config.groupBy = Array.isArray(groupBy2) ? groupBy2 : [groupBy2];
     } else {
       this.config.groupBy = columns;
     }
@@ -46270,6 +46270,27 @@ function effectiveLotCadence(lot, changes, fallbackEnd) {
   return { cadence, cadenceUnit: "u/min" };
 }
 
+// packages/api/src/lib/group.ts
+function groupBy(items, key) {
+  const m = /* @__PURE__ */ new Map();
+  for (const it of items) {
+    const k = key(it);
+    const arr = m.get(k);
+    if (arr) arr.push(it);
+    else m.set(k, [it]);
+  }
+  return m;
+}
+function splitPlannedUnplanned(rows) {
+  let plannedMin = 0;
+  let unplannedMin = 0;
+  for (const r of rows) {
+    if (r.isPlanned) plannedMin += r.durationMinutes;
+    else unplannedMin += r.durationMinutes;
+  }
+  return { plannedMin, unplannedMin };
+}
+
 // packages/api/src/routes/sessions.ts
 var sessionsRouter = (0, import_express2.Router)();
 sessionsRouter.use(authenticate);
@@ -46410,8 +46431,7 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
     db2.select().from(sessionEvents).where(and(eq(sessionEvents.sessionId, session.id), eq(sessionEvents.isPlanned, true))),
     db2.select().from(lotEntries).where(eq(lotEntries.sessionId, session.id)).orderBy(lotEntries.lotOrder)
   ]);
-  let sessionPlannedMin = 0, sessionUnplannedMin = 0;
-  for (const d of sessionDts) d.isPlanned ? sessionPlannedMin += d.durationMinutes : sessionUnplannedMin += d.durationMinutes;
+  const { plannedMin: sessionPlannedMin, unplannedMin: sessionUnplannedMin } = splitPlannedUnplanned(sessionDts);
   const legacyPhasePlannedMin = events.reduce((s, e) => s + (e.durationMinutes ?? 0), 0);
   const plannedStopsMin = sessionPlannedMin + legacyPhasePlannedMin;
   const lotIds2 = lots.map((l) => l.id);
@@ -46424,18 +46444,13 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
     }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(inArray(downtimeEvents.lotEntryId, lotIds2)),
     db2.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds2))
   ]) : [[], []];
-  const dtsByLot = {};
-  for (const dt of allDts) {
-    if (!dt.lotEntryId) continue;
-    (dtsByLot[dt.lotEntryId] ??= []).push(dt);
-  }
-  const changesByLot = {};
-  for (const c of cadenceChanges) (changesByLot[c.lotEntryId] ??= []).push(c);
+  const dtsByLot = groupBy(allDts.filter((d) => d.lotEntryId), (d) => d.lotEntryId);
+  const changesByLot = groupBy(cadenceChanges, (c) => c.lotEntryId);
   const lotResults = [];
   let lotsDurationMin = 0;
   for (const lot of lots) {
-    const dts = dtsByLot[lot.id] ?? [];
-    const eff = effectiveLotCadence(lot, changesByLot[lot.id], closedAt);
+    const dts = dtsByLot.get(lot.id) ?? [];
+    const eff = effectiveLotCadence(lot, changesByLot.get(lot.id), closedAt);
     const lotTrs = computeLotTrs({
       cadence: eff.cadence,
       cadenceUnit: eff.cadenceUnit,
@@ -46778,11 +46793,8 @@ async function buildSessionsTrs(db2, sessionList) {
   }
   const allProducts = await db2.select().from(products);
   const productById = new Map(allProducts.map((p) => [p.id, p]));
-  const changesByLot = /* @__PURE__ */ new Map();
-  if (lotIds.length > 0) {
-    const changes = await db2.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds));
-    for (const c of changes) (changesByLot.get(c.lotEntryId) ?? changesByLot.set(c.lotEntryId, []).get(c.lotEntryId)).push(c);
-  }
+  const cadenceChangeRows = lotIds.length > 0 ? await db2.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds)) : [];
+  const changesByLot = groupBy(cadenceChangeRows, (c) => c.lotEntryId);
   for (const session of sessionList) {
     const plannedStopsMin = plannedBySession.get(session.id) ?? 0;
     const sessionUnplannedMin = unplannedBySession.get(session.id) ?? 0;

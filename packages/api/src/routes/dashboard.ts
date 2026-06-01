@@ -7,6 +7,7 @@ import type { ProductLotInput } from "@trs/engine";
 import { authenticate } from "../middleware";
 import { asyncHandler } from "../lib/http";
 import { effectiveLotCadence } from "../lib/cadence";
+import { groupBy } from "../lib/group";
 
 export const dashboardRouter = Router();
 dashboardRouter.use(authenticate);
@@ -93,11 +94,10 @@ async function buildSessionsTrs(db: any, sessionList: any[]): Promise<Map<string
   const productById = new Map<string, any>(allProducts.map((p: any) => [p.id, p]));
 
   // 5. Cadence changes per lot → time-weighted nominal cadence.
-  const changesByLot = new Map<string, any[]>();
-  if (lotIds.length > 0) {
-    const changes = await db.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds));
-    for (const c of changes) (changesByLot.get(c.lotEntryId) ?? changesByLot.set(c.lotEntryId, []).get(c.lotEntryId)!).push(c);
-  }
+  const cadenceChangeRows = lotIds.length > 0
+    ? await db.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds))
+    : [];
+  const changesByLot = groupBy(cadenceChangeRows, (c: any) => c.lotEntryId as string);
 
   for (const session of sessionList) {
     const plannedStopsMin = plannedBySession.get(session.id) ?? 0;

@@ -6,6 +6,7 @@ import { authenticate } from "../middleware";
 import { asyncHandler, validate } from "../lib/http";
 import { audit } from "../lib/audit";
 import { effectiveLotCadence } from "../lib/cadence";
+import { groupBy, splitPlannedUnplanned } from "../lib/group";
 import { openSessionSchema, addEventSchema, addDowntimeSchema } from "../schemas";
 
 export const sessionsRouter = Router();
@@ -215,8 +216,7 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
       .orderBy(lotEntries.lotOrder),
   ]);
 
-  let sessionPlannedMin = 0, sessionUnplannedMin = 0;
-  for (const d of sessionDts) (d.isPlanned ? sessionPlannedMin += d.durationMinutes : sessionUnplannedMin += d.durationMinutes);
+  const { plannedMin: sessionPlannedMin, unplannedMin: sessionUnplannedMin } = splitPlannedUnplanned(sessionDts);
   const legacyPhasePlannedMin = events.reduce((s, e) => s + (e.durationMinutes ?? 0), 0);
   const plannedStopsMin = sessionPlannedMin + legacyPhasePlannedMin;
 
@@ -236,19 +236,14 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
       ])
     : [[], []];
 
-  const dtsByLot: Record<string, typeof allDts> = {};
-  for (const dt of allDts) {
-    if (!dt.lotEntryId) continue;
-    (dtsByLot[dt.lotEntryId] ??= []).push(dt);
-  }
-  const changesByLot: Record<string, typeof cadenceChanges> = {};
-  for (const c of cadenceChanges) (changesByLot[c.lotEntryId] ??= []).push(c);
+  const dtsByLot = groupBy(allDts.filter(d => d.lotEntryId), d => d.lotEntryId!);
+  const changesByLot = groupBy(cadenceChanges, c => c.lotEntryId);
 
   const lotResults = [];
   let lotsDurationMin = 0;
   for (const lot of lots) {
-    const dts = dtsByLot[lot.id] ?? [];
-    const eff = effectiveLotCadence(lot, changesByLot[lot.id], closedAt);
+    const dts = dtsByLot.get(lot.id) ?? [];
+    const eff = effectiveLotCadence(lot, changesByLot.get(lot.id), closedAt);
     const lotTrs = computeLotTrs({
       cadence: eff.cadence,
       cadenceUnit: eff.cadenceUnit,
