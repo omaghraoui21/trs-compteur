@@ -30,7 +30,7 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold text-gray-800">TRS Compteur</h1>
         </div>
 
-        <p className="text-center text-sm text-gray-500 mb-6">Blistereuse & Geluleuse — DPI</p>
+        <p className="text-center text-sm text-gray-500 mb-6">Blistéreuse & Géluleuse — DPI</p>
 
         {error && <div className="bg-red-50 text-red-600 text-sm rounded-lg p-3 mb-4">{error}</div>}
 

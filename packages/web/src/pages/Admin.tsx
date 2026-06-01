@@ -379,7 +379,7 @@ function EquipmentsPanel() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
             <select value={form.equipmentType} onChange={(e) => setForm({ ...form, equipmentType: e.target.value })} className="input-field">
-              <option value="blistereuse">Blistereuse</option>
+              <option value="blistereuse">Blistéreuse</option>
               <option value="geluleuse">Géluleuse</option>
             </select>
           </div>
@@ -742,7 +742,7 @@ function PhasesPanel() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Équipement cible</label>
             <select value={form.appliesToEquipmentType} onChange={(e) => setForm({ ...form, appliesToEquipmentType: e.target.value })} className="input-field">
               <option value="">Tous les équipements</option>
-              <option value="blistereuse">Blistereuse uniquement</option>
+              <option value="blistereuse">Blistéreuse uniquement</option>
               <option value="geluleuse">Géluleuse uniquement</option>
             </select>
           </div>
@@ -901,7 +901,7 @@ function DowntimesPanel() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Équipement cible</label>
             <select value={form.appliesToEquipmentType} onChange={(e) => setForm({ ...form, appliesToEquipmentType: e.target.value })} className="input-field">
               <option value="">Tous les équipements</option>
-              <option value="blistereuse">Blistereuse uniquement</option>
+              <option value="blistereuse">Blistéreuse uniquement</option>
               <option value="geluleuse">Géluleuse uniquement</option>
             </select>
           </div>

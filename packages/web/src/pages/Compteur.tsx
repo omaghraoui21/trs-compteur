@@ -267,7 +267,7 @@ export default function CompteurPage() {
         <button onClick={() => setView("pick-room")} className="flex items-center gap-1 text-sm text-blue-600 mb-4">
           <ChevronLeft className="h-4 w-4" /> Retour
         </button>
-        <h2 className="text-xl font-bold mb-4">{selectedRoom?.name} — Equipement</h2>
+        <h2 className="text-xl font-bold mb-4">{selectedRoom?.name} — Équipement</h2>
         <div className="grid gap-3">
           {equipmentsList.map(eq => {
             const accent = equipmentAccent(eq.equipmentType);
@@ -419,7 +419,7 @@ export default function CompteurPage() {
               )}
             </div>
             <div className={`rounded-xl p-3 ${activeLot ? "bg-green-50" : "bg-gray-50"}`}>
-              <div className="text-[11px] text-gray-400 mb-0.5">Phase actuelle</div>
+              <div className="text-[11px] text-gray-400 mb-0.5">Activité</div>
               <div className={`font-semibold text-base leading-tight truncate ${activeLot ? "text-green-700" : "text-gray-700"}`}>
                 {currentActivity}
               </div>
@@ -496,7 +496,7 @@ export default function CompteurPage() {
       {activeSession && detail && (
         <>
           {/* U6: Session Timeline Bar */}
-          <SessionTimelineBar detail={detail} session={activeSession} />
+          <SessionTimelineBar detail={detail} session={activeSession} categories={categories} />
 
           {/* Events timeline */}
           <div className="bg-white rounded-xl border shadow-sm mb-4">
@@ -662,37 +662,41 @@ export default function CompteurPage() {
 
 // ─── U6: Session Timeline Bar ────────────────────────────
 
-function SessionTimelineBar({ detail, session }: { detail: SessionDetail; session: Session }) {
+function SessionTimelineBar({ detail, session, categories }: { detail: SessionDetail; session: Session; categories: DowntimeCategory[] }) {
   const segments = useMemo(() => {
     const openedAt = new Date(session.openedAt).getTime();
     const now = session.closedAt ? new Date(session.closedAt).getTime() : Date.now();
     const totalMs = Math.max(now - openedAt, 1);
+    // Each declared stop is classified planned/unplanned by its category — the bar
+    // mirrors the « arrêt planifié / non planifié » model (no more « phases »).
+    const plannedById = new Map(categories.map(c => [c.id, c.isPlanned]));
 
-    type Segment = { start: number; end: number; type: "phase" | "lot" | "downtime" | "gap"; label: string };
+    type Segment = { start: number; end: number; type: "planned" | "lot" | "unplanned"; label: string };
     const segs: Segment[] = [];
 
-    // Events = phases
+    // Legacy planned phases (sessionEvents) still surface as planned stops.
     for (const ev of detail.events) {
       if (ev.eventType === "lot_start" || ev.eventType === "lot_end") continue;
       const start = new Date(ev.startedAt).getTime();
       const dur = (ev.durationMinutes || 0) * 60_000;
       const end = ev.endedAt ? new Date(ev.endedAt).getTime() : start + dur;
-      segs.push({ start, end, type: ev.isPlanned ? "phase" : "phase", label: ev.label || ev.eventType.replace("_", " ") });
+      segs.push({ start, end, type: ev.isPlanned ? "planned" : "unplanned", label: ev.label || ev.eventType.replace(/_/g, " ") });
     }
 
-    // Lots = green (active production)
+    // Lots = green (line running / production)
     for (const lot of detail.lots) {
       const start = new Date(lot.startedAt).getTime();
       const end = lot.endedAt ? new Date(lot.endedAt).getTime() : now;
       segs.push({ start, end, type: "lot", label: `Lot ${lot.batchNumber}` });
     }
 
-    // Downtimes = red
+    // Declared stops — amber if planned, red if unplanned.
     for (const dt of detail.downtimes) {
       const start = new Date(dt.startedAt).getTime();
       const dur = dt.durationMinutes * 60_000;
       const end = dt.endedAt ? new Date(dt.endedAt).getTime() : start + dur;
-      segs.push({ start, end, type: "downtime", label: "Arrêt" });
+      const planned = plannedById.get(dt.categoryId) ?? false;
+      segs.push({ start, end, type: planned ? "planned" : "unplanned", label: planned ? "Arrêt planifié" : "Arrêt non planifié" });
     }
 
     // Sort by start time
@@ -703,11 +707,11 @@ function SessionTimelineBar({ detail, session }: { detail: SessionDetail; sessio
       leftPct: ((seg.start - openedAt) / totalMs) * 100,
       widthPct: Math.max(((seg.end - seg.start) / totalMs) * 100, 0.5),
     }));
-  }, [detail, session]);
+  }, [detail, session, categories]);
 
   if (segments.length === 0) return null;
 
-  const colorMap = { phase: "bg-amber-400", lot: "bg-green-500", downtime: "bg-red-500", gap: "bg-gray-300" };
+  const colorMap = { planned: "bg-amber-400", lot: "bg-green-500", unplanned: "bg-red-500" };
 
   return (
     <div className="mb-4">
@@ -723,9 +727,8 @@ function SessionTimelineBar({ detail, session }: { detail: SessionDetail; sessio
       </div>
       <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-green-500" /> Production</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-400" /> Phase</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-red-500" /> Arrêt</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-gray-200" /> Inter-lots</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-400" /> Arrêt planifié</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-red-500" /> Arrêt non planifié</span>
       </div>
     </div>
   );
@@ -758,7 +761,7 @@ function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs:
   return (
     <div className="bg-white rounded-xl border shadow-sm mb-4 p-4">
       <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-        <Gauge className="h-4 w-4" /> TRS Consolide Session
+        <Gauge className="h-4 w-4" /> TRS consolidé — Session
       </h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
         {[
@@ -848,7 +851,7 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
     if (prod === 0 && conforming !== "") w.push({ level: "warning", msg: "Production nulle" });
     if (Number(lot.cadenceUsed) <= 0) w.push({ level: "error", msg: "Cadence absente ou nulle" });
     const rejectRate = prod > 0 ? (prod - conf) / prod : 0;
-    if (rejectRate > 0.05 && prod > 0) w.push({ level: "warning", msg: `Taux rebut eleve: ${(rejectRate * 100).toFixed(1)}%` });
+    if (rejectRate > 0.05 && prod > 0) w.push({ level: "warning", msg: `Taux de rebut élevé : ${(rejectRate * 100).toFixed(1)}%` });
     return w;
   }, [produced, conforming, lot.cadenceUsed]);
 
@@ -930,12 +933,12 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
 
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <label className="block text-xs text-gray-600 mb-1">Qte produite (NPR)</label>
+          <label className="block text-xs text-gray-600 mb-1">Qté produite (NPR)</label>
           <input type="number" value={produced} onChange={e => setProduced(e.target.value)}
             className="w-full border rounded-lg px-3 py-3 text-base" inputMode="numeric" />
         </div>
         <div>
-          <label className="block text-xs text-gray-600 mb-1">Qte conforme (NPB)</label>
+          <label className="block text-xs text-gray-600 mb-1">Qté conforme (NPB)</label>
           <input type="number" value={conforming} onChange={e => setConforming(e.target.value)}
             className="w-full border rounded-lg px-3 py-3 text-base" inputMode="numeric" />
         </div>
@@ -957,7 +960,7 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
       <div className="flex gap-2">
         <button onClick={onAddDowntime}
           className={`flex-1 bg-orange-100 text-orange-700 ${BTN_PRIMARY} hover:bg-orange-200`}>
-          <AlertTriangle className={BTN_ICON} /> Arret
+          <AlertTriangle className={BTN_ICON} /> Arrêt
         </button>
         {!showConfirm && (
           <button onClick={handleClose} disabled={closing}
@@ -1022,7 +1025,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
     const current = Number(cadence);
     if (ref <= 0) return null;
     const deviation = Math.abs(current - ref) / ref;
-    if (deviation > 0.2) return `Ecart de ${(deviation * 100).toFixed(0)}% vs cadence theorique (${refCadence} ${cadenceUnit})`;
+    if (deviation > 0.2) return `Écart de ${(deviation * 100).toFixed(0)}% vs cadence théorique (${refCadence} ${cadenceUnit})`;
     return null;
   }, [cadence, refCadence, cadenceUnit]);
 
@@ -1069,11 +1072,11 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">N de lot</label>
+          <label className="block text-sm font-medium mb-1">N° de lot</label>
           <input value={batch} onChange={e => setBatch(e.target.value)}
             className="w-full border rounded-lg px-3 py-3 text-base" placeholder={suggestedBatch || "26019"} required />
           {suggestedBatch && batch === suggestedBatch && (
-            <p className="text-xs text-blue-600 mt-1">Auto-suggere: {suggestedBatch}</p>
+            <p className="text-xs text-blue-600 mt-1">Auto-suggéré : {suggestedBatch}</p>
           )}
         </div>
 
@@ -1087,7 +1090,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Unite</label>
+            <label className="block text-sm font-medium mb-1">Unité</label>
             <select value={cadenceUnit} onChange={e => setCadenceUnit(e.target.value)}
               className="w-full border rounded-lg px-3 py-3 text-base">
               <option value="u/min">u/min</option>

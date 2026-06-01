@@ -771,7 +771,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                         Cadence: {lot.cadencePerMin ? `${lot.cadencePerMin.toFixed(0)} u/min` : "—"}
                         {lot.unplannedMin > 0 && <span className="ml-2 text-red-500">Arrêts NP: {fmtDuration(lot.unplannedMin)}</span>}
                         {lot.ecartCadence != null && lot.ecartCadence > 5 && (
-                          <span className="ml-2 text-amber-600">Ecart cadence: {fmtDuration(Math.round(lot.ecartCadence))}</span>
+                          <span className="ml-2 text-amber-600">Écart cadence : {fmtDuration(Math.round(lot.ecartCadence))}</span>
                         )}
                       </div>
                     </td>
