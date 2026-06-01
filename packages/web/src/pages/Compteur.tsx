@@ -663,13 +663,13 @@ export default function CompteurPage() {
 // ─── U6: Session Timeline Bar ────────────────────────────
 
 function SessionTimelineBar({ detail, session, categories }: { detail: SessionDetail; session: Session; categories: DowntimeCategory[] }) {
+  // Stable across detail updates — categories only change on equipment selection.
+  const plannedById = useMemo(() => new Map(categories.map(c => [c.id, c.isPlanned])), [categories]);
+
   const segments = useMemo(() => {
     const openedAt = new Date(session.openedAt).getTime();
     const now = session.closedAt ? new Date(session.closedAt).getTime() : Date.now();
     const totalMs = Math.max(now - openedAt, 1);
-    // Each declared stop is classified planned/unplanned by its category — the bar
-    // mirrors the « arrêt planifié / non planifié » model (no more « phases »).
-    const plannedById = new Map(categories.map(c => [c.id, c.isPlanned]));
 
     type Segment = { start: number; end: number; type: "planned" | "lot" | "unplanned"; label: string };
     const segs: Segment[] = [];
@@ -707,7 +707,7 @@ function SessionTimelineBar({ detail, session, categories }: { detail: SessionDe
       leftPct: ((seg.start - openedAt) / totalMs) * 100,
       widthPct: Math.max(((seg.end - seg.start) / totalMs) * 100, 0.5),
     }));
-  }, [detail, session, categories]);
+  }, [detail, session, plannedById]);
 
   if (segments.length === 0) return null;
 
