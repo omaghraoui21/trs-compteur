@@ -46402,29 +46402,33 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
     return;
   }
   const closedAt = session.closedAt ?? /* @__PURE__ */ new Date();
-  const sessionDts = await db2.select({
-    durationMinutes: downtimeEvents.durationMinutes,
-    isPlanned: downtimeCategories.isPlanned
-  }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(and(eq(downtimeEvents.sessionId, session.id), isNull(downtimeEvents.lotEntryId)));
-  const sessionPlannedMin = sessionDts.filter((d) => d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0);
-  const sessionUnplannedMin = sessionDts.filter((d) => !d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0);
-  const events = await db2.select().from(sessionEvents).where(and(eq(sessionEvents.sessionId, session.id), eq(sessionEvents.isPlanned, true)));
+  const [sessionDts, events, lots] = await Promise.all([
+    db2.select({
+      durationMinutes: downtimeEvents.durationMinutes,
+      isPlanned: downtimeCategories.isPlanned
+    }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(and(eq(downtimeEvents.sessionId, session.id), isNull(downtimeEvents.lotEntryId))),
+    db2.select().from(sessionEvents).where(and(eq(sessionEvents.sessionId, session.id), eq(sessionEvents.isPlanned, true))),
+    db2.select().from(lotEntries).where(eq(lotEntries.sessionId, session.id)).orderBy(lotEntries.lotOrder)
+  ]);
+  let sessionPlannedMin = 0, sessionUnplannedMin = 0;
+  for (const d of sessionDts) d.isPlanned ? sessionPlannedMin += d.durationMinutes : sessionUnplannedMin += d.durationMinutes;
   const legacyPhasePlannedMin = events.reduce((s, e) => s + (e.durationMinutes ?? 0), 0);
   const plannedStopsMin = sessionPlannedMin + legacyPhasePlannedMin;
-  const lots = await db2.select().from(lotEntries).where(eq(lotEntries.sessionId, session.id)).orderBy(lotEntries.lotOrder);
   const lotIds2 = lots.map((l) => l.id);
-  const allDts = lotIds2.length > 0 ? await db2.select({
-    lotEntryId: downtimeEvents.lotEntryId,
-    durationMinutes: downtimeEvents.durationMinutes,
-    famille: downtimeCategories.famille,
-    isPlanned: downtimeCategories.isPlanned
-  }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(inArray(downtimeEvents.lotEntryId, lotIds2)) : [];
+  const [allDts, cadenceChanges] = lotIds2.length > 0 ? await Promise.all([
+    db2.select({
+      lotEntryId: downtimeEvents.lotEntryId,
+      durationMinutes: downtimeEvents.durationMinutes,
+      famille: downtimeCategories.famille,
+      isPlanned: downtimeCategories.isPlanned
+    }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(inArray(downtimeEvents.lotEntryId, lotIds2)),
+    db2.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds2))
+  ]) : [[], []];
   const dtsByLot = {};
   for (const dt of allDts) {
     if (!dt.lotEntryId) continue;
     (dtsByLot[dt.lotEntryId] ??= []).push(dt);
   }
-  const cadenceChanges = lotIds2.length > 0 ? await db2.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds2)) : [];
   const changesByLot = {};
   for (const c of cadenceChanges) (changesByLot[c.lotEntryId] ??= []).push(c);
   const lotResults = [];

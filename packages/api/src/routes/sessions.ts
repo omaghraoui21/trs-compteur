@@ -197,52 +197,50 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
 
   const closedAt = session.closedAt ?? new Date();
 
-  // Session-level stops (inter-lot), category-joined for the planned/unplanned split.
-  const sessionDts = await db.select({
-    durationMinutes: downtimeEvents.durationMinutes,
-    isPlanned: downtimeCategories.isPlanned,
-  }).from(downtimeEvents)
-    .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
-    .where(and(eq(downtimeEvents.sessionId, session.id), isNull(downtimeEvents.lotEntryId)));
-  const sessionPlannedMin = sessionDts.filter(d => d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0);
-  const sessionUnplannedMin = sessionDts.filter(d => !d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0);
+  // Three independent reads — run them concurrently:
+  //  1. session-level stops (inter-lot), category-joined for the planned/unplanned split
+  //  2. legacy planned phases (sessionEvents) — still count toward tAP during transition
+  //  3. lots (with their lot-level downtimes fetched below)
+  const [sessionDts, events, lots] = await Promise.all([
+    db.select({
+      durationMinutes: downtimeEvents.durationMinutes,
+      isPlanned: downtimeCategories.isPlanned,
+    }).from(downtimeEvents)
+      .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+      .where(and(eq(downtimeEvents.sessionId, session.id), isNull(downtimeEvents.lotEntryId))),
+    db.select().from(sessionEvents)
+      .where(and(eq(sessionEvents.sessionId, session.id), eq(sessionEvents.isPlanned, true))),
+    db.select().from(lotEntries)
+      .where(eq(lotEntries.sessionId, session.id))
+      .orderBy(lotEntries.lotOrder),
+  ]);
 
-  // Legacy planned phases (sessionEvents) still count toward tAP during the
-  // transition — disjoint from the new downtime-based planned stops.
-  const events = await db.select().from(sessionEvents)
-    .where(and(eq(sessionEvents.sessionId, session.id), eq(sessionEvents.isPlanned, true)));
+  let sessionPlannedMin = 0, sessionUnplannedMin = 0;
+  for (const d of sessionDts) (d.isPlanned ? sessionPlannedMin += d.durationMinutes : sessionUnplannedMin += d.durationMinutes);
   const legacyPhasePlannedMin = events.reduce((s, e) => s + (e.durationMinutes ?? 0), 0);
-
   const plannedStopsMin = sessionPlannedMin + legacyPhasePlannedMin;
 
-  // Get lots with their (lot-level) downtimes
-  const lots = await db.select().from(lotEntries)
-    .where(eq(lotEntries.sessionId, session.id))
-    .orderBy(lotEntries.lotOrder);
-
-  // M1: single join query for all lots instead of N+1 loop
+  // Two batched lot-level reads (downtimes + cadence changes), run concurrently.
   const lotIds2 = lots.map(l => l.id);
-  const allDts = lotIds2.length > 0
-    ? await db.select({
-        lotEntryId: downtimeEvents.lotEntryId,
-        durationMinutes: downtimeEvents.durationMinutes,
-        famille: downtimeCategories.famille,
-        isPlanned: downtimeCategories.isPlanned,
-      }).from(downtimeEvents)
-      .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
-      .where(inArray(downtimeEvents.lotEntryId, lotIds2))
-    : [];
+  const [allDts, cadenceChanges] = lotIds2.length > 0
+    ? await Promise.all([
+        db.select({
+          lotEntryId: downtimeEvents.lotEntryId,
+          durationMinutes: downtimeEvents.durationMinutes,
+          famille: downtimeCategories.famille,
+          isPlanned: downtimeCategories.isPlanned,
+        }).from(downtimeEvents)
+          .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+          .where(inArray(downtimeEvents.lotEntryId, lotIds2)),
+        db.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds2)),
+      ])
+    : [[], []];
 
   const dtsByLot: Record<string, typeof allDts> = {};
   for (const dt of allDts) {
     if (!dt.lotEntryId) continue;
     (dtsByLot[dt.lotEntryId] ??= []).push(dt);
   }
-
-  // Cadence changes per lot → time-weighted nominal cadence.
-  const cadenceChanges = lotIds2.length > 0
-    ? await db.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds2))
-    : [];
   const changesByLot: Record<string, typeof cadenceChanges> = {};
   for (const c of cadenceChanges) (changesByLot[c.lotEntryId] ??= []).push(c);
 

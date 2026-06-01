@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type PhaseTemplate, type ProductEquipmentCadence, type SessionTrsResponse, type TrsMetrics, type LotEntry } from "@/lib/api";
-import { fmtDuration, fmtPct, trsColor, PHASE_CATEGORY_KEYS, PHASE_CATEGORY_LABELS } from "@trs/engine";
+import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type ProductEquipmentCadence, type SessionTrsResponse, type TrsMetrics, type LotEntry } from "@/lib/api";
+import { fmtDuration, fmtPct, trsColor } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { Onboarding } from "@/components/Onboarding";
 import { RateGauge } from "@/components/RateGauge";
 import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle, Zap, CheckCircle, XCircle, Wrench, Droplets, RotateCcw, Cpu } from "lucide-react";
 import { ListSkeleton } from "@/components/Skeleton";
 
-type View = "pick-room" | "pick-equip" | "timeline" | "new-lot" | "add-phase" | "add-downtime";
+type View = "pick-room" | "pick-equip" | "timeline" | "new-lot" | "add-downtime";
 
 // ─── Touch-friendly class constants (U2) ─────────────────
 const BTN_PRIMARY = "min-h-[48px] text-base font-semibold rounded-xl px-4 py-3 flex items-center justify-center gap-2 transition active:scale-95";
@@ -103,7 +103,6 @@ export default function CompteurPage() {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<DowntimeCategory[]>([]);
-  const [phaseTemplates, setPhaseTemplates] = useState<PhaseTemplate[]>([]);
   const [cadences, setCadences] = useState<ProductEquipmentCadence[]>([]);
   const [trsData, setTrsData] = useState<SessionTrsResponse | null>(null);
   const [trsStale, setTrsStale] = useState(false);
@@ -170,13 +169,11 @@ export default function CompteurPage() {
   const handleEquipmentSelect = async (eq: Equipment) => {
     setSelectedEquipment(eq);
     try {
-      const [cats, phases, cads] = await Promise.all([
+      const [cats, cads] = await Promise.all([
         api.downtimeCategories(eq.equipmentType ?? undefined),
-        api.phaseTemplates(eq.equipmentType ?? undefined),
         api.cadences(eq.id),
       ]);
       setCategories(cats);
-      setPhaseTemplates(phases);
       setCadences(cads);
 
       // Check for existing active session
@@ -1116,183 +1113,9 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
   );
 }
 
-// ─── Add Phase Form ──────────────────────────────────────
-
+// ─── Quick stop durations (minutes) ─────────────────────
 const QUICK_DURATIONS = [5, 10, 15, 30, 60];
 
-// Per-category color theme so the picker reads at a glance. Phases are loaded
-// from the DB (phase_templates), equipment-specific, so Blistereuse and
-// Géluleuse share one UI but show only their own phases (e.g. CHSB vs CHSG).
-const PHASE_CATEGORY_THEME: Record<string, { tab: string; phase: string }> = {
-  production:     { tab: "bg-green-600 text-white border-green-600",   phase: "border-green-500 bg-green-50 text-green-800 font-semibold" },
-  nettoyage:      { tab: "bg-blue-600 text-white border-blue-600",     phase: "border-blue-500 bg-blue-50 text-blue-800 font-semibold" },
-  changement:     { tab: "bg-violet-600 text-white border-violet-600", phase: "border-violet-500 bg-violet-50 text-violet-800 font-semibold" },
-  arret_planifie: { tab: "bg-orange-500 text-white border-orange-500", phase: "border-orange-500 bg-orange-50 text-orange-800 font-semibold" },
-};
-
-function AddPhaseForm({ sessionId, phases, onAdded, onBack }: {
-  sessionId: string;
-  phases: PhaseTemplate[];
-  onAdded: () => void;
-  onBack: () => void;
-}) {
-  const [duration, setDuration] = useState("");
-  const [comment, setComment] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const toast = useToast();
-
-  // Group active phases by category, ordered.
-  const categories = useMemo(() => {
-    const grouped = phases.reduce<Record<string, PhaseTemplate[]>>((acc, p) => {
-      (acc[p.category] ||= []).push(p);
-      return acc;
-    }, {});
-    return PHASE_CATEGORY_KEYS.filter(k => grouped[k]?.length).map(k => ({ key: k, phases: grouped[k] }));
-  }, [phases]);
-
-  const [catKey, setCatKey] = useState(categories[0]?.key ?? "production");
-  const cat = categories.find(c => c.key === catKey) ?? categories[0];
-  const theme = PHASE_CATEGORY_THEME[catKey] ?? PHASE_CATEGORY_THEME.production;
-  const selected = cat?.phases.find(p => p.id === selectedId) ?? null;
-  const canSubmit = selected !== null && duration !== "" && Number(duration) > 0 &&
-    (!selected.requiresComment || comment.trim() !== "");
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSubmit || !selected) return;
-    setLoading(true);
-    try {
-      await api.addEvent(sessionId, {
-        eventType: selected.eventType,
-        label: selected.eventType === "custom" ? selected.label : undefined,
-        durationMinutes: Number(duration),
-        isPlanned: selected.isPlanned,
-        comment: comment.trim() || undefined,
-      });
-      onAdded();
-    } catch (err: any) {
-      toast.error(err.message || "Échec de l'ajout de la phase");
-    }
-    setLoading(false);
-  };
-
-  if (categories.length === 0) {
-    return (
-      <div className="max-w-lg mx-auto">
-        <button onClick={onBack} className="flex items-center gap-1 text-sm text-blue-600 mb-4">
-          <ChevronLeft className="h-4 w-4" /> Retour
-        </button>
-        <div className="bg-white rounded-xl border p-6 text-center text-gray-500 text-sm">
-          Aucune phase configurée pour cet équipement.<br />
-          Ajoutez-en dans Configuration → Phases.
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-lg mx-auto pb-28">
-      <button onClick={onBack} className="flex items-center gap-1 text-sm text-blue-600 mb-4">
-        <ChevronLeft className="h-4 w-4" /> Retour
-      </button>
-      <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-        <Clock className="h-5 w-5" /> Ajouter une phase
-      </h2>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        {/* Category tabs */}
-        <div className="flex overflow-x-auto gap-1.5 pb-1">
-          {categories.map((c) => {
-            const t = PHASE_CATEGORY_THEME[c.key] ?? PHASE_CATEGORY_THEME.production;
-            return (
-              <button
-                key={c.key}
-                type="button"
-                onClick={() => { setCatKey(c.key); setSelectedId(null); }}
-                className={`shrink-0 px-3 py-2 rounded-lg border text-sm font-medium transition ${
-                  catKey === c.key ? t.tab : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                {PHASE_CATEGORY_LABELS[c.key as keyof typeof PHASE_CATEGORY_LABELS] ?? c.key}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Phase grid */}
-        <div className="bg-white rounded-xl border p-3">
-          <div className="grid grid-cols-2 gap-2">
-            {cat?.phases.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setSelectedId(p.id)}
-                className={`border rounded-lg px-3 py-3.5 text-sm text-left transition min-h-[52px] leading-snug ${
-                  selectedId === p.id ? theme.phase : "border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Duration */}
-        <div className="bg-white rounded-xl border p-3 space-y-2">
-          <label className="block text-sm font-medium">Durée (minutes)</label>
-          <div className="flex gap-2 flex-wrap">
-            {QUICK_DURATIONS.map(d => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDuration(String(d))}
-                className={`px-3 py-2 rounded-lg border text-sm font-medium transition min-w-[48px] ${
-                  duration === String(d) ? "bg-blue-600 text-white border-blue-600" : "bg-white border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-          <input
-            type="number"
-            value={duration}
-            onChange={e => setDuration(e.target.value)}
-            className="w-full border rounded-lg px-3 py-3 text-base"
-            placeholder="Autre durée…"
-            inputMode="numeric"
-            min="1"
-          />
-        </div>
-
-        {/* Comment */}
-        <div className="bg-white rounded-xl border p-3">
-          <label className="block text-sm font-medium mb-1">
-            Commentaire {selected?.requiresComment ? <span className="text-red-500">*</span> : <span className="text-gray-400 font-normal">(optionnel)</span>}
-          </label>
-          <textarea
-            value={comment}
-            onChange={e => setComment(e.target.value)}
-            rows={2}
-            className="w-full border rounded-lg px-3 py-2 text-base resize-none"
-            placeholder={selected?.requiresComment ? "Obligatoire pour cette phase" : ""}
-          />
-        </div>
-
-        {/* Submit — sticky above tab bar on mobile, inline on desktop */}
-        <div className="fixed bottom-[calc(56px+env(safe-area-inset-bottom))] inset-x-0 px-4 lg:static lg:px-0 z-30">
-          <button
-            type="submit"
-            disabled={loading || !canSubmit}
-            className={`w-full bg-blue-600 text-white ${BTN_PRIMARY} hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none shadow-lg lg:shadow-none`}
-          >
-            {loading ? "Ajout…" : "Ajouter la phase"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
 
 // ─── Add Downtime Form (U1: timer auto, U2: large buttons) ─
 
