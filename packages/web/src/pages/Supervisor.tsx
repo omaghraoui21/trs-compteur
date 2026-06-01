@@ -122,7 +122,7 @@ export default function SupervisorPage() {
       if (lot.quantityConforming > lot.quantityProduced) errors.push("Conforme > Produit");
       if (lot.quantityProduced === 0) errors.push("Production nulle");
       if (Number(lot.cadenceUsed) <= 0) errors.push("Cadence absente");
-      if (rejectRate > 0.05) warnings.push(`Taux rebut élevé: ${(rejectRate * 100).toFixed(1)}%`);
+      if (rejectRate > 0.05) warnings.push(`Taux de rebut élevé : ${(rejectRate * 100).toFixed(1)}%`);
 
       const dts = lotDowntimes[lot.id];
       const totalDowntimeMin = dts ? dts.reduce((s, d) => s + d.durationMinutes, 0) : null;
@@ -199,7 +199,7 @@ export default function SupervisorPage() {
                         </span>
                       )}
                       {warnings.length > 0 && (
-                        <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full">{warnings.length} warn</span>
+                        <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full">{warnings.length} alerte{warnings.length > 1 ? "s" : ""}</span>
                       )}
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">
