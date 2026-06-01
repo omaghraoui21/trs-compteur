@@ -1,11 +1,11 @@
 import { Router } from "express";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, isNull } from "drizzle-orm";
 import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, diffMinutes } from "@trs/engine";
 import { authenticate } from "../middleware";
 import { asyncHandler, validate } from "../lib/http";
 import { audit } from "../lib/audit";
-import { openSessionSchema, addEventSchema } from "../schemas";
+import { openSessionSchema, addEventSchema, addDowntimeSchema } from "../schemas";
 
 export const sessionsRouter = Router();
 sessionsRouter.use(authenticate);
@@ -39,13 +39,16 @@ sessionsRouter.get("/:id", asyncHandler(async (req, res) => {
     .where(eq(lotEntries.sessionId, session.id))
     .orderBy(lotEntries.lotOrder);
 
-  // M1: single query instead of N+1 loop
+  // Downtimes attached to this session's lots (during production) …
   const lotIds = lots.map(l => l.id);
-  const allDowntimes = lotIds.length > 0
+  const lotDowntimes = lotIds.length > 0
     ? await db.select().from(downtimeEvents).where(inArray(downtimeEvents.lotEntryId, lotIds))
     : [];
+  // … plus session-level downtimes (inter-lot: changeover, cleaning, waiting).
+  const sessionDowntimes = await db.select().from(downtimeEvents)
+    .where(eq(downtimeEvents.sessionId, session.id));
 
-  res.json({ session, events, lots, downtimes: allDowntimes });
+  res.json({ session, events, lots, downtimes: [...lotDowntimes, ...sessionDowntimes] });
 }));
 
 // ─── Open a new session (compteur) ────────────────────────────
@@ -151,6 +154,39 @@ sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async 
   res.status(201).json(event);
 }));
 
+// ─── Add a SESSION-LEVEL downtime (inter-lot, no active lot) ──────────
+// Used for changeover / cleaning / waiting that happen between lots. The
+// operator records a stop classified planned/unplanned exactly like a
+// lot-level one, but it attaches to the session instead of a lot.
+
+sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
+  const { db, userId } = req;
+  const { categoryId, durationMinutes, isShortStop, comment } = req.body;
+  const sessionId = String(req.params.id);
+
+  const [session] = await db.select({ id: sessions.id }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  if (!session) { res.status(404).json({ error: "Session introuvable" }); return; }
+
+  const now = new Date();
+  const endedAt = new Date(now.getTime() + durationMinutes * 60_000);
+
+  const [dt] = await db.insert(downtimeEvents).values({
+    sessionId,
+    lotEntryId: null,
+    categoryId,
+    startedAt: now,
+    endedAt,
+    durationMinutes,
+    status: "closed",
+    isShortStop: isShortStop ?? null,
+    comment,
+    createdBy: userId,
+  }).returning();
+
+  await audit(db, req, "ADD_SESSION_DOWNTIME", "downtime", dt.id, { sessionId, categoryId, durationMinutes });
+  res.status(201).json(dt);
+}));
+
 // ─── Get session TRS (computed) ───────────────────────────────
 
 sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
@@ -160,12 +196,25 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
 
   const closedAt = session.closedAt ?? new Date();
 
-  // Get planned stops from session events
+  // Session-level stops (inter-lot), category-joined for the planned/unplanned split.
+  const sessionDts = await db.select({
+    durationMinutes: downtimeEvents.durationMinutes,
+    isPlanned: downtimeCategories.isPlanned,
+  }).from(downtimeEvents)
+    .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+    .where(and(eq(downtimeEvents.sessionId, session.id), isNull(downtimeEvents.lotEntryId)));
+  const sessionPlannedMin = sessionDts.filter(d => d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0);
+  const sessionUnplannedMin = sessionDts.filter(d => !d.isPlanned).reduce((s, d) => s + d.durationMinutes, 0);
+
+  // Legacy planned phases (sessionEvents) still count toward tAP during the
+  // transition — disjoint from the new downtime-based planned stops.
   const events = await db.select().from(sessionEvents)
     .where(and(eq(sessionEvents.sessionId, session.id), eq(sessionEvents.isPlanned, true)));
-  const plannedStopsMin = events.reduce((s, e) => s + (e.durationMinutes ?? 0), 0);
+  const legacyPhasePlannedMin = events.reduce((s, e) => s + (e.durationMinutes ?? 0), 0);
 
-  // Get lots with their downtimes
+  const plannedStopsMin = sessionPlannedMin + legacyPhasePlannedMin;
+
+  // Get lots with their (lot-level) downtimes
   const lots = await db.select().from(lotEntries)
     .where(eq(lotEntries.sessionId, session.id))
     .orderBy(lotEntries.lotOrder);
@@ -185,10 +234,12 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
 
   const dtsByLot: Record<string, typeof allDts> = {};
   for (const dt of allDts) {
+    if (!dt.lotEntryId) continue;
     (dtsByLot[dt.lotEntryId] ??= []).push(dt);
   }
 
   const lotResults = [];
+  let lotsDurationMin = 0;
   for (const lot of lots) {
     const dts = dtsByLot[lot.id] ?? [];
     const lotTrs = computeLotTrs({
@@ -205,6 +256,7 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
       })),
     });
     if (lotTrs) {
+      lotsDurationMin += lotTrs.lotDurationMin;
       lotResults.push({ ...lotTrs, produced: lot.quantityProduced, conforming: lot.quantityConforming, lotId: lot.id, batchNumber: lot.batchNumber });
     }
   }
@@ -213,8 +265,14 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
     openedAt: session.openedAt,
     closedAt,
     plannedStopsMin,
+    unplannedStopsMin: sessionUnplannedMin,
     lots: lotResults,
   });
 
-  res.json({ session: sessionTrs, lots: lotResults });
+  // « À classer » — session time covered neither by a lot nor by a declared
+  // session-level stop. Must tend to 0; surfaced so the operator/supervisor
+  // can assign every minute a reason (Reason Codes model).
+  const aClasserMin = Math.max(0, Math.round(sessionTrs.tO - lotsDurationMin - sessionPlannedMin - sessionUnplannedMin));
+
+  res.json({ session: sessionTrs, lots: lotResults, aClasserMin });
 }));

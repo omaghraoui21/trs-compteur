@@ -226,7 +226,10 @@ export const lotEntries = pgTable("lot_entries", {
 
 export const downtimeEvents = pgTable("downtime_events", {
   id: uuid("id").primaryKey().defaultRandom(),
-  lotEntryId: uuid("lot_entry_id").notNull().references(() => lotEntries.id, { onDelete: "cascade" }),
+  // A stop is attached to a lot (during production) OR to the session
+  // (inter-lot: changeover, cleaning, waiting). At least one is set.
+  lotEntryId: uuid("lot_entry_id").references(() => lotEntries.id, { onDelete: "cascade" }),
+  sessionId: uuid("session_id").references(() => sessions.id, { onDelete: "cascade" }),
   categoryId: uuid("category_id").notNull().references(() => downtimeCategories.id),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   endedAt: timestamp("ended_at", { withTimezone: true }),
@@ -239,6 +242,7 @@ export const downtimeEvents = pgTable("downtime_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   index("idx_downtime_events_lot").on(t.lotEntryId),
+  index("idx_downtime_events_session").on(t.sessionId),
   index("idx_downtime_events_category").on(t.categoryId),
 ]);
 

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, and, gte, lte, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, or, gte, lte, desc, sql, inArray, isNull } from "drizzle-orm";
 import { sessions, lotEntries, sessionEvents, downtimeEvents, downtimeCategories, equipments, products } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, computeMtbfMttr } from "@trs/engine";
 import type { ProductLotInput } from "@trs/engine";
@@ -30,12 +30,32 @@ async function buildSessionsTrs(db: any, sessionList: any[]): Promise<Map<string
 
   const sessionIds = sessionList.map((s) => s.id);
 
-  // 1. Planned events → plannedStopsMin per session
+  // 1. Planned stops per session = legacy planned phases (sessionEvents) +
+  //    session-level planned downtimes (new model). Unplanned session-level
+  //    stops reduce tF. Both maps are keyed by sessionId.
   const events = await db.select().from(sessionEvents)
     .where(and(inArray(sessionEvents.sessionId, sessionIds), eq(sessionEvents.isPlanned, true)));
   const plannedBySession = new Map<string, number>();
+  const unplannedBySession = new Map<string, number>();
   for (const e of events) {
     plannedBySession.set(e.sessionId, (plannedBySession.get(e.sessionId) ?? 0) + (e.durationMinutes ?? 0));
+  }
+
+  // Session-level downtimes (inter-lot: lot_entry_id IS NULL), category-joined.
+  const sessionDts = await db.select({
+    sessionId: downtimeEvents.sessionId,
+    durationMinutes: downtimeEvents.durationMinutes,
+    isPlanned: downtimeCategories.isPlanned,
+  }).from(downtimeEvents)
+    .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+    .where(and(inArray(downtimeEvents.sessionId, sessionIds), isNull(downtimeEvents.lotEntryId)));
+  const sessionDtDetails = new Map<string, { durationMinutes: number; isPlanned: boolean }[]>();
+  for (const d of sessionDts) {
+    if (!d.sessionId) continue;
+    const target = d.isPlanned ? plannedBySession : unplannedBySession;
+    target.set(d.sessionId, (target.get(d.sessionId) ?? 0) + d.durationMinutes);
+    (sessionDtDetails.get(d.sessionId) ?? sessionDtDetails.set(d.sessionId, []).get(d.sessionId)!)
+      .push({ durationMinutes: d.durationMinutes, isPlanned: d.isPlanned });
   }
 
   // 2. All lots for these sessions
@@ -73,12 +93,16 @@ async function buildSessionsTrs(db: any, sessionList: any[]): Promise<Map<string
 
   for (const session of sessionList) {
     const plannedStopsMin = plannedBySession.get(session.id) ?? 0;
+    const sessionUnplannedMin = unplannedBySession.get(session.id) ?? 0;
     const sessionLots = lotsBySession.get(session.id) ?? [];
 
     const lotDetails: any[] = [];
     const lotResults: any[] = [];
     const productLots: ProductLotInput[] = [];
-    const downtimeDetails: { durationMinutes: number; isPlanned: boolean }[] = [];
+    // Six-losses/pareto consume every stop — include the session-level ones.
+    const downtimeDetails: { durationMinutes: number; isPlanned: boolean }[] = [
+      ...(sessionDtDetails.get(session.id) ?? []),
+    ];
 
     for (const lot of sessionLots) {
       const dts = dtsByLot.get(lot.id) ?? [];
@@ -114,7 +138,8 @@ async function buildSessionsTrs(db: any, sessionList: any[]): Promise<Map<string
     }
 
     const sessionTrs = computeSessionTrs({
-      openedAt: session.openedAt, closedAt: session.closedAt!, plannedStopsMin, lots: lotResults,
+      openedAt: session.openedAt, closedAt: session.closedAt!, plannedStopsMin,
+      unplannedStopsMin: sessionUnplannedMin, lots: lotResults,
     });
     out.set(session.id, { sessionTrs, lotDetails, productLots, plannedStopsMin, downtimeDetails });
   }
@@ -208,8 +233,8 @@ dashboardRouter.get("/pareto", asyncHandler(async (req, res) => {
     isPlanned: downtimeCategories.isPlanned,
   }).from(downtimeEvents)
     .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
-    .innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id))
-    .where(inArray(lotEntries.sessionId, sessionIds));
+    .leftJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id))
+    .where(or(inArray(lotEntries.sessionId, sessionIds), inArray(downtimeEvents.sessionId, sessionIds)));
 
   for (const dt of dtRows) {
     const key = dt.categoryCode;
@@ -377,15 +402,15 @@ dashboardRouter.get("/six-losses", asyncHandler(async (req, res) => {
   const sessionIds = closedSessions.map((s: any) => s.id);
   if (sessionIds.length > 0) {
     const rows = await db.select({
-      sessionId: lotEntries.sessionId,
+      sessionId: sql<string>`coalesce(${lotEntries.sessionId}, ${downtimeEvents.sessionId})`.as("session_id"),
       durationMinutes: downtimeEvents.durationMinutes,
       famille: downtimeCategories.famille,
       isPlanned: downtimeCategories.isPlanned,
       isShortStop: downtimeEvents.isShortStop,
     }).from(downtimeEvents)
       .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
-      .innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id))
-      .where(inArray(lotEntries.sessionId, sessionIds));
+      .leftJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id))
+      .where(or(inArray(lotEntries.sessionId, sessionIds), inArray(downtimeEvents.sessionId, sessionIds)));
     for (const r of rows) {
       const dt: Dt = { durationMinutes: r.durationMinutes, famille: r.famille, isPlanned: r.isPlanned, isShortStop: r.isShortStop };
       (dtsBySession.get(r.sessionId) ?? dtsBySession.set(r.sessionId, []).get(r.sessionId)!).push(dt);
@@ -466,8 +491,8 @@ dashboardRouter.get("/downtime-log", asyncHandler(async (req, res) => {
     batchNumber: lotEntries.batchNumber,
   }).from(downtimeEvents)
     .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
-    .innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id))
-    .innerJoin(sessions, eq(lotEntries.sessionId, sessions.id))
+    .leftJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id))
+    .innerJoin(sessions, sql`${sessions.id} = coalesce(${lotEntries.sessionId}, ${downtimeEvents.sessionId})`)
     .where(and(
       eq(sessions.equipmentId, equipmentId as string),
       eq(sessions.status, "closed"),

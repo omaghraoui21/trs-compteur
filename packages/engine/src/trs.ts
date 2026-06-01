@@ -65,7 +65,10 @@ export interface LotTrsResult {
 export interface SessionTrsInput {
   openedAt: Date | string;
   closedAt: Date | string;
+  /** tAP — planned stops recorded at session level (inter-lot: changeover, cleaning, breaks). Reduces tO → tR. */
   plannedStopsMin: number;
+  /** Unplanned stops recorded at session level (no active lot, e.g. waiting between lots). Reduces tR → tF. Default 0. */
+  unplannedStopsMin?: number;
   lots: (LotTrsResult & { produced: number; conforming: number })[];
 }
 
@@ -234,9 +237,11 @@ export function computeSessionTrs(input: SessionTrsInput): SessionTrsResult {
   const tT = 1440;
   const fermeture = Math.max(0, tT - tO);
 
-  // NF E 60-182 §2.2.6: tF = tR - TOUS les arrêts (planifiés lot + non planifiés)
+  // NF E 60-182 §2.2.6: tF = tR - TOUS les arrêts (planifiés lot + non planifiés).
+  // Unplanned stops can be lot-attached (during production) or session-level
+  // (between lots, no active lot) — both reduce tF.
   const totalPlannedLotMin = input.lots.reduce((s, l) => s + (l.plannedMin ?? 0), 0);
-  const totalUnplannedMin = input.lots.reduce((s, l) => s + (l.unplannedMin ?? 0), 0);
+  const totalUnplannedMin = input.lots.reduce((s, l) => s + (l.unplannedMin ?? 0), 0) + (input.unplannedStopsMin ?? 0);
   const totalArrets = totalPlannedLotMin + totalUnplannedMin;
   const tF = Math.max(0, tR - totalArrets);
 

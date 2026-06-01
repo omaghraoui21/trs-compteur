@@ -217,6 +217,43 @@ describe("computeSessionTrs", () => {
     expect(result.audit.tF_delta).toBe(0);
   });
 
+  it("subtracts session-level unplanned stops (inter-lot, no active lot) from tF", () => {
+    // Session 08:00→17:00 = 540min, planned (changeover/cleaning) = 120 → tR = 420.
+    // One lot with 15min unplanned during it + 30min unplanned recorded BETWEEN lots
+    // (session-level, no lot). tF = tR - (15 + 30) = 375.
+    const lot1 = {
+      lotDurationMin: 225, plannedMin: 0, unplannedMin: 15, tF: 210, tN: 200, tU: 198,
+      nonQualiteMin: 2, TP: 200 / 210, TQ: 0.99, cadencePerMin: 120, ecartCadence: 10,
+      rebut: 240, downtimeByFamille: { "Panne équipement": 15 }, downtimeByNorme: { "AB": 15 },
+      produced: 24000, conforming: 23760, warnings: [],
+    };
+    const result = computeSessionTrs({
+      openedAt: new Date("2026-05-04T08:00:00Z"),
+      closedAt: new Date("2026-05-04T17:00:00Z"),
+      plannedStopsMin: 120,
+      unplannedStopsMin: 30,
+      lots: [lot1],
+    });
+    expect(result.tR).toBe(420);
+    expect(result.tF).toBe(375);           // 420 - 15 - 30
+    expect(result.totalUnplannedMin).toBe(45);
+    expect(result.DO).toBeCloseTo(375 / 420, 3);
+  });
+
+  it("is unchanged when unplannedStopsMin is omitted (backward compatible)", () => {
+    const lot1 = {
+      lotDurationMin: 225, plannedMin: 0, unplannedMin: 15, tF: 210, tN: 200, tU: 198,
+      nonQualiteMin: 2, TP: 200 / 210, TQ: 0.99, cadencePerMin: 120, ecartCadence: 10,
+      rebut: 240, downtimeByFamille: { "Panne équipement": 15 }, downtimeByNorme: { "AB": 15 },
+      produced: 24000, conforming: 23760, warnings: [],
+    };
+    const base = { openedAt: new Date("2026-05-04T08:00:00Z"), closedAt: new Date("2026-05-04T17:00:00Z"), plannedStopsMin: 120, lots: [lot1] };
+    const a = computeSessionTrs(base);
+    const b = computeSessionTrs({ ...base, unplannedStopsMin: 0 });
+    expect(a.tF).toBe(b.tF);
+    expect(a.totalUnplannedMin).toBe(b.totalUnplannedMin);
+  });
+
   it("subtracts planned lot downtimes from tF (NF E 60-182)", () => {
     // Session: 08:00 → 16:00 = 480min, session events=60min → tR=420min
     // Lot 1: 200min, 10min planned downtime, 15min unplanned → lot tF=175
