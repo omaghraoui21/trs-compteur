@@ -57,6 +57,13 @@
       "when": 1780603200000,
       "tag": "0007_lot_cadence_changes",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1780653600000,
+      "tag": "0008_ensure_session_downtime_columns",
+      "breakpoints": true
     }
   ]
 }
