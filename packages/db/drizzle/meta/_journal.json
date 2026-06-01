@@ -50,6 +50,13 @@
       "when": 1780271857317,
       "tag": "0006_refonte_arrets_session_level",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1780603200000,
+      "tag": "0007_lot_cadence_changes",
+      "breakpoints": true
     }
   ]
 }

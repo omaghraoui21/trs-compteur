@@ -821,6 +821,27 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
   const [flashClose, triggerFlashClose] = useFlash();
   const toast = useToast();
 
+  // Cadence can be adjusted mid-lot (logged for audit + time-weighted TRS).
+  const [editingCadence, setEditingCadence] = useState(false);
+  const [newCadence, setNewCadence] = useState("");
+  const [cadenceReason, setCadenceReason] = useState("");
+  const [savingCadence, setSavingCadence] = useState(false);
+
+  const handleChangeCadence = async () => {
+    const val = Number(newCadence);
+    if (!(val > 0)) { toast.error("Cadence invalide"); return; }
+    setSavingCadence(true);
+    try {
+      await api.changeCadence(lot.id, { newCadence: val, cadenceUnit: lot.cadenceUnit, reason: cadenceReason.trim() || undefined });
+      toast.success(`Cadence mise à jour : ${val} ${lot.cadenceUnit}`);
+      setEditingCadence(false); setNewCadence(""); setCadenceReason("");
+      onUpdate();
+    } catch (err: any) {
+      toast.error(err.message || "Échec du changement de cadence");
+    }
+    setSavingCadence(false);
+  };
+
   // U4: Real-time validation warnings
   const warnings = useMemo(() => {
     const w: { level: "error" | "warning"; msg: string }[] = [];
@@ -868,7 +889,35 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
         <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full">En cours</span>
       </div>
 
-      <div className="text-sm text-green-700 mb-3">{product?.name} · Cadence: {lot.cadenceUsed} {lot.cadenceUnit}</div>
+      <div className="flex items-center gap-2 text-sm text-green-700 mb-3 flex-wrap">
+        <span>{product?.name} · Cadence: <span className="font-semibold tabular-nums">{lot.cadenceUsed} {lot.cadenceUnit}</span></span>
+        {!editingCadence && (
+          <button onClick={() => { setEditingCadence(true); setNewCadence(String(lot.cadenceUsed)); }}
+            className="inline-flex items-center gap-1 text-xs text-blue-600 border border-blue-200 rounded-full px-2 py-0.5 hover:bg-blue-50">
+            <Gauge className="h-3.5 w-3.5" /> Modifier
+          </button>
+        )}
+      </div>
+
+      {editingCadence && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3 space-y-2">
+          <div className="text-xs font-medium text-blue-800">Nouvelle cadence ({lot.cadenceUnit})</div>
+          <div className="flex gap-2">
+            <input type="number" inputMode="numeric" min="1" value={newCadence} onChange={e => setNewCadence(e.target.value)}
+              className="w-28 border rounded-lg px-3 py-2 text-base" autoFocus />
+            <input value={cadenceReason} onChange={e => setCadenceReason(e.target.value)} placeholder="Motif (optionnel)"
+              className="flex-1 border rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => { setEditingCadence(false); setNewCadence(""); setCadenceReason(""); }}
+              className="px-3 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50">Annuler</button>
+            <button onClick={handleChangeCadence} disabled={savingCadence || !(Number(newCadence) > 0)}
+              className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              {savingCadence ? "Enregistrement…" : "Enregistrer"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* U4: Real-time validation banners */}
       {errors.length > 0 && (

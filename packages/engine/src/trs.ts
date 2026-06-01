@@ -226,6 +226,41 @@ export function computeLotTrs(input: LotTrsInput): LotTrsResult | null {
   return { lotDurationMin, plannedMin, unplannedMin, tF, tN, tU, nonQualiteMin, TP, TQ, cadencePerMin, ecartCadence, rebut, downtimeByFamille, downtimeByNorme, warnings };
 }
 
+// ─── Time-weighted nominal cadence ──────────────────────
+// When the cadence (consigne) is changed mid-lot, the nominal cadence used for
+// TP is the time-weighted average over the lot duration:
+//   Σ(segmentMinutes × cadenceSegment) / lotDuration.
+// `initial` and each change's cadence are expressed per minute. Changes outside
+// the lot window are ignored. With no changes, returns `initial` (so existing
+// lots are unaffected).
+export function timeWeightedCadence(input: {
+  startedAt: Date | string;
+  endedAt: Date | string;
+  initial: number;
+  changes: { at: Date | string; cadencePerMin: number }[];
+}): number {
+  const start = new Date(input.startedAt).getTime();
+  const end = new Date(input.endedAt).getTime();
+  const total = end - start;
+  if (!(total > 0)) return input.initial;
+
+  const pts = input.changes
+    .map(c => ({ at: new Date(c.at).getTime(), c: c.cadencePerMin }))
+    .filter(p => p.at > start && p.at < end)
+    .sort((a, b) => a.at - b.at);
+
+  let cursor = start;
+  let current = input.initial;
+  let acc = 0;
+  for (const p of pts) {
+    acc += (p.at - cursor) * current;
+    cursor = p.at;
+    current = p.c;
+  }
+  acc += (end - cursor) * current;
+  return acc / total;
+}
+
 // ─── Session-level (consolidated) TRS ───────────────────
 
 export function computeSessionTrs(input: SessionTrsInput): SessionTrsResult {

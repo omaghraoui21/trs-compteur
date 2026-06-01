@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { eq, and, or, gte, lte, desc, sql, inArray, isNull } from "drizzle-orm";
-import { sessions, lotEntries, sessionEvents, downtimeEvents, downtimeCategories, equipments, products } from "@trs/db";
+import { sessions, lotEntries, sessionEvents, downtimeEvents, downtimeCategories, equipments, products, lotCadenceChanges } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, computeMtbfMttr } from "@trs/engine";
 import type { ProductLotInput } from "@trs/engine";
 
 import { authenticate } from "../middleware";
 import { asyncHandler } from "../lib/http";
+import { effectiveLotCadence } from "../lib/cadence";
 
 export const dashboardRouter = Router();
 dashboardRouter.use(authenticate);
@@ -91,6 +92,13 @@ async function buildSessionsTrs(db: any, sessionList: any[]): Promise<Map<string
   const allProducts = await db.select().from(products);
   const productById = new Map<string, any>(allProducts.map((p: any) => [p.id, p]));
 
+  // 5. Cadence changes per lot → time-weighted nominal cadence.
+  const changesByLot = new Map<string, any[]>();
+  if (lotIds.length > 0) {
+    const changes = await db.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds));
+    for (const c of changes) (changesByLot.get(c.lotEntryId) ?? changesByLot.set(c.lotEntryId, []).get(c.lotEntryId)!).push(c);
+  }
+
   for (const session of sessionList) {
     const plannedStopsMin = plannedBySession.get(session.id) ?? 0;
     const sessionUnplannedMin = unplannedBySession.get(session.id) ?? 0;
@@ -106,9 +114,10 @@ async function buildSessionsTrs(db: any, sessionList: any[]): Promise<Map<string
 
     for (const lot of sessionLots) {
       const dts = dtsByLot.get(lot.id) ?? [];
+      const eff = effectiveLotCadence(lot, changesByLot.get(lot.id), session.closedAt!);
       const lotTrs = computeLotTrs({
-        cadence: Number(lot.cadenceUsed),
-        cadenceUnit: lot.cadenceUnit as "u/h" | "u/min",
+        cadence: eff.cadence,
+        cadenceUnit: eff.cadenceUnit,
         produced: lot.quantityProduced,
         conforming: lot.quantityConforming,
         startedAt: lot.startedAt,

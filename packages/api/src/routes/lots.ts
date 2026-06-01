@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { eq, and, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { lotEntries, downtimeEvents, sessionEvents, downtimeCategories, users, electronicSignatures } from "@trs/db";
+import { lotEntries, downtimeEvents, sessionEvents, downtimeCategories, users, electronicSignatures, lotCadenceChanges } from "@trs/db";
 import { diffMinutes } from "@trs/engine";
 import { authenticate, requireRole } from "../middleware";
 import { asyncHandler, validate, HttpError } from "../lib/http";
 import { audit } from "../lib/audit";
-import { startLotSchema, closeLotSchema, updateLotSchema, addDowntimeSchema, validateLotSchema } from "../schemas";
+import { startLotSchema, closeLotSchema, updateLotSchema, addDowntimeSchema, validateLotSchema, changeCadenceSchema } from "../schemas";
 
 export const lotsRouter = Router();
 lotsRouter.use(authenticate);
@@ -132,6 +132,49 @@ lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res
     .where(eq(lotEntries.id, String(req.params.id))).returning();
   if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
   res.json(lot);
+}));
+
+// ─── Change cadence during a lot (logged history) ────────────
+// The consigne can be adjusted while producing. We update the lot's current
+// cadence AND append an immutable history row, so TRS uses a time-weighted
+// nominal cadence and the supervisor can audit every change.
+
+lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(async (req, res) => {
+  const { db, userId, userRole } = req;
+  const { newCadence, cadenceUnit, reason } = req.body;
+  const lotId = String(req.params.id);
+
+  const [lot] = await db.select().from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
+  if (lot.status !== "active") throw new HttpError(409, "La cadence ne peut être modifiée que sur un lot en cours");
+  if (userRole === "operator" && lot.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
+
+  const unit = cadenceUnit ?? lot.cadenceUnit;
+
+  await db.insert(lotCadenceChanges).values({
+    lotEntryId: lotId,
+    oldCadence: String(lot.cadenceUsed),
+    newCadence: String(newCadence),
+    cadenceUnit: unit,
+    reason: reason ?? null,
+    changedBy: userId,
+  });
+
+  const [updated] = await db.update(lotEntries)
+    .set({ cadenceUsed: String(newCadence), cadenceUnit: unit })
+    .where(eq(lotEntries.id, lotId)).returning();
+
+  await audit(db, req, "CHANGE_CADENCE", "lot", lotId, { from: lot.cadenceUsed, to: newCadence, unit, reason });
+  res.json(updated);
+}));
+
+// History of cadence changes for a lot (audit / supervisor view).
+lotsRouter.get("/:id/cadence", asyncHandler(async (req, res) => {
+  const { db } = req;
+  const rows = await db.select().from(lotCadenceChanges)
+    .where(eq(lotCadenceChanges.lotEntryId, String(req.params.id)))
+    .orderBy(lotCadenceChanges.changedAt);
+  res.json(rows);
 }));
 
 // ─── Add downtime to a lot ────────────────────────────────────

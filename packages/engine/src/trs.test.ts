@@ -1,5 +1,41 @@
 import { describe, it, expect } from "vitest";
-import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, groupSessionsByPeriod, isoWeekKey, periodKey, familleToNorme } from "./trs";
+import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, groupSessionsByPeriod, isoWeekKey, periodKey, familleToNorme, timeWeightedCadence } from "./trs";
+
+describe("timeWeightedCadence", () => {
+  const start = new Date("2026-06-01T08:00:00Z");
+  const end = new Date("2026-06-01T10:00:00Z"); // 120 min
+
+  it("returns initial when there are no changes", () => {
+    expect(timeWeightedCadence({ startedAt: start, endedAt: end, initial: 120, changes: [] })).toBe(120);
+  });
+
+  it("weights segments by their duration", () => {
+    // 60 min @120 then 60 min @60 → mean 90
+    const r = timeWeightedCadence({
+      startedAt: start, endedAt: end, initial: 120,
+      changes: [{ at: new Date("2026-06-01T09:00:00Z"), cadencePerMin: 60 }],
+    });
+    expect(r).toBeCloseTo(90, 6);
+  });
+
+  it("ignores changes outside the lot window and handles multiple changes", () => {
+    // 30@100, 30@200, 60@50 → (30*100+30*200+60*50)/120 = (3000+6000+3000)/120 = 100
+    const r = timeWeightedCadence({
+      startedAt: start, endedAt: end, initial: 100,
+      changes: [
+        { at: new Date("2026-06-01T07:00:00Z"), cadencePerMin: 999 }, // before → ignored
+        { at: new Date("2026-06-01T08:30:00Z"), cadencePerMin: 200 },
+        { at: new Date("2026-06-01T09:00:00Z"), cadencePerMin: 50 },
+        { at: new Date("2026-06-01T11:00:00Z"), cadencePerMin: 999 }, // after → ignored
+      ],
+    });
+    expect(r).toBeCloseTo(100, 6);
+  });
+
+  it("returns initial for a zero-length window", () => {
+    expect(timeWeightedCadence({ startedAt: start, endedAt: start, initial: 120, changes: [{ at: start, cadencePerMin: 60 }] })).toBe(120);
+  });
+});
 
 describe("familleToNorme", () => {
   it("maps app families to NF E 60-182 codes", () => {

@@ -91,6 +91,12 @@ export const addDowntimeSchema = z.object({
   comment: z.string().optional(),
 });
 
+export const changeCadenceSchema = z.object({
+  newCadence: z.number().positive("Cadence doit être positive"),
+  cadenceUnit: z.enum(["u/h", "u/min"]).optional(),
+  reason: z.string().optional(),
+});
+
 export const validateLotSchema = z.object({
   action: z.enum(["validate", "reject"]),
   comment: z.string().optional(),

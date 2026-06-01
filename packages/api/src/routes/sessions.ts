@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { eq, and, desc, inArray, isNull } from "drizzle-orm";
-import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories } from "@trs/db";
+import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories, lotCadenceChanges } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, diffMinutes } from "@trs/engine";
 import { authenticate } from "../middleware";
 import { asyncHandler, validate } from "../lib/http";
 import { audit } from "../lib/audit";
+import { effectiveLotCadence } from "../lib/cadence";
 import { openSessionSchema, addEventSchema, addDowntimeSchema } from "../schemas";
 
 export const sessionsRouter = Router();
@@ -238,13 +239,21 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
     (dtsByLot[dt.lotEntryId] ??= []).push(dt);
   }
 
+  // Cadence changes per lot → time-weighted nominal cadence.
+  const cadenceChanges = lotIds2.length > 0
+    ? await db.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds2))
+    : [];
+  const changesByLot: Record<string, typeof cadenceChanges> = {};
+  for (const c of cadenceChanges) (changesByLot[c.lotEntryId] ??= []).push(c);
+
   const lotResults = [];
   let lotsDurationMin = 0;
   for (const lot of lots) {
     const dts = dtsByLot[lot.id] ?? [];
+    const eff = effectiveLotCadence(lot, changesByLot[lot.id], closedAt);
     const lotTrs = computeLotTrs({
-      cadence: Number(lot.cadenceUsed),
-      cadenceUnit: lot.cadenceUnit as "u/h" | "u/min",
+      cadence: eff.cadence,
+      cadenceUnit: eff.cadenceUnit,
       produced: lot.quantityProduced,
       conforming: lot.quantityConforming,
       startedAt: lot.startedAt,

@@ -246,6 +246,23 @@ export const downtimeEvents = pgTable("downtime_events", {
   index("idx_downtime_events_category").on(t.categoryId),
 ]);
 
+// ─── Lot Cadence Changes (audit trail of in-lot cadence edits) ─────────
+// The cadence (consigne) can be adjusted while a lot is running. Each change
+// is recorded here (old → new + timestamp + author) so the TRS can use a
+// time-weighted nominal cadence and the supervisor can audit the history.
+export const lotCadenceChanges = pgTable("lot_cadence_changes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  lotEntryId: uuid("lot_entry_id").notNull().references(() => lotEntries.id, { onDelete: "cascade" }),
+  oldCadence: numeric("old_cadence", { precision: 10, scale: 2 }).notNull(),
+  newCadence: numeric("new_cadence", { precision: 10, scale: 2 }).notNull(),
+  cadenceUnit: text("cadence_unit").notNull().default("u/min"),
+  reason: text("reason"),
+  changedBy: uuid("changed_by").references(() => users.id),
+  changedAt: timestamp("changed_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_lot_cadence_changes_lot").on(t.lotEntryId),
+]);
+
 // ─── Daily Summary (auto-generated from sessions) ──────
 
 export const dailySummaries = pgTable("daily_summaries", {

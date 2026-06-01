@@ -48,6 +48,6 @@ TRS = tU/tR · DO = tF/tR · TP = tN/tF · TQ = conforme/produite
 - [x] **Phase 1** — Visuel standardisé Géluleuse/Blistéreuse
 - [x] **Phase 2** — Unifier les 2 seeds (`scripts/seed.ts` ⟷ `lib/seed.ts`)
 - [x] **Phase 3** — Refonte Arrêts (DB + API + engine + opérateur + migration données)
-- [ ] **Phase 4** — Cadence modifiable pendant le lot (+ historique)
+- [x] **Phase 4** — Cadence modifiable pendant le lot (+ historique)
 - [ ] **Phase 5** — Validation superviseur enrichie
 - [ ] **Phase 6** — Clôture : rebuild handler, typecheck, tests, `/verify`, `/simplify`, `/loop`
