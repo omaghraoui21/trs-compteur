@@ -181,7 +181,14 @@ export default function CompteurPage() {
       const active = allSessions.find(s => s.status === "active");
       if (active) {
         setActiveSession(active);
-        await loadDetail(active.id);
+        try {
+          await loadDetail(active.id);
+        } catch {
+          // Session detail unavailable (e.g. pending DB migration).
+          // Clear stale state so the operator can start a new session.
+          setActiveSession(null);
+          toast.error("Session précédente inaccessible — veuillez contacter l'administrateur.");
+        }
       }
       setView("timeline");
     } catch (err: any) {
