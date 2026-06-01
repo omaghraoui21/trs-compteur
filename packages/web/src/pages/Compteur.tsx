@@ -321,20 +321,13 @@ export default function CompteurPage() {
     />;
   }
 
-  if (view === "add-phase" && activeSession) {
-    return <AddPhaseForm
-      sessionId={activeSession.id}
-      phases={phaseTemplates}
-      onAdded={() => { loadDetail(activeSession.id); setView("timeline"); }}
-      onBack={() => setView("timeline")}
-    />;
-  }
-
   if (view === "add-downtime" && activeSession && detail) {
+    // A stop attaches to the active lot if one is running (during production),
+    // otherwise to the session (inter-lot: changeover, cleaning, waiting).
     const activeLot = detail.lots.find(l => l.status === "active");
-    if (!activeLot) { setView("timeline"); return null; }
     return <AddDowntimeForm
-      lotId={activeLot.id}
+      lotId={activeLot?.id}
+      sessionId={activeSession.id}
       categories={categories}
       onAdded={() => { loadDetail(activeSession.id); setView("timeline"); }}
       onBack={() => setView("timeline")}
@@ -614,11 +607,24 @@ export default function CompteurPage() {
             <TrsSummaryCard sessionTrs={sessionTrs} equipmentId={selectedEquipment?.id || ""} trsObjective={Number(selectedEquipment?.trsObjective || 75)} />
           )}
 
+          {/* « À classer » — temps de session non couvert par un lot ni par un
+              arrêt déclaré. On incite l'opérateur à le qualifier (modèle Reason Codes). */}
+          {trsData?.aClasserMin != null && trsData.aClasserMin > 1 && (
+            <button onClick={() => setView("add-downtime")}
+              className="w-full mb-4 flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-left hover:bg-amber-100 transition">
+              <span className="flex items-center gap-2 text-amber-800">
+                <AlertTriangle className="h-5 w-5 shrink-0" />
+                <span className="text-sm font-medium">{fmtDuration(trsData.aClasserMin)} à classer</span>
+              </span>
+              <span className="text-xs text-amber-700">Déclarer l'arrêt →</span>
+            </button>
+          )}
+
           {/* Actions (U2: large touch targets) */}
           <div className="flex gap-3 mb-8">
-            <button onClick={() => setView("add-phase")}
-              className={`flex-1 bg-blue-50 text-blue-700 ${BTN_PRIMARY} hover:bg-blue-100`}>
-              <Plus className={BTN_ICON} /> Phase
+            <button onClick={() => setView("add-downtime")}
+              className={`flex-1 bg-orange-50 text-orange-700 ${BTN_PRIMARY} hover:bg-orange-100`}>
+              <AlertTriangle className={BTN_ICON} /> Déclarer un arrêt
             </button>
             {!activeLot && (() => {
               const closedLots = detail.lots.filter(l => l.status !== "active");
@@ -1241,8 +1247,8 @@ function AddPhaseForm({ sessionId, phases, onAdded, onBack }: {
 
 // ─── Add Downtime Form (U1: timer auto, U2: large buttons) ─
 
-function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
-  lotId: string; categories: DowntimeCategory[]; onAdded: () => void; onBack: () => void;
+function AddDowntimeForm({ lotId, sessionId, categories, onAdded, onBack }: {
+  lotId?: string; sessionId: string; categories: DowntimeCategory[]; onAdded: () => void; onBack: () => void;
 }) {
   const [catId, setCatId] = useState("");
   const [flashDowntime, triggerFlashDowntime] = useFlash();
@@ -1281,10 +1287,21 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
-  const grouped = categories.reduce<Record<string, DowntimeCategory[]>>((acc, c) => {
-    (acc[c.famille] ??= []).push(c);
-    return acc;
-  }, {});
+  // Two top-level sections — Non planifié then Planifié — each grouped by famille.
+  const sections = useMemo(() => {
+    const build = (planned: boolean) => {
+      const grouped: Record<string, DowntimeCategory[]> = {};
+      for (const c of categories) {
+        if (c.isPlanned !== planned) continue;
+        (grouped[c.famille] ??= []).push(c);
+      }
+      return Object.entries(grouped);
+    };
+    return [
+      { planned: false, title: "Arrêts non planifiés", hint: "Pannes, attentes, utilités, qualité…", familles: build(false) },
+      { planned: true, title: "Arrêts planifiés", hint: "Changement de série, nettoyage, pause, maintenance préventive…", familles: build(true) },
+    ];
+  }, [categories]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1292,12 +1309,15 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
     triggerFlashDowntime();
     setLoading(true);
     try {
-      await api.addDowntime(lotId, {
+      const payload = {
         categoryId: catId,
         durationMinutes: Number(duration),
         isShortStop: shortStop ? true : undefined,
         comment: comment || undefined,
-      });
+      };
+      // During production → attach to the lot; between lots → attach to the session.
+      if (lotId) await api.addDowntime(lotId, payload);
+      else await api.addSessionDowntime(sessionId, payload);
       onAdded();
     } catch (err: any) {
       toast.error(err.message || "Échec de l'ajout de l'arrêt");
@@ -1316,24 +1336,43 @@ function AddDowntimeForm({ lotId, categories, onAdded, onBack }: {
       <button onClick={onBack} className="flex items-center gap-1 text-sm text-blue-600 mb-4">
         <ChevronLeft className="h-4 w-4" /> Retour
       </button>
-      <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+      <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
         <AlertTriangle className="h-5 w-5 text-orange-500" /> Déclarer un arrêt
       </h2>
+      <p className="text-sm text-gray-500 mb-4">
+        {lotId
+          ? "Pendant la production — rattaché au lot en cours."
+          : "Hors production — rattaché à la session (inter-lots)."}
+      </p>
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border p-4 space-y-4">
-        {/* Category selection (U2: larger buttons) */}
-        {Object.entries(grouped).map(([famille, cats]) => (
-          <div key={famille}>
-            <div className="text-xs font-semibold text-gray-500 uppercase mb-1">{famille}</div>
-            <div className="grid grid-cols-2 gap-1.5">
-              {cats.map(c => (
-                <button key={c.id} type="button" onClick={() => setCatId(c.id)}
-                  className={`border rounded-lg px-2.5 py-3 text-sm text-left transition min-h-[44px] ${
-                    catId === c.id ? "border-orange-500 bg-orange-50 text-orange-700 font-medium" : "hover:bg-gray-50"
-                  }`}>
-                  {c.label}
-                </button>
-              ))}
+        {/* Two clear sections: NON planifié (red) then planifié (orange).
+            The famille is a sub-group within each. */}
+        {sections.map(section => section.familles.length > 0 && (
+          <div key={section.title} className={`rounded-xl border p-3 ${section.planned ? "border-amber-200 bg-amber-50/40" : "border-red-200 bg-red-50/40"}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className={`h-2.5 w-2.5 rounded-full ${section.planned ? "bg-amber-500" : "bg-red-500"}`} />
+              <span className={`text-sm font-bold ${section.planned ? "text-amber-800" : "text-red-800"}`}>{section.title}</span>
             </div>
+            <p className="text-[11px] text-gray-500 mb-2">{section.hint}</p>
+            {section.familles.map(([famille, cats]) => (
+              <div key={famille} className="mb-2">
+                <div className="text-xs font-semibold text-gray-500 uppercase mb-1">{famille}</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {cats.map(c => {
+                    const sel = catId === c.id;
+                    const selCls = section.planned
+                      ? "border-amber-500 bg-amber-100 text-amber-800 font-medium"
+                      : "border-red-500 bg-red-100 text-red-800 font-medium";
+                    return (
+                      <button key={c.id} type="button" onClick={() => setCatId(c.id)}
+                        className={`border rounded-lg px-2.5 py-3 text-sm text-left transition min-h-[44px] bg-white ${sel ? selCls : "hover:bg-gray-50"}`}>
+                        {c.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         ))}
 

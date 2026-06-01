@@ -104,6 +104,9 @@ export const api = {
     request<LotEntry>(`/lots/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   addDowntime: (lotId: string, data: AddDowntimeInput) =>
     request<any>(`/lots/${lotId}/downtimes`, { method: "POST", body: JSON.stringify(data) }),
+  // Session-level stop (inter-lot: changeover, cleaning, waiting — no active lot).
+  addSessionDowntime: (sessionId: string, data: AddDowntimeInput) =>
+    request<any>(`/sessions/${sessionId}/downtimes`, { method: "POST", body: JSON.stringify(data) }),
   lotDowntimes: (lotId: string) => request<LotDowntime[]>(`/lots/${lotId}/downtimes`),
   // 21 CFR Part 11: validation/rejection requires re-authentication (password).
   validateLot: (id: string, action: "validate" | "reject", password: string, comment?: string) =>
@@ -215,7 +218,7 @@ export interface ReliabilityMetrics { breakdownCount: number; totalBreakdownMin:
 export interface TrsMetrics { tT: number; tO: number; fermeture: number; tAP: number; tR: number; tF: number; tN: number; tU: number; nonQualiteMin: number; ecartCadenceMin: number; totalUnplannedMin: number; DO: number; TP: number; TQ: number; TRS: number; TRG: number; TEEP: number; utilisation: number; lotCount: number; totalProduced: number; totalConforming: number; totalRebut: number; downtimeByFamille: Record<string, number>; downtimeByNorme?: Record<string, number>; warnings?: TrsWarning[]; audit?: TrsAudit; reliability?: ReliabilityMetrics }
 export interface LotTrs extends TrsMetrics { lotId: string; batchNumber?: string }
 export interface DailyTrs extends TrsMetrics { date: string; notes?: string; lots?: LotTrs[] }
-export interface SessionTrsResponse { session: TrsMetrics; lots: LotTrs[] }
+export interface SessionTrsResponse { session: TrsMetrics; lots: LotTrs[]; aClasserMin?: number }
 export interface DashboardTrsResponse { period: { from: string; to: string; equipmentId: string }; daily: DailyTrs[]; total: TrsMetrics }
 export interface ParetoItem { code: string; label: string; famille: string; isPlanned: boolean; totalMin: number; count: number; pctOfTotal: number; cumulPct: number }
 export interface ParetoResponse { pareto: ParetoItem[]; totalMin: number }

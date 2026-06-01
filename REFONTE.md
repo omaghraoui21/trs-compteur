@@ -47,7 +47,7 @@ TRS = tU/tR · DO = tF/tR · TP = tN/tF · TQ = conforme/produite
 - [x] **Phase 0** — Filet de sécurité (branche + baseline verte : typecheck OK, 50 tests engine)
 - [x] **Phase 1** — Visuel standardisé Géluleuse/Blistéreuse
 - [x] **Phase 2** — Unifier les 2 seeds (`scripts/seed.ts` ⟷ `lib/seed.ts`)
-- [ ] **Phase 3** — Refonte Arrêts (DB + API + engine + opérateur + migration données)
+- [x] **Phase 3** — Refonte Arrêts (DB + API + engine + opérateur + migration données)
 - [ ] **Phase 4** — Cadence modifiable pendant le lot (+ historique)
 - [ ] **Phase 5** — Validation superviseur enrichie
 - [ ] **Phase 6** — Clôture : rebuild handler, typecheck, tests, `/verify`, `/simplify`, `/loop`
