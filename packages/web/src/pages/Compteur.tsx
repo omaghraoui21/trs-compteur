@@ -764,6 +764,7 @@ function AClasserBanner({ minutes, onDeclare, categories, equipmentId, sessionId
   const canQuickQualify = minutes >= 5 && recentCats.length > 0;
 
   const quickQualify = async (categoryId: string) => {
+    if (selecting) return;
     setSelecting(true);
     try {
       await api.addSessionDowntime(sessionId, { categoryId, durationMinutes: Math.round(minutes) });
@@ -800,7 +801,7 @@ function AClasserBanner({ minutes, onDeclare, categories, equipmentId, sessionId
       {canQuickQualify && expanded && (
         <div className={`px-4 pb-4 border-t ${urgent ? "border-red-200" : "border-amber-200"}`}>
           <p className="text-xs text-gray-600 mt-3 mb-2">Classer ces {fmtDuration(minutes)} en un tap :</p>
-          <div className={`grid gap-2 grid-cols-${Math.min(recentCats.length, 3)}`}>
+          <div className={`grid gap-2 ${recentGridCols(recentCats.length)}`}>
             {recentCats.map(c => (
               <button key={c.id} type="button" disabled={selecting} onClick={() => quickQualify(c.id)}
                 className="border border-gray-200 bg-white rounded-lg px-2 py-3 text-sm text-center min-h-[60px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition">
@@ -1336,6 +1337,10 @@ const QUICK_DURATIONS = [5, 10, 15, 30, 60];
 
 const RECENT_DOWNTIMES_MAX = 3;
 const recentDowntimesKey = (equipmentId: string) => `recentDowntimes_${equipmentId}`;
+// Literal classes so the Tailwind compiler can see them (dynamic
+// `grid-cols-${n}` strings are not detected at build time).
+const RECENT_GRID_COLS = ["grid-cols-1", "grid-cols-1", "grid-cols-2", "grid-cols-3"] as const;
+const recentGridCols = (n: number) => RECENT_GRID_COLS[Math.min(n, 3)];
 
 function getRecentDowntimes(equipmentId: string): string[] {
   try {
@@ -1461,7 +1466,7 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
         {recentCats.length > 0 && (
           <div>
             <p className="text-xs text-gray-500 mb-1.5 font-medium">Arrêts récents</p>
-            <div className={`grid gap-2 grid-cols-${Math.min(recentCats.length, 3)}`}>
+            <div className={`grid gap-2 ${recentGridCols(recentCats.length)}`}>
               {recentCats.map(c => {
                 const sel = catId === c.id;
                 return (

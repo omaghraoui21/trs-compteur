@@ -46514,7 +46514,7 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
     unplannedStopsMin: sessionUnplannedMin,
     lots: lotResults
   });
-  const aClasserMin = computeAClasserMin(sessionTrs.tO, lotsDurationMin, sessionPlannedMin, sessionUnplannedMin);
+  const aClasserMin = computeAClasserMin(sessionTrs.tO, lotsDurationMin, plannedStopsMin, sessionUnplannedMin);
   res.json({ session: sessionTrs, lots: lotResults, aClasserMin });
 }));
 

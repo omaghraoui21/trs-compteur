@@ -272,7 +272,11 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
     lots: lotResults,
   });
 
-  const aClasserMin = computeAClasserMin(sessionTrs.tO, lotsDurationMin, sessionPlannedMin, sessionUnplannedMin);
+  // « À classer » — open time covered neither by a lot nor by a declared stop.
+  // Must use plannedStopsMin (session planned downtimes + phases), the same term
+  // computeSessionTrs uses for tR, so phase time isn't wrongly counted as
+  // unclassified — and so this matches the dashboard's aggregation.
+  const aClasserMin = computeAClasserMin(sessionTrs.tO, lotsDurationMin, plannedStopsMin, sessionUnplannedMin);
 
   res.json({ session: sessionTrs, lots: lotResults, aClasserMin });
 }));
