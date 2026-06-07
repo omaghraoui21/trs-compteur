@@ -7,12 +7,12 @@ import { Onboarding } from "@/components/Onboarding";
 import { RateGauge } from "@/components/RateGauge";
 import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle, Zap, CheckCircle, XCircle, Wrench, Droplets, RotateCcw, Cpu, Loader2 } from "lucide-react";
 import { ListSkeleton } from "@/components/Skeleton";
+import BackButton from "@/components/BackButton";
 
 type View = "pick-room" | "pick-equip" | "timeline" | "new-lot" | "add-downtime";
 
 // ─── Touch-friendly class constants (U2) ─────────────────
 const BTN_PRIMARY = "min-h-[60px] text-base font-semibold rounded-xl px-4 py-3 flex items-center justify-center gap-2 transition active:scale-95";
-const BTN_BACK    = "flex items-center gap-1 text-sm text-blue-600 mb-4 min-h-[44px] -ml-2 px-2 rounded-lg hover:bg-blue-50 transition";
 const BTN_ICON = "h-6 w-6";
 
 // Unified accent palette — one consistent visual language for every machine
@@ -287,11 +287,7 @@ export default function CompteurPage() {
   if (view === "pick-equip") {
     return (
       <div className="max-w-lg mx-auto">
-        <button onClick={() => setView("pick-room")}
-          aria-label="Retour"
-          className={BTN_BACK}>
-          <ChevronLeft className="h-4 w-4" /> Retour
-        </button>
+        <BackButton onClick={() => setView("pick-room")} />
         <h2 className="text-xl font-bold mb-4">{selectedRoom?.name} — Équipement</h2>
         <div className="grid gap-3">
           {equipmentsList.map(eq => {
@@ -380,11 +376,7 @@ export default function CompteurPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <button onClick={() => { setView("pick-room"); setActiveSession(null); setDetail(null); sessionCtx.set(null); }}
-        aria-label="Retour"
-        className={BTN_BACK}>
-        <ChevronLeft className="h-4 w-4" /> Retour
-      </button>
+      <BackButton onClick={() => { setView("pick-room"); setActiveSession(null); setDetail(null); sessionCtx.set(null); }} />
 
       {(() => {
         const accent = equipmentAccent(selectedEquipment?.equipmentType);
@@ -1289,11 +1281,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
 
   return (
     <div className="max-w-lg mx-auto">
-      <button onClick={onBack}
-        aria-label="Retour"
-        className={BTN_BACK}>
-        <ChevronLeft className="h-4 w-4" /> Retour
-      </button>
+      <BackButton onClick={onBack} />
       <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
         <Package className="h-5 w-5" /> Nouveau lot
       </h2>
@@ -1476,11 +1464,7 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
 
   return (
     <div className="max-w-lg mx-auto">
-      <button onClick={onBack}
-        aria-label="Retour"
-        className={BTN_BACK}>
-        <ChevronLeft className="h-4 w-4" /> Retour
-      </button>
+      <BackButton onClick={onBack} />
       <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
         <AlertTriangle className="h-5 w-5 text-orange-500" /> Déclarer un arrêt
       </h2>

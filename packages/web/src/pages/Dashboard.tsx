@@ -848,8 +848,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
           <Download className="h-3 w-3" /> Export CSV
         </button>
       </div>
-      <div className="relative">
-        <div className="overflow-x-auto">
+      <div className="relative overflow-auto max-h-[480px]">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10 bg-gray-50 shadow-sm">
             <tr className="text-gray-500 text-sm">
@@ -957,7 +956,6 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
             </tr>
           </tbody>
         </table>
-        </div>
         {/* Fade hint on mobile to indicate horizontal scroll */}
         <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent lg:hidden" />
       </div>

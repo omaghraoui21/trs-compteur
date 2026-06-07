@@ -3,6 +3,7 @@ import { api, type LotEntry, type Product, type LotDowntime, type CadenceChange 
 import { fmtPct, trsColor, diffMinutes, fmtDuration as fmtMinutes } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton, Skeleton } from "@/components/Skeleton";
+import EmptyState from "@/components/EmptyState";
 import { ClipboardCheck, Check, X, ChevronDown, ChevronUp, RefreshCw, Clock, AlertOctagon, ShieldCheck } from "lucide-react";
 
 const PULL_THRESHOLD = 60;
@@ -169,11 +170,7 @@ export default function SupervisorPage() {
       {loading && <ListSkeleton />}
 
       {!loading && lots.length === 0 && (
-        <div className="bg-white rounded-xl border p-12 text-center">
-          <ShieldCheck className="h-12 w-12 mx-auto text-green-400 mb-3" />
-          <p className="font-semibold text-gray-700">Aucun lot en attente</p>
-          <p className="text-sm text-gray-400 mt-1">Tous les lots ont été validés.</p>
-        </div>
+        <EmptyState icon={ShieldCheck} iconCls="text-green-400" title="Aucun lot en attente" description="Tous les lots ont été validés." />
       )}
 
       <div className="space-y-3">
