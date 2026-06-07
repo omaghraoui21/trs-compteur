@@ -195,3 +195,23 @@ export const updateUserSchema = z.object({
 export const resetPasswordSchema = z.object({
   password: z.string().min(6, "Mot de passe : 6 caractères minimum"),
 });
+
+// ─── GET endpoint query schemas ────────────────────────────────
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "format YYYY-MM-DD attendu");
+
+export const dashboardRangeQuerySchema = z.object({
+  equipmentId: z.string().uuid("equipmentId invalide"),
+  from: isoDate,
+  to: isoDate,
+});
+
+export const comparisonQuerySchema = z.object({
+  from: isoDate,
+  to: isoDate,
+});
+
+export const sessionListQuerySchema = z.object({
+  date: isoDate.optional(),
+  equipmentId: z.string().uuid("equipmentId invalide").optional(),
+});

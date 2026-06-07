@@ -5,9 +5,10 @@ import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, co
 import type { ProductLotInput } from "@trs/engine";
 
 import { authenticate } from "../middleware";
-import { asyncHandler } from "../lib/http";
+import { asyncHandler, validateQuery } from "../lib/http";
 import { effectiveLotCadence } from "../lib/cadence";
 import { groupBy } from "../lib/group";
+import { dashboardRangeQuerySchema, comparisonQuerySchema } from "../schemas";
 
 export const dashboardRouter = Router();
 dashboardRouter.use(authenticate);
@@ -163,14 +164,9 @@ async function buildSessionsTrs(db: any, sessionList: any[]): Promise<Map<string
 
 // ─── Zoom TRS: compute TRS for a date range ──────────────────
 
-dashboardRouter.get("/trs", asyncHandler(async (req, res) => {
+dashboardRouter.get("/trs", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
   const { equipmentId, from, to } = req.query;
-
-  if (!equipmentId || !from || !to) {
-    res.status(400).json({ error: "equipmentId, from, to requis" });
-    return;
-  }
 
   const [equipment] = await db.select().from(equipments).where(eq(equipments.id, equipmentId as string)).limit(1);
   const microStopThreshold = equipment?.microStopThresholdMin != null ? Number(equipment.microStopThresholdMin) : 5;
@@ -211,14 +207,9 @@ dashboardRouter.get("/trs", asyncHandler(async (req, res) => {
 
 // ─── Pareto: downtime aggregated by category ──────────────────
 
-dashboardRouter.get("/pareto", asyncHandler(async (req, res) => {
+dashboardRouter.get("/pareto", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
   const { equipmentId, from, to } = req.query;
-
-  if (!equipmentId || !from || !to) {
-    res.status(400).json({ error: "equipmentId, from, to requis" });
-    return;
-  }
 
   // Get all closed sessions in range
   const closedSessions = await db.select().from(sessions)
@@ -300,14 +291,9 @@ dashboardRouter.get("/pareto", asyncHandler(async (req, res) => {
 
 // ─── Comparison: both equipments side by side ─────────────────
 
-dashboardRouter.get("/comparison", asyncHandler(async (req, res) => {
+dashboardRouter.get("/comparison", validateQuery(comparisonQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
   const { from, to } = req.query;
-
-  if (!from || !to) {
-    res.status(400).json({ error: "from, to requis" });
-    return;
-  }
 
   const eqs = await db.select().from(equipments).where(eq(equipments.isActive, true));
   const results: any[] = [];
@@ -346,14 +332,9 @@ dashboardRouter.get("/comparison", asyncHandler(async (req, res) => {
 
 // ─── By-Product aggregation (W) ───────────────────────────────
 
-dashboardRouter.get("/by-product", asyncHandler(async (req, res) => {
+dashboardRouter.get("/by-product", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
   const { equipmentId, from, to } = req.query;
-
-  if (!equipmentId || !from || !to) {
-    res.status(400).json({ error: "equipmentId, from, to requis" });
-    return;
-  }
 
   const closedSessions = await db.select().from(sessions)
     .where(and(
@@ -383,14 +364,9 @@ dashboardRouter.get("/by-product", asyncHandler(async (req, res) => {
 
 // ─── Six Big Losses (X) ───────────────────────────────────────
 
-dashboardRouter.get("/six-losses", asyncHandler(async (req, res) => {
+dashboardRouter.get("/six-losses", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
   const { equipmentId, from, to } = req.query;
-
-  if (!equipmentId || !from || !to) {
-    res.status(400).json({ error: "equipmentId, from, to requis" });
-    return;
-  }
 
   // Get equipment for micro-stop threshold
   const [equipment] = await db.select().from(equipments).where(eq(equipments.id, equipmentId as string)).limit(1);
@@ -445,14 +421,9 @@ dashboardRouter.get("/six-losses", asyncHandler(async (req, res) => {
 
 // ─── Heatmap TRS (Y) ──────────────────────────────────────────
 
-dashboardRouter.get("/heatmap", asyncHandler(async (req, res) => {
+dashboardRouter.get("/heatmap", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
   const { equipmentId, from, to } = req.query;
-
-  if (!equipmentId || !from || !to) {
-    res.status(400).json({ error: "equipmentId, from, to requis" });
-    return;
-  }
 
   const closedSessions = await db.select().from(sessions)
     .where(and(
@@ -486,14 +457,9 @@ dashboardRouter.get("/heatmap", asyncHandler(async (req, res) => {
 // recorded as session events — those belong to the phase timeline, not the stop
 // log. A single join (downtimes → categories → lots → sessions) filtered by the
 // session range, newest first.
-dashboardRouter.get("/downtime-log", asyncHandler(async (req, res) => {
+dashboardRouter.get("/downtime-log", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
   const { equipmentId, from, to } = req.query;
-
-  if (!equipmentId || !from || !to) {
-    res.status(400).json({ error: "equipmentId, from, to requis" });
-    return;
-  }
 
   // Two index-friendly queries instead of a coalesce() join condition (which
   // can't use an index): lot-attached stops (via the lot's session) and

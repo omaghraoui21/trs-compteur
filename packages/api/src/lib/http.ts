@@ -35,3 +35,19 @@ export function validate(schema: ZodSchema): RequestHandler {
     next();
   };
 }
+
+// Validates req.query against a Zod schema (GET endpoint query-param guard).
+export function validateQuery(schema: ZodSchema): RequestHandler {
+  return (req, res, next) => {
+    const result = schema.safeParse(req.query);
+    if (!result.success) {
+      const message = result.error.issues
+        .map((i) => `${i.path.join(".") || "query"}: ${i.message}`)
+        .join("; ");
+      res.status(400).json({ error: message });
+      return;
+    }
+    (req as any).query = result.data;
+    next();
+  };
+}

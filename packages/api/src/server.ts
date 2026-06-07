@@ -50,6 +50,18 @@ const authLimiter = rateLimit({
   message: { error: "Trop de tentatives, réessayez dans 15 minutes" },
 });
 
+// Global API rate limiter — protects heavy dashboard/aggregation queries from DoS.
+// 500 req/15 min accommodates multiple operators on the same shop-floor IP while
+// blocking runaway clients.
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Trop de requêtes, réessayez dans quelques minutes" },
+  skip: (req) => req.path === "/api/health",
+});
+
 const db = createDb();
 
 // Run pending Drizzle migrations on startup — but only in Railway/Docker where
@@ -82,6 +94,8 @@ app.use((req, _res, next) => {
   next();
 });
 
+// Broad API rate limiter applied first, then per-endpoint guards.
+app.use("/api/", apiLimiter);
 // Brute-force protection guards the password endpoint only; /refresh and /logout
 // present high-entropy tokens and must not be throttled (busy shop floor shares one IP).
 app.use("/api/auth/login", authLimiter);
@@ -103,6 +117,11 @@ app.get("/api/health", asyncHandler(async (_req, res) => {
     res.status(503).json({ status: "error", version: "1.0.0", db: "disconnected" });
   }
 }));
+
+// Explicit API 404 — prevents unmatched /api/* paths from falling through to the SPA.
+app.use("/api/", (_req, res) => {
+  res.status(404).json({ error: "Ressource introuvable" });
+});
 
 // Serve the React SPA when STATIC_ROOT is set (Railway/Docker single-service mode).
 // API routes above take precedence; everything else falls through to index.html.

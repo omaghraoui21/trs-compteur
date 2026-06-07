@@ -41577,6 +41577,18 @@ function validate(schema) {
     next();
   };
 }
+function validateQuery(schema) {
+  return (req, res, next) => {
+    const result = schema.safeParse(req.query);
+    if (!result.success) {
+      const message = result.error.issues.map((i) => `${i.path.join(".") || "query"}: ${i.message}`).join("; ");
+      res.status(400).json({ error: message });
+      return;
+    }
+    req.query = result.data;
+    next();
+  };
+}
 
 // packages/api/src/lib/audit.ts
 async function audit(db2, req, action, entityType, entityId, payload) {
@@ -46143,6 +46155,20 @@ var updateUserSchema = external_exports.object({
 var resetPasswordSchema = external_exports.object({
   password: external_exports.string().min(6, "Mot de passe : 6 caract\xE8res minimum")
 });
+var isoDate = external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "format YYYY-MM-DD attendu");
+var dashboardRangeQuerySchema = external_exports.object({
+  equipmentId: external_exports.string().uuid("equipmentId invalide"),
+  from: isoDate,
+  to: isoDate
+});
+var comparisonQuerySchema = external_exports.object({
+  from: isoDate,
+  to: isoDate
+});
+var sessionListQuerySchema = external_exports.object({
+  date: isoDate.optional(),
+  equipmentId: external_exports.string().uuid("equipmentId invalide").optional()
+});
 
 // packages/api/src/routes/auth.ts
 var authRouter = (0, import_express.Router)();
@@ -46312,7 +46338,7 @@ function splitPlannedUnplanned(rows) {
 // packages/api/src/routes/sessions.ts
 var sessionsRouter = (0, import_express2.Router)();
 sessionsRouter.use(authenticate);
-sessionsRouter.get("/", asyncHandler(async (req, res) => {
+sessionsRouter.get("/", validateQuery(sessionListQuerySchema), asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const { date: date2, equipmentId } = req.query;
   let conditions = [];
@@ -46883,13 +46909,9 @@ async function buildSessionsTrs(db2, sessionList) {
   }
   return out;
 }
-dashboardRouter.get("/trs", asyncHandler(async (req, res) => {
+dashboardRouter.get("/trs", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const { equipmentId, from, to } = req.query;
-  if (!equipmentId || !from || !to) {
-    res.status(400).json({ error: "equipmentId, from, to requis" });
-    return;
-  }
   const [equipment] = await db2.select().from(equipments).where(eq(equipments.id, equipmentId)).limit(1);
   const microStopThreshold = equipment?.microStopThresholdMin != null ? Number(equipment.microStopThresholdMin) : 5;
   const closedSessions = await db2.select().from(sessions).where(and(
@@ -46919,13 +46941,9 @@ dashboardRouter.get("/trs", asyncHandler(async (req, res) => {
     total: { ...zoom, reliability: computeMtbfMttr(allDowntimes, zoom.tF, microStopThreshold) }
   });
 }));
-dashboardRouter.get("/pareto", asyncHandler(async (req, res) => {
+dashboardRouter.get("/pareto", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const { equipmentId, from, to } = req.query;
-  if (!equipmentId || !from || !to) {
-    res.status(400).json({ error: "equipmentId, from, to requis" });
-    return;
-  }
   const closedSessions = await db2.select().from(sessions).where(and(
     eq(sessions.equipmentId, equipmentId),
     eq(sessions.status, "closed"),
@@ -46990,13 +47008,9 @@ dashboardRouter.get("/pareto", asyncHandler(async (req, res) => {
   }
   res.json({ pareto, totalMin });
 }));
-dashboardRouter.get("/comparison", asyncHandler(async (req, res) => {
+dashboardRouter.get("/comparison", validateQuery(comparisonQuerySchema), asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const { from, to } = req.query;
-  if (!from || !to) {
-    res.status(400).json({ error: "from, to requis" });
-    return;
-  }
   const eqs = await db2.select().from(equipments).where(eq(equipments.isActive, true));
   const results = [];
   for (const equipment of eqs) {
@@ -47024,13 +47038,9 @@ dashboardRouter.get("/comparison", asyncHandler(async (req, res) => {
   }
   res.json({ period: { from, to }, equipments: results });
 }));
-dashboardRouter.get("/by-product", asyncHandler(async (req, res) => {
+dashboardRouter.get("/by-product", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const { equipmentId, from, to } = req.query;
-  if (!equipmentId || !from || !to) {
-    res.status(400).json({ error: "equipmentId, from, to requis" });
-    return;
-  }
   const closedSessions = await db2.select().from(sessions).where(and(
     eq(sessions.equipmentId, equipmentId),
     eq(sessions.status, "closed"),
@@ -47049,13 +47059,9 @@ dashboardRouter.get("/by-product", asyncHandler(async (req, res) => {
   const byProduct = computeProductTrs(productLots, zoom.tR);
   res.json({ period: { from, to, equipmentId }, periodTR: zoom.tR, periodTRS: zoom.TRS, byProduct });
 }));
-dashboardRouter.get("/six-losses", asyncHandler(async (req, res) => {
+dashboardRouter.get("/six-losses", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const { equipmentId, from, to } = req.query;
-  if (!equipmentId || !from || !to) {
-    res.status(400).json({ error: "equipmentId, from, to requis" });
-    return;
-  }
   const [equipment] = await db2.select().from(equipments).where(eq(equipments.id, equipmentId)).limit(1);
   const microStopThreshold = equipment?.microStopThresholdMin != null ? Number(equipment.microStopThresholdMin) : 5;
   const closedSessions = await db2.select().from(sessions).where(and(
@@ -47091,13 +47097,9 @@ dashboardRouter.get("/six-losses", asyncHandler(async (req, res) => {
   });
   res.json({ period: { from, to, equipmentId }, total: sixLosses, daily: dailyLosses });
 }));
-dashboardRouter.get("/heatmap", asyncHandler(async (req, res) => {
+dashboardRouter.get("/heatmap", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const { equipmentId, from, to } = req.query;
-  if (!equipmentId || !from || !to) {
-    res.status(400).json({ error: "equipmentId, from, to requis" });
-    return;
-  }
   const closedSessions = await db2.select().from(sessions).where(and(
     eq(sessions.equipmentId, equipmentId),
     eq(sessions.status, "closed"),
@@ -47118,13 +47120,9 @@ dashboardRouter.get("/heatmap", asyncHandler(async (req, res) => {
   });
   res.json({ period: { from, to, equipmentId }, heatmap: heatmapData });
 }));
-dashboardRouter.get("/downtime-log", asyncHandler(async (req, res) => {
+dashboardRouter.get("/downtime-log", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const { equipmentId, from, to } = req.query;
-  if (!equipmentId || !from || !to) {
-    res.status(400).json({ error: "equipmentId, from, to requis" });
-    return;
-  }
   const periodFilter = and(
     eq(sessions.equipmentId, equipmentId),
     eq(sessions.status, "closed"),
@@ -47497,6 +47495,14 @@ var authLimiter = rate_limit_default({
   legacyHeaders: false,
   message: { error: "Trop de tentatives, r\xE9essayez dans 15 minutes" }
 });
+var apiLimiter = rate_limit_default({
+  windowMs: 15 * 60 * 1e3,
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Trop de requ\xEAtes, r\xE9essayez dans quelques minutes" },
+  skip: (req) => req.path === "/api/health"
+});
 var db = createDb();
 var __dirname = path.dirname(fileURLToPath(import.meta.url));
 var MIGRATIONS_DIR = process.env.MIGRATIONS_DIR ?? path.resolve(__dirname, "../../db/drizzle");
@@ -47515,6 +47521,7 @@ app.use((req, _res, next) => {
   req.db = db;
   next();
 });
+app.use("/api/", apiLimiter);
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth", authRouter);
 app.use("/api/sessions", sessionsRouter);
@@ -47532,6 +47539,9 @@ app.get("/api/health", asyncHandler(async (_req, res) => {
     res.status(503).json({ status: "error", version: "1.0.0", db: "disconnected" });
   }
 }));
+app.use("/api/", (_req, res) => {
+  res.status(404).json({ error: "Ressource introuvable" });
+});
 var STATIC_ROOT = process.env.STATIC_ROOT;
 if (STATIC_ROOT && existsSync(STATIC_ROOT)) {
   app.use(import_express8.default.static(STATIC_ROOT));

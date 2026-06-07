@@ -7,14 +7,15 @@ import { asyncHandler, validate } from "../lib/http";
 import { audit } from "../lib/audit";
 import { effectiveLotCadence } from "../lib/cadence";
 import { groupBy, splitPlannedUnplanned } from "../lib/group";
-import { openSessionSchema, addEventSchema, addDowntimeSchema } from "../schemas";
+import { openSessionSchema, addEventSchema, addDowntimeSchema, sessionListQuerySchema } from "../schemas";
+import { validateQuery } from "../lib/http";
 
 export const sessionsRouter = Router();
 sessionsRouter.use(authenticate);
 
 // ─── List sessions (with optional date/equipment filter) ─────
 
-sessionsRouter.get("/", asyncHandler(async (req, res) => {
+sessionsRouter.get("/", validateQuery(sessionListQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
   const { date, equipmentId } = req.query;
   let conditions = [];
