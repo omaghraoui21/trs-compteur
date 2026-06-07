@@ -46155,7 +46155,7 @@ var updateUserSchema = external_exports.object({
 var resetPasswordSchema = external_exports.object({
   password: external_exports.string().min(6, "Mot de passe : 6 caract\xE8res minimum")
 });
-var isoDate = external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "format YYYY-MM-DD attendu");
+var isoDate = external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "format YYYY-MM-DD attendu").refine((v) => !isNaN((/* @__PURE__ */ new Date(v + "T00:00:00Z")).getTime()), "date invalide");
 var dashboardRangeQuerySchema = external_exports.object({
   equipmentId: external_exports.string().uuid("equipmentId invalide"),
   from: isoDate,
@@ -47501,7 +47501,7 @@ var apiLimiter = rate_limit_default({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Trop de requ\xEAtes, r\xE9essayez dans quelques minutes" },
-  skip: (req) => req.path === "/api/health"
+  skip: (req) => req.path === "/health"
 });
 var db = createDb();
 var __dirname = path.dirname(fileURLToPath(import.meta.url));

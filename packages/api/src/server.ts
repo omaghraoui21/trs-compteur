@@ -59,7 +59,7 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Trop de requêtes, réessayez dans quelques minutes" },
-  skip: (req) => req.path === "/api/health",
+  skip: (req) => req.path === "/health",
 });
 
 const db = createDb();

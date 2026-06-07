@@ -3,12 +3,11 @@ import { eq, and, desc, inArray, isNull } from "drizzle-orm";
 import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories, lotCadenceChanges } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, diffMinutes } from "@trs/engine";
 import { authenticate } from "../middleware";
-import { asyncHandler, validate } from "../lib/http";
+import { asyncHandler, validate, validateQuery } from "../lib/http";
 import { audit } from "../lib/audit";
 import { effectiveLotCadence } from "../lib/cadence";
 import { groupBy, splitPlannedUnplanned } from "../lib/group";
 import { openSessionSchema, addEventSchema, addDowntimeSchema, sessionListQuerySchema } from "../schemas";
-import { validateQuery } from "../lib/http";
 
 export const sessionsRouter = Router();
 sessionsRouter.use(authenticate);

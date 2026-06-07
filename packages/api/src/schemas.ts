@@ -198,7 +198,10 @@ export const resetPasswordSchema = z.object({
 
 // ─── GET endpoint query schemas ────────────────────────────────
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "format YYYY-MM-DD attendu");
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "format YYYY-MM-DD attendu")
+  .refine((v) => !isNaN(new Date(v + "T00:00:00Z").getTime()), "date invalide");
 
 export const dashboardRangeQuerySchema = z.object({
   equipmentId: z.string().uuid("equipmentId invalide"),
