@@ -222,7 +222,7 @@ export interface LotTrs extends TrsMetrics { lotId: string; batchNumber?: string
 export interface DailyTrs extends TrsMetrics { date: string; notes?: string; lots?: LotTrs[] }
 export interface CadenceChange { id: string; lotEntryId: string; oldCadence: string; newCadence: string; cadenceUnit: string; reason: string | null; changedBy: string | null; changedAt: string }
 export interface SessionTrsResponse { session: TrsMetrics; lots: LotTrs[]; aClasserMin?: number }
-export interface DashboardTrsResponse { period: { from: string; to: string; equipmentId: string }; daily: DailyTrs[]; total: TrsMetrics }
+export interface DashboardTrsResponse { period: { from: string; to: string; equipmentId: string }; daily: (DailyTrs & { aClasserMin: number })[]; total: TrsMetrics & { aClasserMin: number } }
 export interface ParetoItem { code: string; label: string; famille: string; isPlanned: boolean; totalMin: number; count: number; pctOfTotal: number; cumulPct: number }
 export interface ParetoResponse { pareto: ParetoItem[]; totalMin: number }
 export interface ComparisonEquipment { equipmentId: string; equipmentName: string; equipmentCode: string; equipmentType: string; trsObjective: number; daily: DailyTrs[]; total: TrsMetrics }
@@ -258,5 +258,5 @@ export interface HeatmapDataPoint { date: string; TRS: number; DO: number; TP: n
 export interface HeatmapResponse { period: { from: string; to: string; equipmentId: string }; heatmap: HeatmapDataPoint[] }
 
 // Chronological downtime log
-export interface DowntimeLogEntry { id: string; startedAt: string; durationMinutes: number; isPlanned: boolean; famille: string; reason: string; batchNumber: string }
+export interface DowntimeLogEntry { id: string; startedAt: string; durationMinutes: number; isPlanned: boolean; famille: string; reason: string; batchNumber: string; categoryCode: string }
 export interface DowntimeLogResponse { period: { from: string; to: string; equipmentId: string }; log: DowntimeLogEntry[] }

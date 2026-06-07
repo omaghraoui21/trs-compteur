@@ -10,9 +10,10 @@ const COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#8b5cf6"
 interface Props {
   pareto: ParetoItem[];
   totalMin: number;
+  onSelectCode?: (code: string) => void;
 }
 
-export default function ParetoChart({ pareto, totalMin }: Props) {
+export default function ParetoChart({ pareto, totalMin, onSelectCode }: Props) {
   if (pareto.length === 0) return (
     <div className="bg-white rounded-xl border shadow-sm p-4">
       <h3 className="font-semibold text-sm mb-3">Pareto des arrêts</h3>
@@ -70,10 +71,13 @@ export default function ParetoChart({ pareto, totalMin }: Props) {
           </thead>
           <tbody>
             {top10.map((item, i) => (
-              <tr key={item.code} className="border-b border-gray-100 hover:bg-gray-50">
+              <tr key={item.code}
+                className={`border-b border-gray-100 hover:bg-gray-50 ${onSelectCode ? "cursor-pointer" : ""}`}
+                onClick={() => onSelectCode?.(item.code)}>
                 <td className="py-1 px-2 flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full inline-block" style={{ background: COLORS[i % COLORS.length] }} />
                   {item.label}
+                  {onSelectCode && <span className="ml-1 text-[10px] text-blue-400">↗</span>}
                 </td>
                 <td className="py-1 px-2 text-gray-500">{item.famille}</td>
                 <td className="py-1 px-2 text-right font-medium">{fmtDuration(item.totalMin)}</td>

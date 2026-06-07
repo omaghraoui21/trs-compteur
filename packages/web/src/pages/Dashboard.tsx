@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
-import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ComparisonResponse, type TrsMetrics, type DailyTrs, type ByProductResponse, type SixLossesResponse, type HeatmapResponse, type DowntimeLogEntry, type DowntimeLogResponse } from "@/lib/api";
+import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ParetoItem, type ComparisonResponse, type TrsMetrics, type DailyTrs, type ByProductResponse, type SixLossesResponse, type HeatmapResponse, type DowntimeLogEntry, type DowntimeLogResponse } from "@/lib/api";
 import { fmtPct, fmtDuration, trsColor, familleToNorme, computeOeeBenchmark } from "@trs/engine";
 import type { BenchmarkRating } from "@trs/engine";
 import { useToast } from "@/components/Toast";
@@ -60,6 +60,7 @@ export default function DashboardPage() {
   const [showComparison, setShowComparison] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [drillCode, setDrillCode] = useState<string | null>(null);
   const toast = useToast();
 
   const loadEquipments = useCallback(() => {
@@ -137,7 +138,7 @@ export default function DashboardPage() {
 
   const exportCsv = () => {
     if (!data?.daily?.length) return;
-    const headers = ["Date", "Produit", "Lot", "tT", "tO", "Fermeture", "tAP", "tR", "tF", "tN", "tU", "Lots", "NPR", "NPB", "NPC", "DO", "TP", "TQ", "TRS", "TRG"];
+    const headers = ["Date", "Produit", "Lot", "tT", "tO", "Fermeture", "tAP", "tR", "tF", "tN", "tU", "Lots", "NPR", "NPB", "NPC", "DO", "TP", "TQ", "TRS", "TRG", "Non classé (min)"];
     const rows = data.daily.map(d => {
       const lots = d.lots || [];
       const produits = lots.map((l: any) => l.productName).join("+");
@@ -147,7 +148,7 @@ export default function DashboardPage() {
         d.tT, d.tO, d.fermeture, d.tAP, d.tR, Math.round(d.tF), Math.round(d.tN), Math.round(d.tU),
         d.lotCount, d.totalProduced, d.totalConforming, d.totalRebut,
         (d.DO * 100).toFixed(1), (d.TP * 100).toFixed(1), (d.TQ * 100).toFixed(1),
-        (d.TRS * 100).toFixed(1), (d.TRG * 100).toFixed(1),
+        (d.TRS * 100).toFixed(1), (d.TRG * 100).toFixed(1), d.aClasserMin ?? 0,
       ]);
     });
 
@@ -156,7 +157,7 @@ export default function DashboardPage() {
       "TOTAL", "", "", t.tT, t.tO, t.fermeture, t.tAP, t.tR, Math.round(t.tF), Math.round(t.tN), Math.round(t.tU),
       t.lotCount, t.totalProduced, t.totalConforming, t.totalRebut,
       (t.DO * 100).toFixed(1), (t.TP * 100).toFixed(1), (t.TQ * 100).toFixed(1),
-      (t.TRS * 100).toFixed(1), (t.TRG * 100).toFixed(1),
+      (t.TRS * 100).toFixed(1), (t.TRG * 100).toFixed(1), t.aClasserMin ?? 0,
     ]));
 
     const csv = [csvRow(headers), ...rows].join("\n");
@@ -308,11 +309,26 @@ export default function DashboardPage() {
           {/* ─── Buckets temps ───────────────────────────────── */}
           <TimeBuckets metrics={data.total} />
 
+          {/* ─── Classification quality KPI (GMP data integrity) */}
+          <ClassificationQualityCard total={data.total} />
+
           {/* ─── Charts row ──────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
             <TrsChart daily={data.daily} objective={objective} />
-            {paretoData ? <ParetoChart pareto={paretoData.pareto} totalMin={paretoData.totalMin} /> : <ChartUnavailable label="Pareto des arrêts" />}
+            {paretoData
+              ? <ParetoChart pareto={paretoData.pareto} totalMin={paretoData.totalMin} onSelectCode={setDrillCode} />
+              : <ChartUnavailable label="Pareto des arrêts" />}
           </div>
+
+          {/* ─── Pareto drill-down modal ─────────────────────── */}
+          {drillCode && paretoData && downtimeLog && (
+            <ParetoDrillModal
+              code={drillCode}
+              pareto={paretoData.pareto}
+              log={downtimeLog.log}
+              onClose={() => setDrillCode(null)}
+            />
+          )}
 
           {/* ─── By-Product + Six Losses row ───────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
@@ -412,6 +428,96 @@ function LinePerformanceBand({ daily }: { daily: DailyTrs[] }) {
             <span className="w-2.5 h-2.5 rounded" style={{ backgroundColor: s.color }} /> {s.label}
           </span>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Classification quality KPI (GMP / data-integrity signal) ─
+// Headline: à-classer ratio (aClasserMin / tR) — wall-clock time not covered
+// by any declared stop. Secondary: declared stops with no famille, when present.
+function ClassificationQualityCard({ total }: { total: TrsMetrics & { aClasserMin?: number } }) {
+  const aClasser = total.aClasserMin ?? 0;
+  const tR = total.tR;
+  if (tR <= 0) return null;
+
+  const pct = Math.min((aClasser / tR) * 100, 100);
+  const nonQualifie = total.downtimeByFamille?.["Non classé"] ?? 0;
+
+  const color = pct < 5 ? "#16a34a" : pct < 15 ? "#d97706" : "#dc2626";
+  const bgCls = pct < 5 ? "bg-green-50 border-green-200" : pct < 15 ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200";
+
+  return (
+    <div className={`rounded-xl border p-4 mb-4 ${bgCls}`}>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-0.5">Qualité de classement</div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-bold" style={{ color }}>{pct.toFixed(1)}%</span>
+            <span className="text-sm text-gray-500">de temps non classé</span>
+          </div>
+          <div className="text-xs text-gray-500 mt-1">{fmtDuration(aClasser)} non classé sur {fmtDuration(tR)} requis</div>
+          {nonQualifie > 0 && (
+            <div className="text-xs text-gray-500 mt-0.5">dont {fmtDuration(nonQualifie)} d'arrêts déclarés sans famille</div>
+          )}
+        </div>
+        <div className="text-xs text-gray-400 max-w-[160px] text-right">
+          {pct < 5 ? "Bonne traçabilité" : pct < 15 ? "Classement à améliorer" : "Traçabilité insuffisante — action requise"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Pareto drill-down modal ──────────────────────────────────
+// Shows the individual stop events behind a selected Pareto cause.
+function ParetoDrillModal({ code, pareto, log, onClose }: {
+  code: string;
+  pareto: ParetoItem[];
+  log: DowntimeLogEntry[];
+  onClose: () => void;
+}) {
+  const cause = pareto.find(p => p.code === code);
+  const isPhase = code.startsWith("phase_");
+  const events = isPhase ? [] : log.filter(e => e.categoryCode === code);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b">
+          <div>
+            <h3 className="font-semibold">{cause?.label ?? code}</h3>
+            {cause && <p className="text-xs text-gray-400 mt-0.5">{cause.famille} · {fmtDuration(cause.totalMin)} · {cause.count} occurrence{cause.count > 1 ? "s" : ""}</p>}
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-4">
+          {isPhase ? (
+            <p className="text-sm text-gray-500 text-center py-8">Détail indisponible pour les phases planifiées.</p>
+          ) : events.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-8">Aucun événement trouvé pour cette cause.</p>
+          ) : (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-gray-500 border-b">
+                  <th className="text-left py-1 px-2">Date / Heure</th>
+                  <th className="text-right py-1 px-2">Durée</th>
+                  <th className="text-left py-1 px-2">Lot</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map(e => (
+                  <tr key={e.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-1.5 px-2">{new Date(e.startedAt).toLocaleString("fr-FR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
+                    <td className="py-1.5 px-2 text-right font-medium">{fmtDuration(e.durationMinutes)}</td>
+                    <td className="py-1.5 px-2 text-gray-500">{e.batchNumber || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );
