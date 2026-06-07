@@ -1,9 +1,11 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from "react";
+
+interface ActiveSession { name: string; openedAt: Date }
 
 interface SessionCtx {
   equipmentName: string | null;
   openedAt: Date | null;
-  set: (name: string | null, openedAt: Date | null) => void;
+  set: (session: ActiveSession | null) => void;
 }
 
 const SessionContext = createContext<SessionCtx | null>(null);
@@ -15,17 +17,14 @@ export function useActiveSession() {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [equipmentName, setEquipmentName] = useState<string | null>(null);
-  const [openedAt, setOpenedAt] = useState<Date | null>(null);
+  const [session, setSession] = useState<ActiveSession | null>(null);
 
-  const set = useCallback((name: string | null, ts: Date | null) => {
-    setEquipmentName(name);
-    setOpenedAt(ts);
-  }, []);
+  const set = useCallback((s: ActiveSession | null) => setSession(s), []);
 
-  return (
-    <SessionContext.Provider value={{ equipmentName, openedAt, set }}>
-      {children}
-    </SessionContext.Provider>
+  const value = useMemo(
+    () => ({ equipmentName: session?.name ?? null, openedAt: session?.openedAt ?? null, set }),
+    [session, set],
   );
+
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

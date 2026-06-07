@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/Toast";
 import { useActiveSession } from "@/lib/sessionContext";
+import { fmtDuration, diffMinutes } from "@trs/engine";
 import { Timer, ClipboardCheck, BarChart3, Settings, LogOut, KeyRound } from "lucide-react";
 
 const navItems = [
@@ -17,14 +18,9 @@ function useElapsed(openedAt: Date | null): string {
   const [elapsed, setElapsed] = useState("");
   useEffect(() => {
     if (!openedAt) { setElapsed(""); return; }
-    const tick = () => {
-      const diff = Math.floor((Date.now() - openedAt.getTime()) / 1000);
-      const h = Math.floor(diff / 3600);
-      const m = Math.floor((diff % 3600) / 60);
-      setElapsed(h > 0 ? `${h}h${String(m).padStart(2, "0")}` : `${m}min`);
-    };
+    const tick = () => setElapsed(fmtDuration(diffMinutes(openedAt, new Date())));
     tick();
-    const id = setInterval(tick, 30_000);
+    const id = setInterval(tick, 60_000);
     return () => clearInterval(id);
   }, [openedAt]);
   return elapsed;

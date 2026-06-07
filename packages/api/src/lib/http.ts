@@ -20,34 +20,20 @@ export function asyncHandler(fn: AsyncHandler): RequestHandler {
   };
 }
 
-// Validates req.body against a Zod schema, replacing it with the parsed value.
-export function validate(schema: ZodSchema): RequestHandler {
-  return (req, res, next) => {
-    const result = schema.safeParse(req.body);
+function makeValidator(field: "body" | "query"): (schema: ZodSchema) => RequestHandler {
+  return (schema) => (req, res, next) => {
+    const result = schema.safeParse(req[field]);
     if (!result.success) {
       const message = result.error.issues
-        .map((i) => `${i.path.join(".") || "body"}: ${i.message}`)
+        .map((i) => `${i.path.join(".") || field}: ${i.message}`)
         .join("; ");
       res.status(400).json({ error: message });
       return;
     }
-    req.body = result.data;
+    (req as any)[field] = result.data;
     next();
   };
 }
 
-// Validates req.query against a Zod schema (GET endpoint query-param guard).
-export function validateQuery(schema: ZodSchema): RequestHandler {
-  return (req, res, next) => {
-    const result = schema.safeParse(req.query);
-    if (!result.success) {
-      const message = result.error.issues
-        .map((i) => `${i.path.join(".") || "query"}: ${i.message}`)
-        .join("; ");
-      res.status(400).json({ error: message });
-      return;
-    }
-    (req as any).query = result.data;
-    next();
-  };
-}
+export const validate = makeValidator("body");
+export const validateQuery = makeValidator("query");

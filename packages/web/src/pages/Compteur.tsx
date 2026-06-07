@@ -184,20 +184,20 @@ export default function CompteurPage() {
       const active = allSessions.find(s => s.status === "active");
       if (active) {
         setActiveSession(active);
-        sessionCtx.set(eq.name, new Date(active.openedAt));
+        sessionCtx.set({ name: eq.name, openedAt: new Date(active.openedAt) });
         try {
           await loadDetail(active.id);
         } catch {
           // Session detail unavailable (e.g. pending DB migration).
           // Clear stale state so the operator can start a new session.
           setActiveSession(null);
-          sessionCtx.set(null, null);
+          sessionCtx.set(null);
           toast.error("Session précédente inaccessible — veuillez contacter l'administrateur.");
         }
       } else {
         // No active session on this equipment — clear any stale badge from a
         // previous equipment selection or from a different user's session.
-        sessionCtx.set(null, null);
+        sessionCtx.set(null);
       }
       setView("timeline");
     } catch (err: any) {
@@ -210,7 +210,7 @@ export default function CompteurPage() {
     try {
       const session = await api.openSession(selectedEquipment.id, selectedRoom.id);
       setActiveSession(session);
-      sessionCtx.set(selectedEquipment.name, new Date(session.openedAt));
+      sessionCtx.set({ name: selectedEquipment.name, openedAt: new Date(session.openedAt) });
       await loadDetail(session.id);
     } catch (err: any) {
       setError(err.message);
@@ -230,7 +230,7 @@ export default function CompteurPage() {
       setActiveSession(null);
       setDetail(null);
       setTrsData(null);
-      sessionCtx.set(null, null);
+      sessionCtx.set(null);
       setShowCloseModal(false);
       setView("pick-room");
     } catch (err: any) {
@@ -377,7 +377,7 @@ export default function CompteurPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <button onClick={() => { setView("pick-room"); setActiveSession(null); setDetail(null); sessionCtx.set(null, null); }}
+      <button onClick={() => { setView("pick-room"); setActiveSession(null); setDetail(null); sessionCtx.set(null); }}
         className="flex items-center gap-1 text-sm text-blue-600 mb-4">
         <ChevronLeft className="h-4 w-4" /> Retour
       </button>
@@ -624,28 +624,9 @@ export default function CompteurPage() {
 
           {/* « À classer » — temps non couvert par un lot ou un arrêt déclaré.
               ≥ 10 min → bannière rouge urgente en tête ; 1-9 min → rappel amber. */}
-          {trsData?.aClasserMin != null && trsData.aClasserMin > 1 && (() => {
-            const urgent = trsData.aClasserMin >= 10;
-            return (
-              <button onClick={() => setView("add-downtime")}
-                className={`w-full mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${
-                  urgent
-                    ? "border-red-300 bg-red-50 hover:bg-red-100"
-                    : "border-amber-300 bg-amber-50 hover:bg-amber-100"
-                }`}>
-                <span className={`flex items-center gap-2 ${urgent ? "text-red-800" : "text-amber-800"}`}>
-                  <AlertTriangle className={`h-5 w-5 shrink-0 ${urgent ? "text-red-600" : ""}`} />
-                  <span className={`text-sm ${urgent ? "font-bold" : "font-medium"}`}>
-                    {fmtDuration(trsData.aClasserMin)} de temps non classé
-                    {urgent && " — à déclarer avant fermeture"}
-                  </span>
-                </span>
-                <span className={`text-xs shrink-0 ${urgent ? "text-red-700 font-semibold" : "text-amber-700"}`}>
-                  Déclarer →
-                </span>
-              </button>
-            );
-          })()}
+          {trsData?.aClasserMin != null && trsData.aClasserMin > 1 && (
+            <AClasserBanner minutes={trsData.aClasserMin} onDeclare={() => setView("add-downtime")} />
+          )}
 
           {/* Session TRS summary + U8: historical reference */}
           {sessionTrs && sessionTrs.lotCount > 0 && (
@@ -694,6 +675,29 @@ export default function CompteurPage() {
         />
       )}
     </div>
+  );
+}
+
+// ─── « À classer » banner ────────────────────────────────
+
+function AClasserBanner({ minutes, onDeclare }: { minutes: number; onDeclare: () => void }) {
+  const urgent = minutes >= 10;
+  return (
+    <button onClick={onDeclare}
+      className={`w-full mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${
+        urgent ? "border-red-300 bg-red-50 hover:bg-red-100" : "border-amber-300 bg-amber-50 hover:bg-amber-100"
+      }`}>
+      <span className={`flex items-center gap-2 ${urgent ? "text-red-800" : "text-amber-800"}`}>
+        <AlertTriangle className={`h-5 w-5 shrink-0 ${urgent ? "text-red-600" : ""}`} />
+        <span className={`text-sm ${urgent ? "font-bold" : "font-medium"}`}>
+          {fmtDuration(minutes)} de temps non classé
+          {urgent && " — à déclarer avant fermeture"}
+        </span>
+      </span>
+      <span className={`text-xs shrink-0 ${urgent ? "text-red-700 font-semibold" : "text-amber-700"}`}>
+        Déclarer →
+      </span>
+    </button>
   );
 }
 
@@ -1214,10 +1218,11 @@ const QUICK_DURATIONS = [5, 10, 15, 30, 60];
 // ─── Add Downtime Form (U1: timer auto, U2: large buttons) ─
 
 const RECENT_DOWNTIMES_MAX = 3;
+const recentDowntimesKey = (equipmentId: string) => `recentDowntimes_${equipmentId}`;
 
 function getRecentDowntimes(equipmentId: string): string[] {
   try {
-    const v = JSON.parse(localStorage.getItem(`recentDowntimes_${equipmentId}`) || "[]");
+    const v = JSON.parse(localStorage.getItem(recentDowntimesKey(equipmentId)) || "[]");
     return Array.isArray(v) ? v : [];
   } catch { return []; }
 }
@@ -1225,7 +1230,7 @@ function getRecentDowntimes(equipmentId: string): string[] {
 function saveRecentDowntime(equipmentId: string, catId: string) {
   const prev = getRecentDowntimes(equipmentId);
   const next = [catId, ...prev.filter(id => id !== catId)].slice(0, RECENT_DOWNTIMES_MAX);
-  localStorage.setItem(`recentDowntimes_${equipmentId}`, JSON.stringify(next));
+  localStorage.setItem(recentDowntimesKey(equipmentId), JSON.stringify(next));
 }
 
 function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, onBack }: {
@@ -1236,11 +1241,13 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
   const toast = useToast();
   const [mode, setMode] = useState<"manual" | "timer">("manual");
 
-  // Raccourcis : 3 dernières catégories utilisées sur cet équipement
-  const recentCats = useMemo(() => {
-    const ids = getRecentDowntimes(equipmentId);
-    return ids.map(id => categories.find(c => c.id === id)).filter(Boolean) as DowntimeCategory[];
-  }, [equipmentId, categories]);
+  // Raccourcis : 3 dernières catégories utilisées sur cet équipement.
+  // Split into two memos: localStorage read only on equipmentId change; lookup on categories change.
+  const recentIds = useMemo(() => getRecentDowntimes(equipmentId), [equipmentId]);
+  const recentCats = useMemo(
+    () => recentIds.map(id => categories.find(c => c.id === id)).filter(Boolean) as DowntimeCategory[],
+    [recentIds, categories],
+  );
   const [duration, setDuration] = useState("");
   const [comment, setComment] = useState("");
   const [shortStop, setShortStop] = useState(false);
@@ -1466,6 +1473,15 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
 
 // ─── End-of-Shift Summary Modal ──────────────────────────
 
+function CheckItem({ ok, warn, label }: { ok: boolean; warn?: boolean; label: string }) {
+  return (
+    <div className={`flex items-center gap-2 text-sm py-1.5 px-3 rounded-lg ${ok ? "text-green-700 bg-green-50" : warn ? "text-amber-700 bg-amber-50" : "text-red-700 bg-red-50"}`}>
+      {ok ? <CheckCircle className="h-4 w-4 shrink-0" /> : warn ? <AlertTriangle className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
+      <span>{label}</span>
+    </div>
+  );
+}
+
 function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, isClosing, onConfirm, onCancel }: {
   trsData: SessionTrsResponse | null;
   hasActiveLot: boolean;
@@ -1478,13 +1494,6 @@ function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, isC
   const s = trsData?.session;
   const classifiedOk = aClasserMin < 5;
   const classifiedBlocking = aClasserMin >= 10;
-
-  const CheckItem = ({ ok, warn, label }: { ok: boolean; warn?: boolean; label: string }) => (
-    <div className={`flex items-center gap-2 text-sm py-1.5 px-3 rounded-lg ${ok ? "text-green-700 bg-green-50" : warn ? "text-amber-700 bg-amber-50" : "text-red-700 bg-red-50"}`}>
-      {ok ? <CheckCircle className="h-4 w-4 shrink-0" /> : warn ? <AlertTriangle className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
-      <span>{label}</span>
-    </div>
-  );
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
