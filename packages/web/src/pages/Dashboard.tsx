@@ -223,10 +223,11 @@ export default function DashboardPage() {
 
         <div>
           <label className="block text-xs text-gray-500 mb-1">Période</label>
-          <div className="flex border rounded-lg overflow-hidden">
+          <div className="flex border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-400">
             {(["day", "week", "month", "custom"] as ZoomLevel[]).map(z => (
               <button key={z} onClick={() => setZoom(z)}
-                className={`px-3 py-2 text-sm ${zoom === z ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
+                aria-pressed={zoom === z}
+                className={`px-3 py-2 text-sm transition ${zoom === z ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
                 {z === "day" ? "Jour" : z === "week" ? "Sem." : z === "month" ? "Mois" : "Libre"}
               </button>
             ))}
@@ -464,7 +465,7 @@ function ClassificationQualityCard({ total }: { total: TrsMetrics & { aClasserMi
   return (
     <div className={`rounded-xl border p-4 mb-4 ${bgCls}`}>
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
+        <div className="flex-1 min-w-0">
           <div className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-0.5">Qualité de classement</div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-bold" style={{ color }}>{pct.toFixed(1)}%</span>
@@ -474,8 +475,23 @@ function ClassificationQualityCard({ total }: { total: TrsMetrics & { aClasserMi
           {nonQualifie > 0 && (
             <div className="text-xs text-gray-500 mt-0.5">dont {fmtDuration(nonQualifie)} d'arrêts déclarés sans famille</div>
           )}
+          {/* Visual progress bar with threshold markers */}
+          <div className="relative h-2 bg-white/60 rounded-full overflow-hidden mt-3 border border-black/10" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: color }}
+            />
+            {/* 5% marker */}
+            <div className="absolute top-0 h-full w-px bg-black/20" style={{ left: "5%" }} />
+            {/* 15% marker */}
+            <div className="absolute top-0 h-full w-px bg-black/20" style={{ left: "15%" }} />
+          </div>
+          <div className="flex justify-between text-[9px] text-gray-400 mt-0.5 px-0" style={{ paddingLeft: "4%", paddingRight: "0" }}>
+            <span>5%</span>
+            <span style={{ marginLeft: "calc(10% - 0.5rem)" }}>15%</span>
+          </div>
         </div>
-        <div className="text-xs text-gray-400 max-w-[160px] text-right">{statusLabel}</div>
+        <div className="text-xs text-gray-400 max-w-[160px] text-right shrink-0">{statusLabel}</div>
       </div>
     </div>
   );
@@ -552,15 +568,15 @@ function DowntimeLog({ log }: { log: DowntimeLogEntry[] }) {
         <div className="px-4 py-8 text-center text-gray-400 text-sm">Aucun arrêt sur la période</div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm" aria-label="Journal des arrêts">
             <thead>
               <tr className="text-[11px] uppercase tracking-wide text-gray-400 text-left border-b">
-                <th className="px-4 py-2 font-medium">Date</th>
-                <th className="px-4 py-2 font-medium text-right">Durée</th>
-                <th className="px-4 py-2 font-medium">Type</th>
-                <th className="px-4 py-2 font-medium">Famille</th>
-                <th className="px-4 py-2 font-medium">Raison</th>
-                <th className="px-4 py-2 font-medium">Lot</th>
+                <th className="px-4 py-2 font-medium" scope="col">Date</th>
+                <th className="px-4 py-2 font-medium text-right" scope="col">Durée</th>
+                <th className="px-4 py-2 font-medium" scope="col">Type</th>
+                <th className="px-4 py-2 font-medium" scope="col">Famille</th>
+                <th className="px-4 py-2 font-medium" scope="col">Raison</th>
+                <th className="px-4 py-2 font-medium" scope="col">Lot</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -606,10 +622,11 @@ function ChartUnavailable({ label }: { label: string }) {
 function StatStrip({ metrics }: { metrics: TrsMetrics }) {
   if (metrics.lotCount === 0) return null;
   const heldMin = metrics.tAP + metrics.totalUnplannedMin;
+  const downtimeHeavy = metrics.tR > 0 && heldMin / metrics.tR > 0.3;
   const cards: { label: string; value: string; sub?: string; color?: string }[] = [
     { label: "Production", value: metrics.totalProduced.toLocaleString("fr-FR"), sub: "pièces produites" },
     { label: "Conformes", value: metrics.totalConforming.toLocaleString("fr-FR"), sub: `${metrics.totalRebut.toLocaleString("fr-FR")} rebuts` },
-    { label: "Temps d'arrêt", value: fmtDuration(heldMin), sub: "planifiés + non planifiés" },
+    { label: "Temps d'arrêt", value: fmtDuration(heldMin), sub: "planifiés + non planifiés", color: downtimeHeavy ? "#dc2626" : undefined },
     { label: "Temps de marche", value: fmtDuration(Math.round(metrics.tF)), sub: "tF" },
     { label: "Disponibilité", value: fmtPct(metrics.DO), sub: "DO", color: trsColor(metrics.DO) },
     { label: "Performance", value: fmtPct(metrics.TP), sub: "TP", color: trsColor(metrics.TP) },
@@ -837,22 +854,22 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
       <div className="relative">
         <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 text-gray-500">
-              <th className="px-3 py-2 text-left"></th>
-              <th className="px-3 py-2 text-left">Date</th>
-              <th className="px-3 py-2 text-right">tO</th>
-              <th className="px-3 py-2 text-right">tAP</th>
-              <th className="px-3 py-2 text-right">tR</th>
-              <th className="px-3 py-2 text-right">tF</th>
-              <th className="px-3 py-2 text-right">Lots</th>
-              <th className="px-3 py-2 text-right">NPR</th>
-              <th className="px-3 py-2 text-right">NPC</th>
-              <th className="px-3 py-2 text-right">DO</th>
-              <th className="px-3 py-2 text-right">TP</th>
-              <th className="px-3 py-2 text-right">TQ</th>
-              <th className="px-3 py-2 text-right">TRS</th>
-              <th className="px-3 py-2 text-right">TRG</th>
+          <thead className="sticky top-0 z-10 bg-gray-50 shadow-sm">
+            <tr className="text-gray-500 text-sm">
+              <th className="px-3 py-2 text-left" scope="col"></th>
+              <th className="px-3 py-2 text-left" scope="col">Date</th>
+              <th className="px-3 py-2 text-right" scope="col">tO</th>
+              <th className="px-3 py-2 text-right" scope="col">tAP</th>
+              <th className="px-3 py-2 text-right" scope="col">tR</th>
+              <th className="px-3 py-2 text-right" scope="col">tF</th>
+              <th className="px-3 py-2 text-right" scope="col">Lots</th>
+              <th className="px-3 py-2 text-right" scope="col">NPR</th>
+              <th className="px-3 py-2 text-right" scope="col">NPC</th>
+              <th className="px-3 py-2 text-right" scope="col">DO</th>
+              <th className="px-3 py-2 text-right" scope="col">TP</th>
+              <th className="px-3 py-2 text-right" scope="col">TQ</th>
+              <th className="px-3 py-2 text-right" scope="col">TRS</th>
+              <th className="px-3 py-2 text-right" scope="col">TRG</th>
             </tr>
           </thead>
           <tbody className="divide-y">

@@ -286,7 +286,9 @@ export default function CompteurPage() {
   if (view === "pick-equip") {
     return (
       <div className="max-w-lg mx-auto">
-        <button onClick={() => setView("pick-room")} className="flex items-center gap-1 text-sm text-blue-600 mb-4">
+        <button onClick={() => setView("pick-room")}
+          aria-label="Retour"
+          className="flex items-center gap-1 text-sm text-blue-600 mb-4 min-h-[44px] -ml-2 px-2 rounded-lg hover:bg-blue-50 transition">
           <ChevronLeft className="h-4 w-4" /> Retour
         </button>
         <h2 className="text-xl font-bold mb-4">{selectedRoom?.name} — Équipement</h2>
@@ -378,7 +380,8 @@ export default function CompteurPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <button onClick={() => { setView("pick-room"); setActiveSession(null); setDetail(null); sessionCtx.set(null); }}
-        className="flex items-center gap-1 text-sm text-blue-600 mb-4">
+        aria-label="Retour"
+        className="flex items-center gap-1 text-sm text-blue-600 mb-4 min-h-[44px] -ml-2 px-2 rounded-lg hover:bg-blue-50 transition">
         <ChevronLeft className="h-4 w-4" /> Retour
       </button>
 
@@ -420,6 +423,7 @@ export default function CompteurPage() {
                   style={{ backgroundColor: trsColor(trsData.session.TRS) + "22", color: trsColor(trsData.session.TRS) }}>
                   TRS {fmtPct(trsData.session.TRS)}
                 </span>
+                {!trsStale && <span className="h-2 w-2 rounded-full bg-green-400 motion-safe:animate-pulse shrink-0" />}
                 <span className="text-xs text-gray-400">en direct</span>
                 {trsStale && (
                   <span className="inline-flex items-center gap-1 text-xs text-amber-600" title="La mise à jour automatique a échoué — valeur possiblement périmée">
@@ -441,9 +445,9 @@ export default function CompteurPage() {
                 <div className="text-sm text-gray-400 font-medium">Aucun lot actif</div>
               )}
             </div>
-            <div className={`rounded-xl p-3 ${activeLot ? "bg-green-50" : "bg-gray-50"}`}>
+            <div className={`rounded-xl p-3 transition-colors duration-300 ${activeLot ? "bg-green-50" : "bg-gray-50"}`}>
               <div className="text-[11px] text-gray-400 mb-0.5">Activité</div>
-              <div className={`font-semibold text-base leading-tight truncate ${activeLot ? "text-green-700" : "text-gray-700"}`}>
+              <div className={`font-semibold text-base leading-tight truncate transition-colors duration-300 ${activeLot ? "text-green-700" : "text-gray-700"}`}>
                 {currentActivity}
               </div>
             </div>
@@ -613,8 +617,12 @@ export default function CompteurPage() {
                           </span>
                         )}
                         {lotTrs && (
-                          <span className="ml-auto font-medium" style={{ color: trsColor(lotTrs.TP) }}>
-                            TP {fmtPct(lotTrs.TP)}
+                          <span className="ml-auto inline-flex items-center gap-1.5">
+                            <span className="text-xs font-medium text-gray-400">TP {fmtPct(lotTrs.TP)}</span>
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                              style={{ backgroundColor: trsColor(lotTrs.TP * lotTrs.TQ) + "22", color: trsColor(lotTrs.TP * lotTrs.TQ) }}>
+                              TRS {fmtPct(lotTrs.TP * lotTrs.TQ)}
+                            </span>
                           </span>
                         )}
                       </div>
@@ -676,6 +684,7 @@ export default function CompteurPage() {
                   </>
                 )}
                 <button onClick={handleCloseSession}
+                  aria-label="Fermer la session"
                   className={`flex-1 bg-red-50 text-red-700 ${BTN_PRIMARY} hover:bg-red-100`}>
                   <Square className={BTN_ICON} /> Fermer
                 </button>
@@ -714,20 +723,28 @@ function LiveSessionBar({ elapsed, sessionTrs, aClasserMin }: {
   const lots = sessionTrs?.lotCount ?? 0;
   const classOk = aClasserMin <= 1;
 
-  const metrics: Array<{ label: string; value: string; color?: string; warn?: boolean }> = [
+  const urgentUnclassified = aClasserMin >= 10;
+
+  const metrics: Array<{ label: string; value: string; color?: string; warn?: boolean; urgent?: boolean }> = [
     { label: "Durée", value: dur },
     { label: "Lots", value: lots > 0 ? String(lots) : "—" },
     { label: "TRS", value: trs != null ? fmtPct(trs) : "—", color: trs != null ? trsColor(trs) : undefined },
-    { label: "Non classé", value: classOk ? "—" : fmtDuration(aClasserMin), warn: !classOk },
+    { label: "Non classé", value: classOk ? "—" : fmtDuration(aClasserMin), warn: !classOk, urgent: urgentUnclassified },
   ];
 
   return (
     <div className="grid grid-cols-4 gap-2 mb-4">
       {metrics.map(m => (
         <div key={m.label}
-          className={`rounded-xl border px-2 py-2.5 text-center ${m.warn ? "border-amber-300 bg-amber-50" : "bg-white border-gray-200"}`}>
+          className={`rounded-xl border px-2 py-4 text-center ${
+            m.urgent ? "border-red-300 bg-red-50" :
+            m.warn ? "border-amber-300 bg-amber-50" :
+            "bg-white border-gray-200"
+          }`}>
           <div className="text-[10px] text-gray-500 uppercase tracking-wide leading-tight">{m.label}</div>
-          <div className="text-base font-bold mt-0.5 leading-tight" style={{ color: m.warn ? "#92400e" : m.color }}>
+          <div className="text-xl font-bold mt-0.5 leading-tight tabular-nums" style={{
+            color: m.urgent ? "#b91c1c" : m.warn ? "#92400e" : m.color
+          }}>
             {m.value}
           </div>
         </div>
@@ -1251,6 +1268,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
         {error && <div className="bg-red-50 text-red-600 rounded-lg p-3 mb-4 text-sm">{error}</div>}
         <div className="flex gap-3">
           <button onClick={() => setStep("form")}
+            aria-label="Retour au formulaire"
             className={`flex-1 border border-gray-300 text-gray-700 ${BTN_PRIMARY} hover:bg-gray-50`}>
             <ChevronLeft className="h-4 w-4" /> Modifier
           </button>
@@ -1265,7 +1283,9 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
 
   return (
     <div className="max-w-lg mx-auto">
-      <button onClick={onBack} className="flex items-center gap-1 text-sm text-blue-600 mb-4">
+      <button onClick={onBack}
+        aria-label="Retour"
+        className="flex items-center gap-1 text-sm text-blue-600 mb-4 min-h-[44px] -ml-2 px-2 rounded-lg hover:bg-blue-50 transition">
         <ChevronLeft className="h-4 w-4" /> Retour
       </button>
       <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
@@ -1450,7 +1470,9 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
 
   return (
     <div className="max-w-lg mx-auto">
-      <button onClick={onBack} className="flex items-center gap-1 text-sm text-blue-600 mb-4">
+      <button onClick={onBack}
+        aria-label="Retour"
+        className="flex items-center gap-1 text-sm text-blue-600 mb-4 min-h-[44px] -ml-2 px-2 rounded-lg hover:bg-blue-50 transition">
         <ChevronLeft className="h-4 w-4" /> Retour
       </button>
       <h2 className="text-xl font-bold mb-1 flex items-center gap-2">

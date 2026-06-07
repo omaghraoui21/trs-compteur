@@ -169,10 +169,10 @@ export default function SupervisorPage() {
       {loading && <ListSkeleton />}
 
       {!loading && lots.length === 0 && (
-        <div className="bg-white rounded-xl border p-8 text-center text-gray-400">
-          <ClipboardCheck className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-          <p className="font-medium text-gray-500">Aucun lot en attente</p>
-          <p className="text-sm mt-1">Tous les lots ont été traités.</p>
+        <div className="bg-white rounded-xl border p-12 text-center">
+          <ShieldCheck className="h-12 w-12 mx-auto text-green-400 mb-3" />
+          <p className="font-semibold text-gray-700">Aucun lot en attente</p>
+          <p className="text-sm text-gray-400 mt-1">Tous les lots ont été validés.</p>
         </div>
       )}
 
@@ -187,6 +187,8 @@ export default function SupervisorPage() {
               {/* Card header — always visible */}
               <button
                 onClick={() => expandLot(lot.id)}
+                aria-expanded={isExpanded}
+                aria-controls={`lot-detail-${lot.id}`}
                 className="w-full px-4 py-3 text-left hover:bg-gray-50 transition"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -218,7 +220,7 @@ export default function SupervisorPage() {
 
               {/* Expanded detail */}
               {isExpanded && (
-                <div className="border-t px-4 py-3 space-y-3">
+                <div id={`lot-detail-${lot.id}`} className="border-t px-4 py-3 space-y-3">
                   {/* Quantities */}
                   <div className="grid grid-cols-3 gap-3 text-sm">
                     {[

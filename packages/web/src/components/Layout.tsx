@@ -42,17 +42,25 @@ export default function Layout({ children }: { children: ReactNode }) {
         </div>
         <div className="flex items-center gap-4">
           {equipmentName ? (
-            <span className="hidden sm:inline text-sm font-medium bg-green-500/20 text-green-100 px-2.5 py-1 rounded-full flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse shrink-0" />
-              {equipmentName}{elapsed ? ` • ${elapsed}` : ""}
+            <span className="text-sm font-medium bg-green-500/20 text-green-100 px-2.5 py-1 rounded-full flex items-center gap-1.5 max-w-[180px] sm:max-w-none truncate">
+              <span className="h-2 w-2 rounded-full bg-green-400 motion-safe:animate-pulse shrink-0" />
+              <span className="truncate">{equipmentName}{elapsed ? ` • ${elapsed}` : ""}</span>
             </span>
           ) : (
             <span className="hidden sm:inline text-sm opacity-80">{user?.displayName}</span>
           )}
-          <button onClick={() => setPwOpen(true)} className="p-1.5 rounded hover:bg-blue-600 transition" title="Changer mon mot de passe">
+          <button
+            onClick={() => setPwOpen(true)}
+            className="p-1.5 rounded hover:bg-blue-600 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+            aria-label="Changer mon mot de passe"
+          >
             <KeyRound className="h-4 w-4" />
           </button>
-          <button onClick={logout} className="p-1.5 rounded hover:bg-blue-600 transition" title="Déconnexion">
+          <button
+            onClick={logout}
+            className="p-1.5 rounded hover:bg-blue-600 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+            aria-label="Déconnexion"
+          >
             <LogOut className="h-4 w-4" />
           </button>
         </div>
@@ -63,21 +71,37 @@ export default function Layout({ children }: { children: ReactNode }) {
       <div className="flex-1 flex">
         {/* ── Desktop sidebar (lg+) ── */}
         <nav className="hidden lg:flex w-48 bg-white border-r flex-col py-2 shrink-0">
-          {items.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-2.5 text-sm transition ${
-                  isActive ? "bg-blue-50 text-blue-700 font-medium border-r-2 border-blue-700" : "text-gray-600 hover:bg-gray-50"
-                }`
-              }
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </NavLink>
-          ))}
+          <div className="flex-1">
+            {items.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/"}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-2.5 text-sm transition ${
+                    isActive ? "bg-blue-50 text-blue-700 font-medium border-r-2 border-blue-700" : "text-gray-600 hover:bg-gray-50"
+                  }`
+                }
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+          {user && (
+            <div className="border-t px-4 py-3 mt-auto">
+              <div className="text-xs font-medium text-gray-700 truncate">{user.displayName}</div>
+              <div className="mt-0.5">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                  user.role === "admin" ? "bg-purple-100 text-purple-700" :
+                  user.role === "supervisor" ? "bg-blue-100 text-blue-700" :
+                  "bg-gray-100 text-gray-600"
+                }`}>
+                  {user.role === "admin" ? "Admin" : user.role === "supervisor" ? "Superviseur" : "Opérateur"}
+                </span>
+              </div>
+            </div>
+          )}
         </nav>
 
         {/* extra bottom padding on mobile so the fixed tab bar (56px + safe area)
