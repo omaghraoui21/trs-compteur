@@ -209,7 +209,7 @@ export interface DowntimeEvent { id: string; lotEntryId: string; categoryId: str
 // Returned by GET /lots/:id/downtimes — category joined server-side (famille/reason/isPlanned).
 export interface LotDowntime extends DowntimeEvent { famille: string; reason: string; isPlanned: boolean }
 
-export interface SessionDetail { session: Session; events: SessionEvent[]; lots: LotEntry[]; downtimes: DowntimeEvent[] }
+export interface SessionDetail { session: Session; events: SessionEvent[]; lots: LotEntry[]; downtimes: LotDowntime[] }
 export interface TrsWarning { code: string; level: "error" | "warning"; message: string; field: string; value?: number }
 export interface TrsAudit { tF_norme: number; tF_lots: number; tF_delta: number; formula: string }
 export interface ReliabilityMetrics { breakdownCount: number; totalBreakdownMin: number; mtbf: number | null; mttr: number | null; availability: number | null }

@@ -33,22 +33,37 @@ sessionsRouter.get("/:id", asyncHandler(async (req, res) => {
   const [session] = await db.select().from(sessions).where(eq(sessions.id, String(req.params.id))).limit(1);
   if (!session) { res.status(404).json({ error: "Session introuvable" }); return; }
 
-  const events = await db.select().from(sessionEvents)
-    .where(eq(sessionEvents.sessionId, session.id))
-    .orderBy(sessionEvents.sortOrder);
+  const dtSelect = {
+    id: downtimeEvents.id,
+    lotEntryId: downtimeEvents.lotEntryId,
+    categoryId: downtimeEvents.categoryId,
+    startedAt: downtimeEvents.startedAt,
+    endedAt: downtimeEvents.endedAt,
+    durationMinutes: downtimeEvents.durationMinutes,
+    comment: downtimeEvents.comment,
+    famille: downtimeCategories.famille,
+    reason: downtimeCategories.label,
+    isPlanned: downtimeCategories.isPlanned,
+  };
 
-  const lots = await db.select().from(lotEntries)
-    .where(eq(lotEntries.sessionId, session.id))
-    .orderBy(lotEntries.lotOrder);
+  const [events, lots, sessionDowntimes] = await Promise.all([
+    db.select().from(sessionEvents)
+      .where(eq(sessionEvents.sessionId, session.id))
+      .orderBy(sessionEvents.sortOrder),
+    db.select().from(lotEntries)
+      .where(eq(lotEntries.sessionId, session.id))
+      .orderBy(lotEntries.lotOrder),
+    db.select(dtSelect).from(downtimeEvents)
+      .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+      .where(and(eq(downtimeEvents.sessionId, session.id), isNull(downtimeEvents.lotEntryId))),
+  ]);
 
-  // Downtimes attached to this session's lots (during production) …
   const lotIds = lots.map(l => l.id);
   const lotDowntimes = lotIds.length > 0
-    ? await db.select().from(downtimeEvents).where(inArray(downtimeEvents.lotEntryId, lotIds))
+    ? await db.select(dtSelect).from(downtimeEvents)
+        .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+        .where(inArray(downtimeEvents.lotEntryId, lotIds))
     : [];
-  // … plus session-level downtimes (inter-lot: changeover, cleaning, waiting).
-  const sessionDowntimes = await db.select().from(downtimeEvents)
-    .where(eq(downtimeEvents.sessionId, session.id));
 
   res.json({ session, events, lots, downtimes: [...lotDowntimes, ...sessionDowntimes] });
 }));

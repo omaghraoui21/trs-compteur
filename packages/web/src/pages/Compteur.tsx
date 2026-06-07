@@ -161,14 +161,10 @@ export default function CompteurPage() {
   const loadDetail = useCallback(async (sessionId: string) => {
     setDetailLoading(true);
     try {
-      const [d, t, sdts] = await Promise.all([
-        api.session(sessionId),
-        api.sessionTrs(sessionId),
-        api.sessionDowntimes(sessionId),
-      ]);
+      const [d, t] = await Promise.all([api.session(sessionId), api.sessionTrs(sessionId)]);
       setDetail(d);
       setTrsData(t);
-      setSessionDts(sdts);
+      setSessionDts(d.downtimes.filter(dt => !dt.lotEntryId));
       setTrsStale(false);
     } finally {
       setDetailLoading(false);
@@ -526,7 +522,7 @@ export default function CompteurPage() {
           <LiveSessionBar elapsed={elapsed} sessionTrs={sessionTrs} aClasserMin={trsData?.aClasserMin ?? 0} />
 
           {/* U6: Session Timeline Bar */}
-          <SessionTimelineBar detail={detail} session={activeSession} categories={categories} />
+          <SessionTimelineBar detail={detail} session={activeSession} />
 
           {/* Events timeline */}
           <div className="bg-white rounded-xl border shadow-sm mb-4">
@@ -648,7 +644,8 @@ export default function CompteurPage() {
 
           {/* Session-level declared stops (inter-lot) — with inline delete */}
           {sessionDts.length > 0 && (
-            <SessionDowntimesList
+            <DeclaredDowntimesList
+              title="Arrêts de la session"
               downtimes={sessionDts}
               onDelete={async (dtId) => {
                 try {
@@ -858,10 +855,7 @@ function AClasserBanner({ minutes, onDeclare, categories, equipmentId, sessionId
 
 // ─── U6: Session Timeline Bar ────────────────────────────
 
-function SessionTimelineBar({ detail, session, categories }: { detail: SessionDetail; session: Session; categories: DowntimeCategory[] }) {
-  // Stable across detail updates — categories only change on equipment selection.
-  const plannedById = useMemo(() => new Map(categories.map(c => [c.id, c.isPlanned])), [categories]);
-
+function SessionTimelineBar({ detail, session }: { detail: SessionDetail; session: Session }) {
   const segments = useMemo(() => {
     const openedAt = new Date(session.openedAt).getTime();
     const now = session.closedAt ? new Date(session.closedAt).getTime() : Date.now();
@@ -891,8 +885,7 @@ function SessionTimelineBar({ detail, session, categories }: { detail: SessionDe
       const start = new Date(dt.startedAt).getTime();
       const dur = dt.durationMinutes * 60_000;
       const end = dt.endedAt ? new Date(dt.endedAt).getTime() : start + dur;
-      const planned = plannedById.get(dt.categoryId) ?? false;
-      segs.push({ start, end, type: planned ? "planned" : "unplanned", label: planned ? "Arrêt planifié" : "Arrêt non planifié" });
+      segs.push({ start, end, type: dt.isPlanned ? "planned" : "unplanned", label: dt.isPlanned ? "Arrêt planifié" : "Arrêt non planifié" });
     }
 
     // Sort by start time
@@ -903,7 +896,7 @@ function SessionTimelineBar({ detail, session, categories }: { detail: SessionDe
       leftPct: ((seg.start - openedAt) / totalMs) * 100,
       widthPct: Math.max(((seg.end - seg.start) / totalMs) * 100, 0.5),
     }));
-  }, [detail, session, plannedById]);
+  }, [detail, session]);
 
   if (segments.length === 0) return null;
 
@@ -1018,10 +1011,10 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
   const toast = useToast();
 
   const [lotDts, setLotDts] = useState<LotDowntime[]>([]);
-  const fetchLotDts = useCallback(async () => {
+  const fetchLotDts = async () => {
     try { setLotDts(await api.lotDowntimes(lot.id)); } catch { /* non-critical */ }
-  }, [lot.id]);
-  useEffect(() => { fetchLotDts(); }, [fetchLotDts]);
+  };
+  useEffect(() => { fetchLotDts(); }, [lot.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cadence can be adjusted mid-lot (logged for audit + time-weighted TRS).
   const [editingCadence, setEditingCadence] = useState(false);
@@ -1437,10 +1430,6 @@ function DeclaredDowntimesList({ title, downtimes, onDelete }: {
   );
 }
 
-function SessionDowntimesList({ downtimes, onDelete }: { downtimes: LotDowntime[]; onDelete: (dtId: string) => void }) {
-  return <DeclaredDowntimesList title="Arrêts de la session" downtimes={downtimes} onDelete={onDelete} />;
-}
-
 // ─── Add Downtime Form (U1: timer auto, U2: large buttons) ─
 
 const RECENT_DOWNTIMES_MAX = 3;
@@ -1466,7 +1455,7 @@ function saveRecentDowntime(equipmentId: string, catId: string) {
 function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMin, onAdded, onBack }: {
   lotId?: string; sessionId: string; equipmentId: string; categories: DowntimeCategory[]; aClasserMin?: number; onAdded: () => void; onBack: () => void;
 }) {
-  const suggestedMin = aClasserMin != null && aClasserMin >= 1 ? Math.round(aClasserMin) : 0;
+  const suggestedMin = (aClasserMin ?? 0) >= 1 ? Math.round(aClasserMin!) : 0;
   const [catId, setCatId] = useState("");
   const [flashDowntime, triggerFlashDowntime] = useFlash();
   const toast = useToast();
@@ -1514,6 +1503,15 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
+  const famillesNP = useMemo(
+    () => [...new Set(categories.filter(c => !c.isPlanned).map(c => c.famille))],
+    [categories],
+  );
+  const famillesP = useMemo(
+    () => [...new Set(categories.filter(c => c.isPlanned).map(c => c.famille))],
+    [categories],
+  );
+
   // Two top-level sections — Non planifié then Planifié — each grouped by famille.
   const sections = useMemo(() => {
     const build = (planned: boolean, filter: string | null) => {
@@ -1525,13 +1523,11 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
       }
       return Object.entries(grouped);
     };
-    const famillesOf = (planned: boolean) =>
-      [...new Set(categories.filter(c => c.isPlanned === planned).map(c => c.famille))];
     return [
-      { planned: false, title: "Arrêts non planifiés", hint: "Pannes, attentes, utilités, qualité…", familles: build(false, familleFilterNP), allFamilles: famillesOf(false), filter: familleFilterNP, setFilter: setFamilleFilterNP },
-      { planned: true, title: "Arrêts planifiés", hint: "Changement de série, nettoyage, pause, maintenance préventive…", familles: build(true, familleFilterP), allFamilles: famillesOf(true), filter: familleFilterP, setFilter: setFamilleFilterP },
+      { planned: false, title: "Arrêts non planifiés", hint: "Pannes, attentes, utilités, qualité…", familles: build(false, familleFilterNP), allFamilles: famillesNP, filter: familleFilterNP, setFilter: setFamilleFilterNP },
+      { planned: true, title: "Arrêts planifiés", hint: "Changement de série, nettoyage, pause, maintenance préventive…", familles: build(true, familleFilterP), allFamilles: famillesP, filter: familleFilterP, setFilter: setFamilleFilterP },
     ];
-  }, [categories, familleFilterNP, familleFilterP]);
+  }, [categories, familleFilterNP, familleFilterP, famillesNP, famillesP]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

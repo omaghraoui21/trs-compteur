@@ -46310,11 +46310,25 @@ sessionsRouter.get("/:id", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "Session introuvable" });
     return;
   }
-  const events = await db2.select().from(sessionEvents).where(eq(sessionEvents.sessionId, session.id)).orderBy(sessionEvents.sortOrder);
-  const lots = await db2.select().from(lotEntries).where(eq(lotEntries.sessionId, session.id)).orderBy(lotEntries.lotOrder);
+  const dtSelect = {
+    id: downtimeEvents.id,
+    lotEntryId: downtimeEvents.lotEntryId,
+    categoryId: downtimeEvents.categoryId,
+    startedAt: downtimeEvents.startedAt,
+    endedAt: downtimeEvents.endedAt,
+    durationMinutes: downtimeEvents.durationMinutes,
+    comment: downtimeEvents.comment,
+    famille: downtimeCategories.famille,
+    reason: downtimeCategories.label,
+    isPlanned: downtimeCategories.isPlanned
+  };
+  const [events, lots, sessionDowntimes] = await Promise.all([
+    db2.select().from(sessionEvents).where(eq(sessionEvents.sessionId, session.id)).orderBy(sessionEvents.sortOrder),
+    db2.select().from(lotEntries).where(eq(lotEntries.sessionId, session.id)).orderBy(lotEntries.lotOrder),
+    db2.select(dtSelect).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(and(eq(downtimeEvents.sessionId, session.id), isNull(downtimeEvents.lotEntryId)))
+  ]);
   const lotIds = lots.map((l) => l.id);
-  const lotDowntimes = lotIds.length > 0 ? await db2.select().from(downtimeEvents).where(inArray(downtimeEvents.lotEntryId, lotIds)) : [];
-  const sessionDowntimes = await db2.select().from(downtimeEvents).where(eq(downtimeEvents.sessionId, session.id));
+  const lotDowntimes = lotIds.length > 0 ? await db2.select(dtSelect).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(inArray(downtimeEvents.lotEntryId, lotIds)) : [];
   res.json({ session, events, lots, downtimes: [...lotDowntimes, ...sessionDowntimes] });
 }));
 sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (req, res) => {
