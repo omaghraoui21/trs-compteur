@@ -114,10 +114,11 @@ async function buildSessionsTrs(db: any, sessionList: any[]): Promise<Map<string
 
     for (const lot of sessionLots) {
       const dts = dtsByLot.get(lot.id) ?? [];
-      const eff = effectiveLotCadence(lot, changesByLot.get(lot.id), session.closedAt!);
+      const eff = effectiveLotCadence(lot, changesByLot.get(lot.id));
       const lotTrs = computeLotTrs({
-        cadence: eff.cadence,
-        cadenceUnit: eff.cadenceUnit,
+        cadence: eff.initialCadence,
+        cadenceUnit: eff.initialUnit,
+        cadenceChanges: eff.cadenceChanges,
         produced: lot.quantityProduced,
         conforming: lot.quantityConforming,
         startedAt: lot.startedAt,
@@ -132,13 +133,17 @@ async function buildSessionsTrs(db: any, sessionList: any[]): Promise<Map<string
         lotDetails.push({
           lotId: lot.id, batchNumber: lot.batchNumber,
           productName: product?.name ?? "", productCode: product?.code ?? "",
+          // nominalCadencePerMin: the original consigne; cadencePerMin: the effective
+          // (time-weighted) value actually used for TP.
           cadenceUsed: Number(lot.cadenceUsed), cadenceUnit: lot.cadenceUnit,
           quantityProduced: lot.quantityProduced, quantityConforming: lot.quantityConforming,
           quantityRejected: lot.quantityRejected, ...lotTrs,
         });
         productLots.push({
           productId: lot.productId, productName: product?.name ?? "",
-          cadence: Number(lot.cadenceUsed), cadenceUnit: lot.cadenceUnit as "u/h" | "u/min",
+          // Use the effective (time-weighted) cadence so computeProductTrs computes
+          // avgCadencePerMin from the cadence actually used, not the final consigne.
+          cadence: lotTrs.cadencePerMin, cadenceUnit: "u/min",
           produced: lot.quantityProduced, conforming: lot.quantityConforming,
           lotDurationMin: lotTrs.lotDurationMin, unplannedMin: lotTrs.unplannedMin,
           tF: lotTrs.tF, tN: lotTrs.tN, tU: lotTrs.tU,

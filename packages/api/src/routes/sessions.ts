@@ -243,10 +243,11 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
   let lotsDurationMin = 0;
   for (const lot of lots) {
     const dts = dtsByLot.get(lot.id) ?? [];
-    const eff = effectiveLotCadence(lot, changesByLot.get(lot.id), closedAt);
+    const eff = effectiveLotCadence(lot, changesByLot.get(lot.id));
     const lotTrs = computeLotTrs({
-      cadence: eff.cadence,
-      cadenceUnit: eff.cadenceUnit,
+      cadence: eff.initialCadence,
+      cadenceUnit: eff.initialUnit,
+      cadenceChanges: eff.cadenceChanges,
       produced: lot.quantityProduced,
       conforming: lot.quantityConforming,
       startedAt: lot.startedAt,

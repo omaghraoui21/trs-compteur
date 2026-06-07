@@ -42,6 +42,15 @@ export interface LotTrsInput {
   startedAt: Date | string;
   endedAt: Date | string;
   downtimes: DowntimeInput[];
+  /**
+   * Optional cadence change history for time-weighted TP.
+   * When provided, `cadence`/`cadenceUnit` are the INITIAL cadence (at lot start,
+   * before any operator adjustment). Each entry gives the new cadence per minute
+   * at the moment it took effect. `timeWeightedCadence()` is used internally.
+   * The effective (weighted) cadence is stored in `LotTrsResult.cadencePerMin`;
+   * the initial consigne in `LotTrsResult.nominalCadencePerMin`.
+   */
+  cadenceChanges?: { at: Date | string; cadencePerMin: number }[];
 }
 
 export interface LotTrsResult {
@@ -54,7 +63,10 @@ export interface LotTrsResult {
   nonQualiteMin: number;
   TP: number;
   TQ: number;
+  /** Effective (time-weighted) cadence used for TP — equals nominalCadencePerMin when no changes. */
   cadencePerMin: number;
+  /** Initial target cadence (the consigne at lot start), always in u/min. */
+  nominalCadencePerMin: number;
   ecartCadence: number;
   rebut: number;
   downtimeByFamille: Record<string, number>;
@@ -174,11 +186,29 @@ export interface SixBigLossesResult {
 // ─── Lot-level TRS ──────────────────────────────────────
 
 export function computeLotTrs(input: LotTrsInput): LotTrsResult | null {
-  const { cadence, cadenceUnit, produced, conforming, startedAt, endedAt, downtimes } = input;
+  const { cadence, cadenceUnit, produced, conforming, startedAt, endedAt, downtimes, cadenceChanges } = input;
   if (cadence <= 0) return null;
 
   const warnings: TrsWarning[] = [];
-  const cadencePerMin = cadenceUnit === "u/min" ? cadence : cadence / 60;
+  const nominalCadencePerMin = cadenceUnit === "u/min" ? cadence : cadence / 60;
+  const cadencePerMin = (cadenceChanges && cadenceChanges.length > 0)
+    ? timeWeightedCadence({ startedAt, endedAt, initial: nominalCadencePerMin, changes: cadenceChanges })
+    : nominalCadencePerMin;
+
+  // Warn when operator reduced cadence significantly vs initial consigne (>5%).
+  if (cadenceChanges && cadenceChanges.length > 0 && nominalCadencePerMin > 0) {
+    const deviation = (nominalCadencePerMin - cadencePerMin) / nominalCadencePerMin;
+    if (Math.abs(deviation) > 0.05) {
+      warnings.push({
+        code: "CADENCE_WEIGHTED",
+        level: "warning",
+        message: `Cadence pondérée ${(cadencePerMin).toFixed(1)} u/min vs consigne ${nominalCadencePerMin.toFixed(1)} u/min (écart ${(deviation * 100).toFixed(1)}%)`,
+        field: "TP",
+        value: cadencePerMin,
+      });
+    }
+  }
+
   const lotDurationMin = diffMinutes(startedAt, endedAt);
 
   const plannedMin = downtimes
@@ -223,7 +253,7 @@ export function computeLotTrs(input: LotTrsInput): LotTrsResult | null {
     warnings.push({ code: "STOPS_GT_DURATION", level: "error", message: `Arrêts NP (${unplannedMin}min) > durée lot (${lotDurationMin}min)`, field: "tF", value: unplannedMin });
   }
 
-  return { lotDurationMin, plannedMin, unplannedMin, tF, tN, tU, nonQualiteMin, TP, TQ, cadencePerMin, ecartCadence, rebut, downtimeByFamille, downtimeByNorme, warnings };
+  return { lotDurationMin, plannedMin, unplannedMin, tF, tN, tU, nonQualiteMin, TP, TQ, cadencePerMin, nominalCadencePerMin, ecartCadence, rebut, downtimeByFamille, downtimeByNorme, warnings };
 }
 
 // ─── Time-weighted nominal cadence ──────────────────────

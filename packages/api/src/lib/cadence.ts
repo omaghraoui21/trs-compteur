@@ -1,5 +1,3 @@
-import { timeWeightedCadence } from "@trs/engine";
-
 // One row of the lot_cadence_changes audit trail.
 export interface CadenceChangeRow {
   oldCadence: string | number;
@@ -10,27 +8,39 @@ export interface CadenceChangeRow {
 
 const perMin = (v: number, unit: string) => (unit === "u/min" ? v : v / 60);
 
-// Effective nominal cadence to feed computeLotTrs. With no recorded changes,
-// returns the lot's own cadence unchanged (so existing lots are unaffected).
-// With changes, returns the time-weighted average over the lot duration,
-// normalised to u/min.
+// Returns the cadence inputs for computeLotTrs (which now handles time-weighting
+// natively via its cadenceChanges field).
+//
+// - initialCadence / initialUnit : the cadence at lot start (before any changes).
+// - cadenceChanges               : per-minute change transitions to pass through.
+//
+// When there are no recorded changes the array is empty and computeLotTrs falls
+// back to the single nominal cadence (unchanged behaviour).
 export function effectiveLotCadence(
-  lot: { cadenceUsed: string | number; cadenceUnit: string; startedAt: Date | string; endedAt: Date | string | null },
+  lot: { cadenceUsed: string | number; cadenceUnit: string },
   changes: CadenceChangeRow[] | undefined,
-  fallbackEnd: Date | string,
-): { cadence: number; cadenceUnit: "u/min" | "u/h" } {
+): {
+  initialCadence: number;
+  initialUnit: "u/min" | "u/h";
+  cadenceChanges: { at: Date | string; cadencePerMin: number }[];
+} {
   if (!changes || changes.length === 0) {
-    return { cadence: Number(lot.cadenceUsed), cadenceUnit: lot.cadenceUnit as "u/min" | "u/h" };
+    return {
+      initialCadence: Number(lot.cadenceUsed),
+      initialUnit: lot.cadenceUnit as "u/min" | "u/h",
+      cadenceChanges: [],
+    };
   }
   const sorted = [...changes].sort(
     (a, b) => new Date(a.changedAt).getTime() - new Date(b.changedAt).getTime(),
   );
-  const initial = perMin(Number(sorted[0].oldCadence), sorted[0].cadenceUnit);
-  const cadence = timeWeightedCadence({
-    startedAt: lot.startedAt,
-    endedAt: lot.endedAt ?? fallbackEnd,
-    initial,
-    changes: sorted.map((c) => ({ at: c.changedAt, cadencePerMin: perMin(Number(c.newCadence), c.cadenceUnit) })),
-  });
-  return { cadence, cadenceUnit: "u/min" };
+  return {
+    // The cadence at lot start is the oldCadence of the first recorded change.
+    initialCadence: Number(sorted[0].oldCadence),
+    initialUnit: sorted[0].cadenceUnit as "u/min" | "u/h",
+    cadenceChanges: sorted.map((c) => ({
+      at: c.changedAt,
+      cadencePerMin: perMin(Number(c.newCadence), c.cadenceUnit),
+    })),
+  };
 }

@@ -45664,10 +45664,23 @@ function familleToNorme(famille) {
   return FAMILLE_TO_NORME[famille] || famille;
 }
 function computeLotTrs(input) {
-  const { cadence, cadenceUnit: cadenceUnit2, produced, conforming, startedAt, endedAt, downtimes } = input;
+  const { cadence, cadenceUnit: cadenceUnit2, produced, conforming, startedAt, endedAt, downtimes, cadenceChanges } = input;
   if (cadence <= 0) return null;
   const warnings = [];
-  const cadencePerMin = cadenceUnit2 === "u/min" ? cadence : cadence / 60;
+  const nominalCadencePerMin = cadenceUnit2 === "u/min" ? cadence : cadence / 60;
+  const cadencePerMin = cadenceChanges && cadenceChanges.length > 0 ? timeWeightedCadence({ startedAt, endedAt, initial: nominalCadencePerMin, changes: cadenceChanges }) : nominalCadencePerMin;
+  if (cadenceChanges && cadenceChanges.length > 0 && nominalCadencePerMin > 0) {
+    const deviation = (nominalCadencePerMin - cadencePerMin) / nominalCadencePerMin;
+    if (Math.abs(deviation) > 0.05) {
+      warnings.push({
+        code: "CADENCE_WEIGHTED",
+        level: "warning",
+        message: `Cadence pond\xE9r\xE9e ${cadencePerMin.toFixed(1)} u/min vs consigne ${nominalCadencePerMin.toFixed(1)} u/min (\xE9cart ${(deviation * 100).toFixed(1)}%)`,
+        field: "TP",
+        value: cadencePerMin
+      });
+    }
+  }
   const lotDurationMin = diffMinutes(startedAt, endedAt);
   const plannedMin = downtimes.filter((d) => d.isPlanned).reduce((sum, d) => sum + d.durationMinutes, 0);
   const unplannedMin = downtimes.filter((d) => !d.isPlanned).reduce((sum, d) => sum + d.durationMinutes, 0);
@@ -45696,7 +45709,7 @@ function computeLotTrs(input) {
   if (unplannedMin > lotDurationMin) {
     warnings.push({ code: "STOPS_GT_DURATION", level: "error", message: `Arr\xEAts NP (${unplannedMin}min) > dur\xE9e lot (${lotDurationMin}min)`, field: "tF", value: unplannedMin });
   }
-  return { lotDurationMin, plannedMin, unplannedMin, tF, tN, tU, nonQualiteMin, TP, TQ, cadencePerMin, ecartCadence, rebut, downtimeByFamille, downtimeByNorme, warnings };
+  return { lotDurationMin, plannedMin, unplannedMin, tF, tN, tU, nonQualiteMin, TP, TQ, cadencePerMin, nominalCadencePerMin, ecartCadence, rebut, downtimeByFamille, downtimeByNorme, warnings };
 }
 function timeWeightedCadence(input) {
   const start = new Date(input.startedAt).getTime();
@@ -46253,21 +46266,26 @@ var import_express2 = __toESM(require_express2(), 1);
 
 // packages/api/src/lib/cadence.ts
 var perMin = (v, unit) => unit === "u/min" ? v : v / 60;
-function effectiveLotCadence(lot, changes, fallbackEnd) {
+function effectiveLotCadence(lot, changes) {
   if (!changes || changes.length === 0) {
-    return { cadence: Number(lot.cadenceUsed), cadenceUnit: lot.cadenceUnit };
+    return {
+      initialCadence: Number(lot.cadenceUsed),
+      initialUnit: lot.cadenceUnit,
+      cadenceChanges: []
+    };
   }
   const sorted = [...changes].sort(
     (a, b2) => new Date(a.changedAt).getTime() - new Date(b2.changedAt).getTime()
   );
-  const initial = perMin(Number(sorted[0].oldCadence), sorted[0].cadenceUnit);
-  const cadence = timeWeightedCadence({
-    startedAt: lot.startedAt,
-    endedAt: lot.endedAt ?? fallbackEnd,
-    initial,
-    changes: sorted.map((c) => ({ at: c.changedAt, cadencePerMin: perMin(Number(c.newCadence), c.cadenceUnit) }))
-  });
-  return { cadence, cadenceUnit: "u/min" };
+  return {
+    // The cadence at lot start is the oldCadence of the first recorded change.
+    initialCadence: Number(sorted[0].oldCadence),
+    initialUnit: sorted[0].cadenceUnit,
+    cadenceChanges: sorted.map((c) => ({
+      at: c.changedAt,
+      cadencePerMin: perMin(Number(c.newCadence), c.cadenceUnit)
+    }))
+  };
 }
 
 // packages/api/src/lib/group.ts
@@ -46450,10 +46468,11 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
   let lotsDurationMin = 0;
   for (const lot of lots) {
     const dts = dtsByLot.get(lot.id) ?? [];
-    const eff = effectiveLotCadence(lot, changesByLot.get(lot.id), closedAt);
+    const eff = effectiveLotCadence(lot, changesByLot.get(lot.id));
     const lotTrs = computeLotTrs({
-      cadence: eff.cadence,
-      cadenceUnit: eff.cadenceUnit,
+      cadence: eff.initialCadence,
+      cadenceUnit: eff.initialUnit,
+      cadenceChanges: eff.cadenceChanges,
       produced: lot.quantityProduced,
       conforming: lot.quantityConforming,
       startedAt: lot.startedAt,
@@ -46807,10 +46826,11 @@ async function buildSessionsTrs(db2, sessionList) {
     ];
     for (const lot of sessionLots) {
       const dts = dtsByLot.get(lot.id) ?? [];
-      const eff = effectiveLotCadence(lot, changesByLot.get(lot.id), session.closedAt);
+      const eff = effectiveLotCadence(lot, changesByLot.get(lot.id));
       const lotTrs = computeLotTrs({
-        cadence: eff.cadence,
-        cadenceUnit: eff.cadenceUnit,
+        cadence: eff.initialCadence,
+        cadenceUnit: eff.initialUnit,
+        cadenceChanges: eff.cadenceChanges,
         produced: lot.quantityProduced,
         conforming: lot.quantityConforming,
         startedAt: lot.startedAt,
@@ -46826,6 +46846,8 @@ async function buildSessionsTrs(db2, sessionList) {
           batchNumber: lot.batchNumber,
           productName: product?.name ?? "",
           productCode: product?.code ?? "",
+          // nominalCadencePerMin: the original consigne; cadencePerMin: the effective
+          // (time-weighted) value actually used for TP.
           cadenceUsed: Number(lot.cadenceUsed),
           cadenceUnit: lot.cadenceUnit,
           quantityProduced: lot.quantityProduced,
@@ -46836,8 +46858,10 @@ async function buildSessionsTrs(db2, sessionList) {
         productLots.push({
           productId: lot.productId,
           productName: product?.name ?? "",
-          cadence: Number(lot.cadenceUsed),
-          cadenceUnit: lot.cadenceUnit,
+          // Use the effective (time-weighted) cadence so computeProductTrs computes
+          // avgCadencePerMin from the cadence actually used, not the final consigne.
+          cadence: lotTrs.cadencePerMin,
+          cadenceUnit: "u/min",
           produced: lot.quantityProduced,
           conforming: lot.quantityConforming,
           lotDurationMin: lotTrs.lotDurationMin,

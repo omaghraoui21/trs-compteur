@@ -168,6 +168,59 @@ describe("computeLotTrs", () => {
     expect(result!.warnings.some(w => w.code === "TP_OVER_100")).toBe(true);
   });
 
+  it("exposes nominalCadencePerMin equal to cadencePerMin when no changes", () => {
+    const result = computeLotTrs({
+      cadence: 7200,
+      cadenceUnit: "u/h",
+      produced: 7200,
+      conforming: 7200,
+      startedAt: new Date("2026-05-04T09:00:00Z"),
+      endedAt: new Date("2026-05-04T10:00:00Z"),
+      downtimes: [],
+    });
+    expect(result!.nominalCadencePerMin).toBe(120);
+    expect(result!.cadencePerMin).toBe(120);
+    expect(result!.warnings).toEqual([]);
+  });
+
+  it("time-weights cadence when cadenceChanges provided", () => {
+    // Lot 09:00-11:00 (120 min). Consigne 120 u/min → réduite à 60 u/min à 10:00.
+    // 60 min @120 + 60 min @60 → pondérée = 90 u/min.
+    // Produced = 90*120 = 10800 (exact pace at weighted cadence).
+    const result = computeLotTrs({
+      cadence: 120,           // initial consigne
+      cadenceUnit: "u/min",
+      produced: 10800,
+      conforming: 10800,
+      startedAt: new Date("2026-05-04T09:00:00Z"),
+      endedAt: new Date("2026-05-04T11:00:00Z"),
+      downtimes: [],
+      cadenceChanges: [{ at: new Date("2026-05-04T10:00:00Z"), cadencePerMin: 60 }],
+    });
+    expect(result).not.toBeNull();
+    expect(result!.nominalCadencePerMin).toBe(120);          // initial consigne
+    expect(result!.cadencePerMin).toBeCloseTo(90, 5);        // time-weighted effective
+    expect(result!.tN).toBeCloseTo(10800 / 90, 3);          // 120 min
+    expect(result!.TP).toBeCloseTo(1, 3);                    // produced exactly at weighted pace
+    // Cadence dropped 25% → CADENCE_WEIGHTED warning emitted
+    expect(result!.warnings.some(w => w.code === "CADENCE_WEIGHTED")).toBe(true);
+  });
+
+  it("no CADENCE_WEIGHTED warning when change is within 5%", () => {
+    // 60 min @100 + 60 min @98 → weighted = 99, deviation = 1% < 5%
+    const result = computeLotTrs({
+      cadence: 100,
+      cadenceUnit: "u/min",
+      produced: 5940,
+      conforming: 5940,
+      startedAt: new Date("2026-05-04T09:00:00Z"),
+      endedAt: new Date("2026-05-04T11:00:00Z"),
+      downtimes: [],
+      cadenceChanges: [{ at: new Date("2026-05-04T10:00:00Z"), cadencePerMin: 98 }],
+    });
+    expect(result!.warnings.filter(w => w.code === "CADENCE_WEIGHTED")).toHaveLength(0);
+  });
+
   it("subtracts planned + unplanned downtimes from tF (NF E 60-182 §2.2.6)", () => {
     // Lot: 120min, 10min planned (changement format), 20min unplanned (panne)
     // tF = 120 - 10 - 20 = 90 (NOT 100)
@@ -214,13 +267,13 @@ describe("computeSessionTrs", () => {
     // Old sum-of-lots: tF=405. New NF E 60-182: tF = tR - 15 = 405 (same here because lot durations happen to add up to tR)
     const lot1 = {
       lotDurationMin: 225, plannedMin: 0, unplannedMin: 15, tF: 210, tN: 200, tU: 198,
-      nonQualiteMin: 2, TP: 200 / 210, TQ: 0.99, cadencePerMin: 120, ecartCadence: 10,
+      nonQualiteMin: 2, TP: 200 / 210, TQ: 0.99, cadencePerMin: 120, nominalCadencePerMin: 120, ecartCadence: 10,
       rebut: 240, downtimeByFamille: { "Panne équipement": 15 }, downtimeByNorme: { "AB": 15 },
       produced: 24000, conforming: 23760, warnings: [],
     };
     const lot2 = {
       lotDurationMin: 195, plannedMin: 0, unplannedMin: 0, tF: 195, tN: 190, tU: 188,
-      nonQualiteMin: 2, TP: 190 / 195, TQ: 0.99, cadencePerMin: 120, ecartCadence: 5,
+      nonQualiteMin: 2, TP: 190 / 195, TQ: 0.99, cadencePerMin: 120, nominalCadencePerMin: 120, ecartCadence: 5,
       rebut: 240, downtimeByFamille: {}, downtimeByNorme: {},
       produced: 22800, conforming: 22560, warnings: [],
     };
@@ -259,7 +312,7 @@ describe("computeSessionTrs", () => {
     // (session-level, no lot). tF = tR - (15 + 30) = 375.
     const lot1 = {
       lotDurationMin: 225, plannedMin: 0, unplannedMin: 15, tF: 210, tN: 200, tU: 198,
-      nonQualiteMin: 2, TP: 200 / 210, TQ: 0.99, cadencePerMin: 120, ecartCadence: 10,
+      nonQualiteMin: 2, TP: 200 / 210, TQ: 0.99, cadencePerMin: 120, nominalCadencePerMin: 120, ecartCadence: 10,
       rebut: 240, downtimeByFamille: { "Panne équipement": 15 }, downtimeByNorme: { "AB": 15 },
       produced: 24000, conforming: 23760, warnings: [],
     };
@@ -279,7 +332,7 @@ describe("computeSessionTrs", () => {
   it("is unchanged when unplannedStopsMin is omitted (backward compatible)", () => {
     const lot1 = {
       lotDurationMin: 225, plannedMin: 0, unplannedMin: 15, tF: 210, tN: 200, tU: 198,
-      nonQualiteMin: 2, TP: 200 / 210, TQ: 0.99, cadencePerMin: 120, ecartCadence: 10,
+      nonQualiteMin: 2, TP: 200 / 210, TQ: 0.99, cadencePerMin: 120, nominalCadencePerMin: 120, ecartCadence: 10,
       rebut: 240, downtimeByFamille: { "Panne équipement": 15 }, downtimeByNorme: { "AB": 15 },
       produced: 24000, conforming: 23760, warnings: [],
     };
@@ -296,7 +349,7 @@ describe("computeSessionTrs", () => {
     // tF_norme = tR - (10+15) = 395
     const lot1 = {
       lotDurationMin: 200, plannedMin: 10, unplannedMin: 15, tF: 175, tN: 170, tU: 168,
-      nonQualiteMin: 2, TP: 170 / 175, TQ: 0.988, cadencePerMin: 120, ecartCadence: 5,
+      nonQualiteMin: 2, TP: 170 / 175, TQ: 0.988, cadencePerMin: 120, nominalCadencePerMin: 120, ecartCadence: 5,
       rebut: 240, downtimeByFamille: { "Nettoyage": 10, "Panne équipement": 15 }, downtimeByNorme: { "AP": 10, "AB": 15 },
       produced: 20400, conforming: 20160, warnings: [],
     };
@@ -320,13 +373,13 @@ describe("computeSessionTrs", () => {
     // Unplanned: 20min total
     const lot1 = {
       lotDurationMin: 180, plannedMin: 0, unplannedMin: 20, tF: 160, tN: 150, tU: 148,
-      nonQualiteMin: 2, TP: 150 / 160, TQ: 148 / 150, cadencePerMin: 120, ecartCadence: 10,
+      nonQualiteMin: 2, TP: 150 / 160, TQ: 148 / 150, cadencePerMin: 120, nominalCadencePerMin: 120, ecartCadence: 10,
       rebut: 240, downtimeByFamille: { "Panne équipement": 20 }, downtimeByNorme: { "AB": 20 },
       produced: 18000, conforming: 17760, warnings: [],
     };
     const lot2 = {
       lotDurationMin: 120, plannedMin: 0, unplannedMin: 0, tF: 120, tN: 110, tU: 109,
-      nonQualiteMin: 1, TP: 110 / 120, TQ: 109 / 110, cadencePerMin: 120, ecartCadence: 10,
+      nonQualiteMin: 1, TP: 110 / 120, TQ: 109 / 110, cadencePerMin: 120, nominalCadencePerMin: 120, ecartCadence: 10,
       rebut: 120, downtimeByFamille: {}, downtimeByNorme: {},
       produced: 13200, conforming: 13080, warnings: [],
     };
@@ -386,7 +439,7 @@ describe("computeSessionTrs", () => {
   it("propagates lot-level warnings to session", () => {
     const lot = {
       lotDurationMin: 60, plannedMin: 0, unplannedMin: 0, tF: 60, tN: 50, tU: 48,
-      nonQualiteMin: 2, TP: 50 / 60, TQ: 48 / 50, cadencePerMin: 120, ecartCadence: 10,
+      nonQualiteMin: 2, TP: 50 / 60, TQ: 48 / 50, cadencePerMin: 120, nominalCadencePerMin: 120, ecartCadence: 10,
       rebut: 240, downtimeByFamille: {}, downtimeByNorme: {},
       produced: 6000, conforming: 5760,
       warnings: [{ code: "CONFORMING_GT_PRODUCED", level: "error" as const, message: "test", field: "TQ" }],
