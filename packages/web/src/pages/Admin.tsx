@@ -5,7 +5,7 @@ import { TableSkeleton } from "@/components/Skeleton";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/components/Toast";
 
-type Tab = "rooms" | "equipments" | "products" | "downtimes" | "cadences" | "users";
+type Tab = "rooms" | "equipments" | "products" | "cadences" | "downtimes" | "users";
 
 const TABS: { key: Tab; label: string; icon: typeof Building2; adminOnly?: boolean }[] = [
   { key: "rooms", label: "Locaux", icon: Building2 },
