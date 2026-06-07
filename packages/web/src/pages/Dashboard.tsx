@@ -433,9 +433,24 @@ function LinePerformanceBand({ daily }: { daily: DailyTrs[] }) {
   );
 }
 
+// Shared event-date formatter used by ParetoDrillModal and DowntimeLog.
+function fmtEventDate(iso: string, showYear = false): string {
+  return new Date(iso).toLocaleString("fr-FR", {
+    day: "2-digit", month: "2-digit", ...(showYear ? { year: "2-digit" } : {}),
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
 // ─── Classification quality KPI (GMP / data-integrity signal) ─
 // Headline: à-classer ratio (aClasserMin / tR) — wall-clock time not covered
 // by any declared stop. Secondary: declared stops with no famille, when present.
+
+const CLASS_THRESHOLDS = [
+  { min: 15, color: "#dc2626", bgCls: "bg-red-50 border-red-200",   label: "Traçabilité insuffisante — action requise" },
+  { min:  5, color: "#d97706", bgCls: "bg-amber-50 border-amber-200", label: "Classement à améliorer" },
+  { min:  0, color: "#16a34a", bgCls: "bg-green-50 border-green-200", label: "Bonne traçabilité" },
+] as const;
+
 function ClassificationQualityCard({ total }: { total: TrsMetrics & { aClasserMin?: number } }) {
   const aClasser = total.aClasserMin ?? 0;
   const tR = total.tR;
@@ -444,8 +459,7 @@ function ClassificationQualityCard({ total }: { total: TrsMetrics & { aClasserMi
   const pct = Math.min((aClasser / tR) * 100, 100);
   const nonQualifie = total.downtimeByFamille?.["Non classé"] ?? 0;
 
-  const color = pct < 5 ? "#16a34a" : pct < 15 ? "#d97706" : "#dc2626";
-  const bgCls = pct < 5 ? "bg-green-50 border-green-200" : pct < 15 ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200";
+  const { color, bgCls, label: statusLabel } = CLASS_THRESHOLDS.find(t => pct >= t.min) ?? CLASS_THRESHOLDS[2];
 
   return (
     <div className={`rounded-xl border p-4 mb-4 ${bgCls}`}>
@@ -461,9 +475,7 @@ function ClassificationQualityCard({ total }: { total: TrsMetrics & { aClasserMi
             <div className="text-xs text-gray-500 mt-0.5">dont {fmtDuration(nonQualifie)} d'arrêts déclarés sans famille</div>
           )}
         </div>
-        <div className="text-xs text-gray-400 max-w-[160px] text-right">
-          {pct < 5 ? "Bonne traçabilité" : pct < 15 ? "Classement à améliorer" : "Traçabilité insuffisante — action requise"}
-        </div>
+        <div className="text-xs text-gray-400 max-w-[160px] text-right">{statusLabel}</div>
       </div>
     </div>
   );
@@ -478,8 +490,11 @@ function ParetoDrillModal({ code, pareto, log, onClose }: {
   onClose: () => void;
 }) {
   const cause = pareto.find(p => p.code === code);
-  const isPhase = code.startsWith("phase_");
-  const events = isPhase ? [] : log.filter(e => e.categoryCode === code);
+  const isPhase = cause?.isPhase ?? false;
+  const events = useMemo(
+    () => isPhase ? [] : log.filter(e => e.categoryCode === code),
+    [isPhase, code, log],
+  );
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -509,7 +524,7 @@ function ParetoDrillModal({ code, pareto, log, onClose }: {
               <tbody>
                 {events.map(e => (
                   <tr key={e.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-1.5 px-2">{new Date(e.startedAt).toLocaleString("fr-FR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
+                    <td className="py-1.5 px-2">{fmtEventDate(e.startedAt)}</td>
                     <td className="py-1.5 px-2 text-right font-medium">{fmtDuration(e.durationMinutes)}</td>
                     <td className="py-1.5 px-2 text-gray-500">{e.batchNumber || "—"}</td>
                   </tr>
@@ -552,7 +567,7 @@ function DowntimeLog({ log }: { log: DowntimeLogEntry[] }) {
               {log.map(e => (
                 <tr key={e.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2.5 whitespace-nowrap text-gray-600">
-                    {new Date(e.startedAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                    {fmtEventDate(e.startedAt, true)}
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums font-medium">{fmtDuration(e.durationMinutes)}</td>
                   <td className="px-4 py-2.5">

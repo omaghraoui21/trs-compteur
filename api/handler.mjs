@@ -46965,7 +46965,7 @@ dashboardRouter.get("/pareto", validateQuery(dashboardRangeQuerySchema), asyncHa
   for (const dt of dtRows) {
     const key = dt.categoryCode;
     if (!aggregation[key]) {
-      aggregation[key] = { code: dt.categoryCode, label: dt.categoryLabel, famille: dt.famille, isPlanned: dt.isPlanned, totalMin: 0, count: 0 };
+      aggregation[key] = { code: dt.categoryCode, label: dt.categoryLabel, famille: dt.famille, isPlanned: dt.isPlanned, isPhase: false, totalMin: 0, count: 0 };
     }
     aggregation[key].totalMin += dt.durationMinutes;
     aggregation[key].count += 1;
@@ -46988,7 +46988,7 @@ dashboardRouter.get("/pareto", validateQuery(dashboardRangeQuerySchema), asyncHa
           mqch: "MQCH",
           custom: ev.label || "Autre"
         };
-        aggregation[key] = { code: key, label: labels[ev.eventType] || ev.eventType, famille: "Phase planifi\xE9e", isPlanned: true, totalMin: 0, count: 0 };
+        aggregation[key] = { code: key, label: labels[ev.eventType] || ev.eventType, famille: "Phase planifi\xE9e", isPlanned: true, isPhase: true, totalMin: 0, count: 0 };
       }
       aggregation[key].totalMin += dur;
       aggregation[key].count += 1;

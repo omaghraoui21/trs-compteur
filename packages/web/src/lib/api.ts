@@ -223,7 +223,7 @@ export interface DailyTrs extends TrsMetrics { date: string; notes?: string; lot
 export interface CadenceChange { id: string; lotEntryId: string; oldCadence: string; newCadence: string; cadenceUnit: string; reason: string | null; changedBy: string | null; changedAt: string }
 export interface SessionTrsResponse { session: TrsMetrics; lots: LotTrs[]; aClasserMin?: number }
 export interface DashboardTrsResponse { period: { from: string; to: string; equipmentId: string }; daily: (DailyTrs & { aClasserMin: number })[]; total: TrsMetrics & { aClasserMin: number } }
-export interface ParetoItem { code: string; label: string; famille: string; isPlanned: boolean; totalMin: number; count: number; pctOfTotal: number; cumulPct: number }
+export interface ParetoItem { code: string; label: string; famille: string; isPlanned: boolean; isPhase: boolean; totalMin: number; count: number; pctOfTotal: number; cumulPct: number }
 export interface ParetoResponse { pareto: ParetoItem[]; totalMin: number }
 export interface ComparisonEquipment { equipmentId: string; equipmentName: string; equipmentCode: string; equipmentType: string; trsObjective: number; daily: DailyTrs[]; total: TrsMetrics }
 export interface ComparisonResponse { period: { from: string; to: string }; equipments: ComparisonEquipment[] }

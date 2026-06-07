@@ -233,7 +233,7 @@ dashboardRouter.get("/pareto", validateQuery(dashboardRangeQuerySchema), asyncHa
   }
 
   // All downtimes in those sessions, category-joined, in ONE query.
-  const aggregation: Record<string, { code: string; label: string; famille: string; isPlanned: boolean; totalMin: number; count: number }> = {};
+  const aggregation: Record<string, { code: string; label: string; famille: string; isPlanned: boolean; isPhase: boolean; totalMin: number; count: number }> = {};
   let totalMin = 0;
 
   const dtRows = await db.select({
@@ -250,7 +250,7 @@ dashboardRouter.get("/pareto", validateQuery(dashboardRangeQuerySchema), asyncHa
   for (const dt of dtRows) {
     const key = dt.categoryCode;
     if (!aggregation[key]) {
-      aggregation[key] = { code: dt.categoryCode, label: dt.categoryLabel, famille: dt.famille, isPlanned: dt.isPlanned, totalMin: 0, count: 0 };
+      aggregation[key] = { code: dt.categoryCode, label: dt.categoryLabel, famille: dt.famille, isPlanned: dt.isPlanned, isPhase: false, totalMin: 0, count: 0 };
     }
     aggregation[key].totalMin += dt.durationMinutes;
     aggregation[key].count += 1;
@@ -270,7 +270,7 @@ dashboardRouter.get("/pareto", validateQuery(dashboardRangeQuerySchema), asyncHa
             chsb: "CHSB", chsg: "CHSG", apr: "APR", remplissage: "Remplissage",
             mqch: "MQCH", custom: ev.label || "Autre",
           };
-          aggregation[key] = { code: key, label: labels[ev.eventType] || ev.eventType, famille: "Phase planifiée", isPlanned: true, totalMin: 0, count: 0 };
+          aggregation[key] = { code: key, label: labels[ev.eventType] || ev.eventType, famille: "Phase planifiée", isPlanned: true, isPhase: true, totalMin: 0, count: 0 };
         }
         aggregation[key].totalMin += dur;
         aggregation[key].count += 1;
