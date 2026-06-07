@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { eq, and, or, gte, lte, desc, sql, inArray, isNull } from "drizzle-orm";
 import { sessions, lotEntries, sessionEvents, downtimeEvents, downtimeCategories, equipments, products, lotCadenceChanges } from "@trs/db";
-import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, computeMtbfMttr } from "@trs/engine";
+import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, computeMtbfMttr, computeAClasserMin } from "@trs/engine";
 import type { ProductLotInput } from "@trs/engine";
 
 import { authenticate } from "../middleware";
@@ -24,6 +24,7 @@ interface BuiltSession {
   lotDetails: any[];
   productLots: ProductLotInput[];
   plannedStopsMin: number;
+  aClasserMin: number;
   downtimeDetails: { durationMinutes: number; isPlanned: boolean }[];
 }
 
@@ -157,8 +158,8 @@ async function buildSessionsTrs(db: any, sessionList: any[]): Promise<Map<string
       unplannedStopsMin: sessionUnplannedMin, lots: lotResults,
     });
     const lotsDurationMin = lotResults.reduce((s: number, l: any) => s + (l.lotDurationMin ?? 0), 0);
-    const aClasserMin = Math.max(0, Math.round(sessionTrs.tO - lotsDurationMin - plannedStopsMin - sessionUnplannedMin));
-    out.set(session.id, { sessionTrs, lotDetails, productLots, plannedStopsMin, downtimeDetails, aClasserMin } as any);
+    const aClasserMin = computeAClasserMin(sessionTrs.tO, lotsDurationMin, plannedStopsMin, sessionUnplannedMin);
+    out.set(session.id, { sessionTrs, lotDetails, productLots, plannedStopsMin, downtimeDetails, aClasserMin });
   }
 
   return out;
@@ -188,7 +189,7 @@ dashboardRouter.get("/trs", validateQuery(dashboardRangeQuerySchema), asyncHandl
 
   const built = await buildSessionsTrs(db, closedSessions);
   for (const session of closedSessions) {
-    const { sessionTrs, lotDetails, downtimeDetails, aClasserMin } = built.get(session.id)! as any;
+    const { sessionTrs, lotDetails, downtimeDetails, aClasserMin } = built.get(session.id)!;
     allDowntimes.push(...downtimeDetails);
     totalAClasserMin += aClasserMin ?? 0;
     sessionResults.push({

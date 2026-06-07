@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { eq, and, desc, inArray, isNull } from "drizzle-orm";
 import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories, lotCadenceChanges } from "@trs/db";
-import { computeLotTrs, computeSessionTrs, diffMinutes } from "@trs/engine";
+import { computeLotTrs, computeSessionTrs, computeAClasserMin, diffMinutes } from "@trs/engine";
 import { authenticate } from "../middleware";
 import { asyncHandler, validate, validateQuery } from "../lib/http";
 import { audit } from "../lib/audit";
@@ -272,10 +272,7 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
     lots: lotResults,
   });
 
-  // « À classer » — session time covered neither by a lot nor by a declared
-  // session-level stop. Must tend to 0; surfaced so the operator/supervisor
-  // can assign every minute a reason (Reason Codes model).
-  const aClasserMin = Math.max(0, Math.round(sessionTrs.tO - lotsDurationMin - sessionPlannedMin - sessionUnplannedMin));
+  const aClasserMin = computeAClasserMin(sessionTrs.tO, lotsDurationMin, sessionPlannedMin, sessionUnplannedMin);
 
   res.json({ session: sessionTrs, lots: lotResults, aClasserMin });
 }));

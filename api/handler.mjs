@@ -45981,6 +45981,9 @@ function computeMtbfMttr(downtimes, runTimeMin, microStopThresholdMin = 5) {
   const availability = mtbf / (mtbf + mttr);
   return { breakdownCount, totalBreakdownMin, mtbf, mttr, availability };
 }
+function computeAClasserMin(tO, lotsDurationMin, plannedStopsMin, unplannedStopsMin) {
+  return Math.max(0, Math.round(tO - lotsDurationMin - plannedStopsMin - unplannedStopsMin));
+}
 
 // packages/engine/src/phases.ts
 var PHASE_CATEGORY_KEYS = ["production", "nettoyage", "changement", "arret_planifie"];
@@ -46511,7 +46514,7 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
     unplannedStopsMin: sessionUnplannedMin,
     lots: lotResults
   });
-  const aClasserMin = Math.max(0, Math.round(sessionTrs.tO - lotsDurationMin - sessionPlannedMin - sessionUnplannedMin));
+  const aClasserMin = computeAClasserMin(sessionTrs.tO, lotsDurationMin, sessionPlannedMin, sessionUnplannedMin);
   res.json({ session: sessionTrs, lots: lotResults, aClasserMin });
 }));
 
@@ -46896,7 +46899,7 @@ async function buildSessionsTrs(db2, sessionList) {
       lots: lotResults
     });
     const lotsDurationMin = lotResults.reduce((s, l) => s + (l.lotDurationMin ?? 0), 0);
-    const aClasserMin = Math.max(0, Math.round(sessionTrs.tO - lotsDurationMin - plannedStopsMin - sessionUnplannedMin));
+    const aClasserMin = computeAClasserMin(sessionTrs.tO, lotsDurationMin, plannedStopsMin, sessionUnplannedMin);
     out.set(session.id, { sessionTrs, lotDetails, productLots, plannedStopsMin, downtimeDetails, aClasserMin });
   }
   return out;

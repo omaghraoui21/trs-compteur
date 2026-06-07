@@ -647,11 +647,10 @@ export default function CompteurPage() {
           {(() => {
             const urgentUnclassified = (trsData?.aClasserMin ?? 0) >= 10;
             const closedLots = detail.lots.filter(l => l.status !== "active");
-            const lastLot = closedLots[closedLots.length - 1];
+            const lastClosedLot = closedLots[closedLots.length - 1];
             return (
               <div className="flex gap-3 mb-8">
                 {urgentUnclassified ? (
-                  /* A1+A2: single red CTA replaces both "Déclarer" and lot button — no triple CTA */
                   <button onClick={() => setView("add-downtime")}
                     className={`flex-1 bg-red-600 text-white ${BTN_PRIMARY} hover:bg-red-700`}>
                     <AlertTriangle className={BTN_ICON} /> Classez le temps non couvert
@@ -662,9 +661,9 @@ export default function CompteurPage() {
                       className={`flex-1 bg-orange-50 text-orange-700 ${BTN_PRIMARY} hover:bg-orange-100`}>
                       <AlertTriangle className={BTN_ICON} /> Déclarer un arrêt
                     </button>
-                    {!activeLot && (lastLot ? (
+                    {!activeLot && (lastClosedLot ? (
                       <button
-                        onClick={() => { setPrefillProductId(lastLot.productId); setView("new-lot"); }}
+                        onClick={() => { setPrefillProductId(lastClosedLot.productId); setView("new-lot"); }}
                         className={`flex-1 bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700`}>
                         <Zap className={BTN_ICON} /> Lot suivant
                       </button>
@@ -755,11 +754,12 @@ function AClasserBanner({ minutes, onDeclare, categories, equipmentId, sessionId
   const [expanded, setExpanded] = useState(false);
   const [selecting, setSelecting] = useState(false);
 
+  // Split like AddDowntimeForm: localStorage read only on equipmentId change,
+  // category lookup only on recentIds/categories change.
+  const recentIds = useMemo(() => getRecentDowntimes(equipmentId), [equipmentId]);
   const recentCats = useMemo(
-    () => getRecentDowntimes(equipmentId)
-      .map(id => categories.find(c => c.id === id))
-      .filter(Boolean) as DowntimeCategory[],
-    [equipmentId, categories],
+    () => recentIds.map(id => categories.find(c => c.id === id)).filter(Boolean) as DowntimeCategory[],
+    [recentIds, categories],
   );
   const canQuickQualify = minutes >= 5 && recentCats.length > 0;
 
@@ -800,7 +800,7 @@ function AClasserBanner({ minutes, onDeclare, categories, equipmentId, sessionId
       {canQuickQualify && expanded && (
         <div className={`px-4 pb-4 border-t ${urgent ? "border-red-200" : "border-amber-200"}`}>
           <p className="text-xs text-gray-600 mt-3 mb-2">Classer ces {fmtDuration(minutes)} en un tap :</p>
-          <div className={`grid gap-2 ${recentCats.length === 1 ? "grid-cols-1" : recentCats.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+          <div className={`grid gap-2 grid-cols-${Math.min(recentCats.length, 3)}`}>
             {recentCats.map(c => (
               <button key={c.id} type="button" disabled={selecting} onClick={() => quickQualify(c.id)}
                 className="border border-gray-200 bg-white rounded-lg px-2 py-3 text-sm text-center min-h-[60px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition">
@@ -1461,7 +1461,7 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
         {recentCats.length > 0 && (
           <div>
             <p className="text-xs text-gray-500 mb-1.5 font-medium">Arrêts récents</p>
-            <div className={`grid gap-2 ${recentCats.length === 1 ? "grid-cols-1" : recentCats.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+            <div className={`grid gap-2 grid-cols-${Math.min(recentCats.length, 3)}`}>
               {recentCats.map(c => {
                 const sel = catId === c.id;
                 return (

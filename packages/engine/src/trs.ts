@@ -702,6 +702,18 @@ function rate(value: number, t: { worldClass: number; acceptable: number }): Ben
   return "below";
 }
 
+// ─── À-classer helper ────────────────────────────────────────
+// Session wall-clock time not covered by any lot or declared stop.
+// Shared formula used by both the live operator view and the dashboard.
+export function computeAClasserMin(
+  tO: number,
+  lotsDurationMin: number,
+  plannedStopsMin: number,
+  unplannedStopsMin: number,
+): number {
+  return Math.max(0, Math.round(tO - lotsDurationMin - plannedStopsMin - unplannedStopsMin));
+}
+
 export function computeOeeBenchmark(
   metrics: { DO: number; TP: number; TQ: number; TRS: number },
   industry: OeeIndustry = "pharmaceutical",
