@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { Timer } from "lucide-react";
+import { Timer, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -56,9 +56,10 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 text-white rounded-lg py-2.5 font-medium hover:bg-blue-700 disabled:opacity-50 transition"
+          className="w-full bg-blue-600 text-white rounded-lg py-2.5 font-medium hover:bg-blue-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
         >
-          {loading ? "Connexion..." : "Se connecter"}
+          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          {loading ? "Connexion…" : "Se connecter"}
         </button>
       </form>
     </div>

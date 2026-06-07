@@ -336,6 +336,13 @@ export default function SupervisorPage() {
                   {errors.length > 0 && (
                     <p className="text-xs text-red-500 text-center">Résolvez les erreurs avant de valider. Vous pouvez rejeter le lot.</p>
                   )}
+
+                  <button
+                    onClick={() => setExpanded(null)}
+                    className="w-full flex items-center justify-center gap-1 text-xs text-gray-400 hover:text-gray-600 py-1 border-t mt-1"
+                  >
+                    <ChevronUp className="h-3.5 w-3.5" /> Réduire
+                  </button>
                 </div>
               )}
             </div>

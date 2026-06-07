@@ -5,7 +5,7 @@ import { useToast } from "@/components/Toast";
 import { useActiveSession } from "@/lib/sessionContext";
 import { Onboarding } from "@/components/Onboarding";
 import { RateGauge } from "@/components/RateGauge";
-import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle, Zap, CheckCircle, XCircle, Wrench, Droplets, RotateCcw, Cpu } from "lucide-react";
+import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle, Zap, CheckCircle, XCircle, Wrench, Droplets, RotateCcw, Cpu, Loader2 } from "lucide-react";
 import { ListSkeleton } from "@/components/Skeleton";
 
 type View = "pick-room" | "pick-equip" | "timeline" | "new-lot" | "add-downtime";
@@ -112,6 +112,7 @@ export default function CompteurPage() {
   const [elapsed, setElapsed] = useState(0);
   const [prefillProductId, setPrefillProductId] = useState("");
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   const [bootError, setBootError] = useState("");
   const toast = useToast();
   const sessionCtx = useActiveSession();
@@ -223,16 +224,20 @@ export default function CompteurPage() {
 
   const handleConfirmClose = async () => {
     if (!activeSession) return;
-    setShowCloseModal(false);
+    setIsClosing(true);
     try {
       await api.closeSession(activeSession.id);
       setActiveSession(null);
       setDetail(null);
       setTrsData(null);
       sessionCtx.set(null, null);
+      setShowCloseModal(false);
       setView("pick-room");
     } catch (err: any) {
       toast.error(err.message || "Fermeture du compteur échouée");
+      setShowCloseModal(false);
+    } finally {
+      setIsClosing(false);
     }
   };
 
@@ -683,6 +688,7 @@ export default function CompteurPage() {
           hasActiveLot={!!activeLot}
           aClasserMin={trsData?.aClasserMin ?? 0}
           trsObjective={Number(selectedEquipment?.trsObjective || 75)}
+          isClosing={isClosing}
           onConfirm={handleConfirmClose}
           onCancel={() => setShowCloseModal(false)}
         />
@@ -1460,11 +1466,12 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
 
 // ─── End-of-Shift Summary Modal ──────────────────────────
 
-function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, onConfirm, onCancel }: {
+function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, isClosing, onConfirm, onCancel }: {
   trsData: SessionTrsResponse | null;
   hasActiveLot: boolean;
   aClasserMin: number;
   trsObjective: number;
+  isClosing?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -1546,13 +1553,14 @@ function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, onC
         )}
 
         <div className="flex gap-3">
-          <button onClick={onCancel}
-            className={`flex-1 border border-gray-300 text-gray-700 ${BTN_PRIMARY} hover:bg-gray-50`}>
+          <button onClick={onCancel} disabled={isClosing}
+            className={`flex-1 border border-gray-300 text-gray-700 ${BTN_PRIMARY} hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none`}>
             Annuler
           </button>
-          <button onClick={onConfirm} disabled={classifiedBlocking}
+          <button onClick={onConfirm} disabled={classifiedBlocking || isClosing}
             className={`flex-1 bg-red-600 text-white ${BTN_PRIMARY} hover:bg-red-700 disabled:opacity-40 disabled:pointer-events-none`}>
-            <Square className="h-4 w-4" /> Fermer
+            {isClosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
+            {isClosing ? "Fermeture…" : "Fermer"}
           </button>
         </div>
       </div>
