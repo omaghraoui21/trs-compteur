@@ -628,7 +628,14 @@ export default function CompteurPage() {
           {/* « À classer » — temps non couvert par un lot ou un arrêt déclaré.
               ≥ 10 min → bannière rouge urgente en tête ; 1-9 min → rappel amber. */}
           {trsData?.aClasserMin != null && trsData.aClasserMin > 1 && (
-            <AClasserBanner minutes={trsData.aClasserMin} onDeclare={() => setView("add-downtime")} />
+            <AClasserBanner
+              minutes={trsData.aClasserMin}
+              onDeclare={() => setView("add-downtime")}
+              categories={categories}
+              equipmentId={selectedEquipment?.id || ""}
+              sessionId={activeSession.id}
+              onQualified={() => loadDetail(activeSession.id)}
+            />
           )}
 
           {/* Session TRS summary + U8: historical reference */}
@@ -730,26 +737,84 @@ function LiveSessionBar({ elapsed, sessionTrs, aClasserMin }: {
   );
 }
 
-// ─── « À classer » banner ────────────────────────────────
+// ─── « À classer » banner + quick-qualify (Vorne post-gap pattern) ─
+// Below 5 min: a plain reminder that opens the full declare form.
+// At ≥ 5 min with known recent categories: expands inline so the operator
+// classifies the whole gap in one tap, without leaving the timeline.
 
-function AClasserBanner({ minutes, onDeclare }: { minutes: number; onDeclare: () => void }) {
+function AClasserBanner({ minutes, onDeclare, categories, equipmentId, sessionId, onQualified }: {
+  minutes: number;
+  onDeclare: () => void;
+  categories: DowntimeCategory[];
+  equipmentId: string;
+  sessionId: string;
+  onQualified: () => void;
+}) {
   const urgent = minutes >= 10;
+  const toast = useToast();
+  const [expanded, setExpanded] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+
+  const recentCats = useMemo(
+    () => getRecentDowntimes(equipmentId)
+      .map(id => categories.find(c => c.id === id))
+      .filter(Boolean) as DowntimeCategory[],
+    [equipmentId, categories],
+  );
+  const canQuickQualify = minutes >= 5 && recentCats.length > 0;
+
+  const quickQualify = async (categoryId: string) => {
+    setSelecting(true);
+    try {
+      await api.addSessionDowntime(sessionId, { categoryId, durationMinutes: Math.round(minutes) });
+      saveRecentDowntime(equipmentId, categoryId);
+      toast.success("Temps classé");
+      onQualified();
+    } catch (err: any) {
+      toast.error(err.message || "Échec du classement");
+    } finally {
+      setSelecting(false);
+    }
+  };
+
   return (
-    <button onClick={onDeclare}
-      className={`w-full mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${
-        urgent ? "border-red-300 bg-red-50 hover:bg-red-100" : "border-amber-300 bg-amber-50 hover:bg-amber-100"
-      }`}>
-      <span className={`flex items-center gap-2 ${urgent ? "text-red-800" : "text-amber-800"}`}>
-        <AlertTriangle className={`h-5 w-5 shrink-0 ${urgent ? "text-red-600" : ""}`} />
-        <span className={`text-sm ${urgent ? "font-bold" : "font-medium"}`}>
-          {fmtDuration(minutes)} de temps non classé
-          {urgent && " — à déclarer avant fermeture"}
+    <div className={`w-full mb-4 rounded-xl border transition ${
+      urgent ? "border-red-300 bg-red-50" : "border-amber-300 bg-amber-50"
+    }`}>
+      <button onClick={() => (canQuickQualify ? setExpanded(e => !e) : onDeclare())}
+        className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition rounded-xl ${
+          urgent ? "hover:bg-red-100" : "hover:bg-amber-100"
+        }`}>
+        <span className={`flex items-center gap-2 ${urgent ? "text-red-800" : "text-amber-800"}`}>
+          <AlertTriangle className={`h-5 w-5 shrink-0 ${urgent ? "text-red-600" : ""}`} />
+          <span className={`text-sm ${urgent ? "font-bold" : "font-medium"}`}>
+            {fmtDuration(minutes)} de temps non classé
+            {urgent && " — à déclarer avant fermeture"}
+          </span>
         </span>
-      </span>
-      <span className={`text-xs shrink-0 ${urgent ? "text-red-700 font-semibold" : "text-amber-700"}`}>
-        Déclarer →
-      </span>
-    </button>
+        <span className={`text-xs shrink-0 ${urgent ? "text-red-700 font-semibold" : "text-amber-700"}`}>
+          {canQuickQualify ? (expanded ? "Réduire ▲" : "Classer ▾") : "Déclarer →"}
+        </span>
+      </button>
+
+      {canQuickQualify && expanded && (
+        <div className={`px-4 pb-4 border-t ${urgent ? "border-red-200" : "border-amber-200"}`}>
+          <p className="text-xs text-gray-600 mt-3 mb-2">Classer ces {fmtDuration(minutes)} en un tap :</p>
+          <div className={`grid gap-2 ${recentCats.length === 1 ? "grid-cols-1" : recentCats.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+            {recentCats.map(c => (
+              <button key={c.id} type="button" disabled={selecting} onClick={() => quickQualify(c.id)}
+                className="border border-gray-200 bg-white rounded-lg px-2 py-3 text-sm text-center min-h-[60px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition">
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={onDeclare}
+            className="mt-3 text-sm text-blue-600 font-medium">
+            Autre arrêt / saisie détaillée →
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
