@@ -637,42 +637,45 @@ export default function CompteurPage() {
           )}
 
           {/* Actions (U2: large touch targets) */}
-          <div className="flex gap-3 mb-8">
-            <button onClick={() => setView("add-downtime")}
-              className={`flex-1 bg-orange-50 text-orange-700 ${BTN_PRIMARY} hover:bg-orange-100`}>
-              <AlertTriangle className={BTN_ICON} /> Déclarer un arrêt
-            </button>
-            {!activeLot && (() => {
-              const closedLots = detail.lots.filter(l => l.status !== "active");
-              const lastLot = closedLots[closedLots.length - 1];
-              const urgentUnclassified = (trsData?.aClasserMin ?? 0) >= 10;
-              if (urgentUnclassified) {
-                return (
+          {(() => {
+            const urgentUnclassified = (trsData?.aClasserMin ?? 0) >= 10;
+            const closedLots = detail.lots.filter(l => l.status !== "active");
+            const lastLot = closedLots[closedLots.length - 1];
+            return (
+              <div className="flex gap-3 mb-8">
+                {urgentUnclassified ? (
+                  /* A1+A2: single red CTA replaces both "Déclarer" and lot button — no triple CTA */
                   <button onClick={() => setView("add-downtime")}
-                    className={`flex-1 bg-amber-50 text-amber-800 border border-amber-300 ${BTN_PRIMARY} hover:bg-amber-100`}>
-                    <AlertTriangle className={BTN_ICON} /> Classez d'abord
+                    className={`flex-1 bg-red-600 text-white ${BTN_PRIMARY} hover:bg-red-700`}>
+                    <AlertTriangle className={BTN_ICON} /> Classez le temps non couvert
                   </button>
-                );
-              }
-              return lastLot ? (
-                <button
-                  onClick={() => { setPrefillProductId(lastLot.productId); setView("new-lot"); }}
-                  className={`flex-1 bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700`}
-                >
-                  <Zap className={BTN_ICON} /> Lot suivant
+                ) : (
+                  <>
+                    <button onClick={() => setView("add-downtime")}
+                      className={`flex-1 bg-orange-50 text-orange-700 ${BTN_PRIMARY} hover:bg-orange-100`}>
+                      <AlertTriangle className={BTN_ICON} /> Déclarer un arrêt
+                    </button>
+                    {!activeLot && (lastLot ? (
+                      <button
+                        onClick={() => { setPrefillProductId(lastLot.productId); setView("new-lot"); }}
+                        className={`flex-1 bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700`}>
+                        <Zap className={BTN_ICON} /> Lot suivant
+                      </button>
+                    ) : (
+                      <button onClick={() => setView("new-lot")}
+                        className={`flex-1 bg-green-50 text-green-700 ${BTN_PRIMARY} hover:bg-green-100`}>
+                        <Package className={BTN_ICON} /> Nouveau lot
+                      </button>
+                    ))}
+                  </>
+                )}
+                <button onClick={handleCloseSession}
+                  className={`flex-1 bg-red-50 text-red-700 ${BTN_PRIMARY} hover:bg-red-100`}>
+                  <Square className={BTN_ICON} /> Fermer
                 </button>
-              ) : (
-                <button onClick={() => setView("new-lot")}
-                  className={`flex-1 bg-green-50 text-green-700 ${BTN_PRIMARY} hover:bg-green-100`}>
-                  <Package className={BTN_ICON} /> Nouveau lot
-                </button>
-              );
-            })()}
-            <button onClick={handleCloseSession}
-              className={`flex-1 bg-red-50 text-red-700 ${BTN_PRIMARY} hover:bg-red-100`}>
-              <Square className={BTN_ICON} /> Fermer
-            </button>
-          </div>
+              </div>
+            );
+          })()}
         </>
       )}
       {showCloseModal && activeSession && (
