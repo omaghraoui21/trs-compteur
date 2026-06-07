@@ -171,15 +171,6 @@ export const api = {
     deleteDowntimeCategory: (id: string) =>
       request<AdminDowntimeCategory>(`/admin/downtime-categories/${id}`, { method: "DELETE" }),
 
-    // Phase Templates
-    listPhaseTemplates: () => request<AdminPhaseTemplate[]>("/admin/phase-templates"),
-    createPhaseTemplate: (data: { code: string; label: string; category: string; eventType: string; isPlanned?: boolean; requiresComment?: boolean; appliesToEquipmentType?: string | null; sortOrder?: number }) =>
-      request<AdminPhaseTemplate>("/admin/phase-templates", { method: "POST", body: JSON.stringify(data) }),
-    updatePhaseTemplate: (id: string, data: Partial<{ code: string; label: string; category: string; eventType: string; isPlanned: boolean; requiresComment: boolean; appliesToEquipmentType: string | null; sortOrder: number; isActive: boolean }>) =>
-      request<AdminPhaseTemplate>(`/admin/phase-templates/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-    deletePhaseTemplate: (id: string) =>
-      request<AdminPhaseTemplate>(`/admin/phase-templates/${id}`, { method: "DELETE" }),
-
     // Cadences
     listCadences: () => request<ProductEquipmentCadence[]>("/admin/cadences"),
     upsertCadence: (data: { productId: string; equipmentId: string; cadenceValue: number; cadenceUnit: string; trsObjective?: number }) =>
@@ -240,7 +231,6 @@ export interface AdminRoom { id: string; code: string; name: string; description
 export interface AdminEquipment { id: string; roomId: string; code: string; name: string; equipmentType: string | null; trsObjective: string; defaultCadenceUnit: string; microStopThresholdMin: number; isActive: boolean; createdAt: string }
 export interface AdminProduct { id: string; code: string; name: string; defaultCadence: string | null; cadenceUnit: string; unit: string; isActive: boolean; createdAt: string }
 export interface AdminDowntimeCategory { id: string; code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null; isActive: boolean; createdAt: string }
-export interface AdminPhaseTemplate { id: string; code: string; label: string; category: string; eventType: string; isPlanned: boolean; requiresComment: boolean; appliesToEquipmentType: string | null; sortOrder: number; isActive: boolean; createdAt: string }
 export interface ProductEquipmentCadence { id: string; productId: string; equipmentId: string; cadenceValue: string; cadenceUnit: string; trsObjective: string | null }
 
 // W: By-Product aggregation

@@ -9,8 +9,8 @@ const STEPS = [
   },
   {
     icon: Clock,
-    title: "Enregistrer les phases",
-    description: "Ajoutez nettoyage, pauses et vide de ligne au fil de la journée. Chaque phase est prise en compte dans le calcul TRS.",
+    title: "Déclarer les arrêts",
+    description: "Signalez chaque arrêt planifié (nettoyage, changement de série, pause) et non planifié (panne, attente) via « Déclarer un arrêt ». Le TRS est calculé automatiquement.",
   },
   {
     icon: Package,

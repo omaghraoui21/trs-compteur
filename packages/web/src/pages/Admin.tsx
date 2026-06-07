@@ -1,19 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
-import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type AdminPhaseTemplate, type ProductEquipmentCadence, type AdminUser } from "@/lib/api";
-import { PHASE_CATEGORY_KEYS, PHASE_CATEGORY_LABELS, PHASE_EVENT_TYPES } from "@trs/engine";
-import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, Clock, List, Network, ChevronDown, ChevronRight, Users, KeyRound } from "lucide-react";
+import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type ProductEquipmentCadence, type AdminUser } from "@/lib/api";
+import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, List, Network, ChevronDown, ChevronRight, Users, KeyRound } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/components/Toast";
 
-type Tab = "rooms" | "equipments" | "products" | "phases" | "downtimes" | "cadences" | "users";
+type Tab = "rooms" | "equipments" | "products" | "downtimes" | "cadences" | "users";
 
 const TABS: { key: Tab; label: string; icon: typeof Building2; adminOnly?: boolean }[] = [
   { key: "rooms", label: "Locaux", icon: Building2 },
   { key: "equipments", label: "Équipements", icon: Cpu },
   { key: "products", label: "Produits", icon: Package },
   { key: "cadences", label: "Cadences", icon: Gauge },
-  { key: "phases", label: "Phases", icon: Clock },
   { key: "downtimes", label: "Arrêts", icon: AlertTriangle },
   { key: "users", label: "Utilisateurs", icon: Users, adminOnly: true },
 ];
@@ -64,7 +62,6 @@ export default function AdminPage() {
       {activeTab === "equipments" && <EquipmentsPanel />}
       {activeTab === "products" && <ProductsPanel />}
       {activeTab === "cadences" && <CadencesPanel />}
-      {activeTab === "phases" && <PhasesPanel />}
       {activeTab === "downtimes" && <DowntimesPanel />}
       {activeTab === "users" && user?.role === "admin" && <UsersPanel currentUserId={user.id} />}
     </div>
@@ -647,154 +644,6 @@ function CadencesPanel() {
 }
 
 // ─── Downtimes Panel (with planned/unplanned toggle) ─────
-
-function PhasesPanel() {
-  const [items, setItems] = useState<AdminPhaseTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const emptyForm = { code: "", label: "", category: PHASE_CATEGORY_KEYS[0] as string, eventType: "custom" as string, requiresComment: false, appliesToEquipmentType: "", sortOrder: "0" };
-  const [form, setForm] = useState(emptyForm);
-  const [error, setError] = useState("");
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try { setItems(await api.admin.listPhaseTemplates()); } catch (e: any) { setError(e.message); }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const resetForm = () => { setForm(emptyForm); setShowForm(false); setEditingId(null); setError(""); };
-
-  const startEdit = (p: AdminPhaseTemplate) => {
-    setForm({
-      code: p.code, label: p.label, category: p.category, eventType: p.eventType,
-      requiresComment: p.requiresComment, appliesToEquipmentType: p.appliesToEquipmentType || "",
-      sortOrder: String(p.sortOrder),
-    });
-    setEditingId(p.id); setShowForm(true);
-  };
-
-  const save = async () => {
-    setError("");
-    try {
-      const payload = {
-        code: form.code, label: form.label, category: form.category, eventType: form.eventType,
-        isPlanned: true,
-        requiresComment: form.requiresComment,
-        appliesToEquipmentType: form.appliesToEquipmentType || null,
-        sortOrder: Number(form.sortOrder) || 0,
-      };
-      if (editingId) {
-        await api.admin.updatePhaseTemplate(editingId, payload);
-      } else {
-        await api.admin.createPhaseTemplate(payload);
-      }
-      resetForm(); load();
-    } catch (e: any) { setError(e.message); }
-  };
-
-  const remove = async (id: string) => {
-    if (!confirm("Désactiver cette phase ?")) return;
-    try { await api.admin.deletePhaseTemplate(id); load(); } catch (e: any) { setError(e.message); }
-  };
-
-  if (loading) return <Spinner />;
-
-  const grouped = items.reduce<Record<string, AdminPhaseTemplate[]>>((acc, p) => {
-    (acc[p.category] ||= []).push(p);
-    return acc;
-  }, {});
-
-  return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
-        <div>
-          <p className="text-sm text-gray-500">{items.length} phases configurées <span className="ml-1 align-middle text-[10px] font-semibold uppercase bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Hérité</span></p>
-          <p className="text-xs text-gray-400 mt-1">
-            Modèle hérité. L'opérateur ne saisit plus de phases : tout est déclaré via
-            « Déclarer un arrêt » (planifié / non planifié). Conservé pour les données historiques.
-          </p>
-        </div>
-        <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary shrink-0"><Plus className="h-4 w-4" /> Ajouter</button>
-      </div>
-
-      {error && <ErrorBanner msg={error} onClose={() => setError("")} />}
-
-      {showForm && (
-        <FormCard title={editingId ? "Modifier la phase" : "Nouvelle phase"} onCancel={resetForm} onSave={save}>
-          <Field label="Code" value={form.code} onChange={(v) => setForm({ ...form, code: v })} placeholder="PH-CODE" />
-          <Field label="Label" value={form.label} onChange={(v) => setForm({ ...form, label: v })} placeholder="Nom de la phase" />
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="input-field">
-              {PHASE_CATEGORY_KEYS.map(k => <option key={k} value={k}>{PHASE_CATEGORY_LABELS[k]}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Type d'événement (TRS)</label>
-            <select value={form.eventType} onChange={(e) => setForm({ ...form, eventType: e.target.value })} className="input-field">
-              {PHASE_EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Équipement cible</label>
-            <select value={form.appliesToEquipmentType} onChange={(e) => setForm({ ...form, appliesToEquipmentType: e.target.value })} className="input-field">
-              <option value="">Tous les équipements</option>
-              <option value="blistereuse">Blistéreuse uniquement</option>
-              <option value="geluleuse">Géluleuse uniquement</option>
-            </select>
-          </div>
-          <Field label="Ordre d'affichage" value={form.sortOrder} onChange={(v) => setForm({ ...form, sortOrder: v })} type="number" placeholder="10" />
-          <div className="flex items-center gap-3">
-            <button type="button" onClick={() => setForm({ ...form, requiresComment: !form.requiresComment })} className="flex items-center gap-2">
-              {form.requiresComment ? <ToggleRight className="h-6 w-6 text-blue-600" /> : <ToggleLeft className="h-6 w-6 text-gray-400" />}
-              <span className="text-sm">Commentaire obligatoire</span>
-            </button>
-          </div>
-        </FormCard>
-      )}
-
-      {PHASE_CATEGORY_KEYS.filter(k => grouped[k]?.length).map((cat) => (
-        <div key={cat} className="mb-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-            {PHASE_CATEGORY_LABELS[cat]}
-            <span className="text-xs font-normal text-gray-400">({grouped[cat].length})</span>
-          </h3>
-          <div className="overflow-x-auto">
-          <table className="rtable w-full text-sm">
-            <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Label</th><th className="py-2 px-3">Équipement</th><th className="py-2 px-3">Type</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
-            <tbody>
-              {grouped[cat].map((p) => (
-                <tr key={p.id} className={`border-b hover:bg-gray-50 ${!p.isActive ? "opacity-50" : ""}`}>
-                  <td data-label="Code" className="py-2 px-3 font-mono text-xs">{p.code}</td>
-                  <td data-label="Label" className="py-2 px-3 font-medium">{p.label}{p.requiresComment && <span className="ml-1 text-red-500" title="Commentaire obligatoire">*</span>}</td>
-                  <td data-label="Équipement" className="py-2 px-3 capitalize">{p.appliesToEquipmentType || "Tous"}</td>
-                  <td data-label="Type" className="py-2 px-3 font-mono text-xs text-gray-500">{p.eventType}</td>
-                  <td data-label="Statut" className="py-2 px-3"><StatusBadge active={p.isActive} /></td>
-                  <td data-label="Actions" className="py-2 px-3">
-                    <div className="flex gap-1">
-                      <IconBtn icon={Pencil} onClick={() => startEdit(p)} title="Modifier" />
-                      {p.isActive && <IconBtn icon={Trash2} onClick={() => remove(p.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                      {!p.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updatePhaseTemplate(p.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        </div>
-      ))}
-
-      <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200 text-xs text-blue-700">
-        <h4 className="text-sm font-semibold text-blue-800 mb-1">Modèle actuel : tout est un arrêt</h4>
-        <p>La notion de <strong>phase</strong> est <strong>héritée</strong>. Désormais l'opérateur ne déclare que des <strong>arrêts planifiés</strong> (changement de série, nettoyage, pause, maintenance préventive → réduisent le temps requis tR) et des <strong>arrêts non planifiés</strong> (pannes, attentes → réduisent le temps de fonctionnement tF). Le temps de marche est le reste. Cet onglet ne sert qu'à gérer d'anciennes données de phase et peut rester vide.</p>
-      </div>
-    </div>
-  );
-}
 
 function DowntimesPanel() {
   const [items, setItems] = useState<AdminDowntimeCategory[]>([]);

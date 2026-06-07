@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, and } from "drizzle-orm";
-import { rooms, equipments, products, downtimeCategories, productEquipmentCadences, phaseTemplates } from "@trs/db";
+import { rooms, equipments, products, downtimeCategories, productEquipmentCadences } from "@trs/db";
 
 import { authenticate } from "../middleware";
 import { asyncHandler } from "../lib/http";
@@ -39,18 +39,6 @@ refRouter.get("/downtime-categories", asyncHandler(async (req, res) => {
   let data = await db.select().from(downtimeCategories).where(eq(downtimeCategories.isActive, true));
   if (eqType) {
     data = data.filter(c => !c.appliesToEquipmentType || c.appliesToEquipmentType === eqType);
-  }
-  res.json(data);
-}));
-
-refRouter.get("/phase-templates", asyncHandler(async (req, res) => {
-  const { db } = req;
-  const eqType = req.query.equipmentType as string | undefined;
-  let data = await db.select().from(phaseTemplates)
-    .where(eq(phaseTemplates.isActive, true))
-    .orderBy(phaseTemplates.category, phaseTemplates.sortOrder);
-  if (eqType) {
-    data = data.filter(p => !p.appliesToEquipmentType || p.appliesToEquipmentType === eqType);
   }
   res.json(data);
 }));

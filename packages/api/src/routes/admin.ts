@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { eq, and } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { rooms, equipments, products, downtimeCategories, productEquipmentCadences, phaseTemplates, users } from "@trs/db";
+import { rooms, equipments, products, downtimeCategories, productEquipmentCadences, users } from "@trs/db";
 import { authenticate, requireRole } from "../middleware";
 import { asyncHandler, validate, HttpError } from "../lib/http";
 import { audit } from "../lib/audit";
@@ -10,7 +10,6 @@ import {
   createEquipmentSchema, updateEquipmentSchema,
   createProductSchema, updateProductSchema,
   createDowntimeCategorySchema, updateDowntimeCategorySchema,
-  createPhaseTemplateSchema, updatePhaseTemplateSchema,
   createCadenceSchema,
   createUserSchema, updateUserSchema, resetPasswordSchema,
 } from "../schemas";
@@ -166,50 +165,6 @@ adminRouter.patch("/downtime-categories/:id", validate(updateDowntimeCategorySch
 adminRouter.delete("/downtime-categories/:id", asyncHandler(async (req, res) => {
   const [row] = await req.db.update(downtimeCategories).set({ isActive: false }).where(eq(downtimeCategories.id, String(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Categorie introuvable" }); return; }
-  res.json(row);
-}));
-
-// ─── Phase Templates CRUD ───────────────────────────────
-
-adminRouter.get("/phase-templates", asyncHandler(async (req, res) => {
-  const data = await req.db.select().from(phaseTemplates)
-    .orderBy(phaseTemplates.category, phaseTemplates.sortOrder);
-  res.json(data);
-}));
-
-adminRouter.post("/phase-templates", validate(createPhaseTemplateSchema), asyncHandler(async (req, res) => {
-  const { code, label, category, eventType, isPlanned, requiresComment, appliesToEquipmentType, sortOrder } = req.body;
-  const [row] = await req.db.insert(phaseTemplates).values({
-    code, label, category, eventType,
-    isPlanned: isPlanned ?? true,
-    requiresComment: requiresComment ?? false,
-    appliesToEquipmentType: appliesToEquipmentType || null,
-    sortOrder: sortOrder ?? 0,
-  }).returning();
-  res.status(201).json(row);
-}));
-
-adminRouter.patch("/phase-templates/:id", validate(updatePhaseTemplateSchema), asyncHandler(async (req, res) => {
-  const { code, label, category, eventType, isPlanned, requiresComment, appliesToEquipmentType, sortOrder, isActive } = req.body;
-  const updates: Record<string, unknown> = {};
-  if (code !== undefined) updates.code = code;
-  if (label !== undefined) updates.label = label;
-  if (category !== undefined) updates.category = category;
-  if (eventType !== undefined) updates.eventType = eventType;
-  if (isPlanned !== undefined) updates.isPlanned = isPlanned;
-  if (requiresComment !== undefined) updates.requiresComment = requiresComment;
-  if (appliesToEquipmentType !== undefined) updates.appliesToEquipmentType = appliesToEquipmentType || null;
-  if (sortOrder !== undefined) updates.sortOrder = sortOrder;
-  if (isActive !== undefined) updates.isActive = isActive;
-  if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Aucune mise à jour" }); return; }
-  const [row] = await req.db.update(phaseTemplates).set(updates).where(eq(phaseTemplates.id, String(req.params.id))).returning();
-  if (!row) { res.status(404).json({ error: "Phase introuvable" }); return; }
-  res.json(row);
-}));
-
-adminRouter.delete("/phase-templates/:id", asyncHandler(async (req, res) => {
-  const [row] = await req.db.update(phaseTemplates).set({ isActive: false }).where(eq(phaseTemplates.id, String(req.params.id))).returning();
-  if (!row) { res.status(404).json({ error: "Phase introuvable" }); return; }
   res.json(row);
 }));
 
