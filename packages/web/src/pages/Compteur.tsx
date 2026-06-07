@@ -11,7 +11,7 @@ import { ListSkeleton } from "@/components/Skeleton";
 type View = "pick-room" | "pick-equip" | "timeline" | "new-lot" | "add-downtime";
 
 // ─── Touch-friendly class constants (U2) ─────────────────
-const BTN_PRIMARY = "min-h-[48px] text-base font-semibold rounded-xl px-4 py-3 flex items-center justify-center gap-2 transition active:scale-95";
+const BTN_PRIMARY = "min-h-[60px] text-base font-semibold rounded-xl px-4 py-3 flex items-center justify-center gap-2 transition active:scale-95";
 const BTN_ICON = "h-6 w-6";
 
 // Unified accent palette — one consistent visual language for every machine
@@ -86,7 +86,7 @@ function RetryError({ message, onRetry }: { message: string; onRetry: () => void
       </p>
       <button
         onClick={onRetry}
-        className="w-full bg-blue-600 text-white min-h-[48px] rounded-xl font-semibold text-base active:scale-95 transition hover:bg-blue-700"
+        className="w-full bg-blue-600 text-white min-h-[60px] rounded-xl font-semibold text-base active:scale-95 transition hover:bg-blue-700"
       >
         Réessayer
       </button>
@@ -518,6 +518,9 @@ export default function CompteurPage() {
 
       {activeSession && detail && (
         <>
+          {/* TAED live status — 4 métriques toujours visibles en tête de session */}
+          <LiveSessionBar elapsed={elapsed} sessionTrs={sessionTrs} aClasserMin={trsData?.aClasserMin ?? 0} />
+
           {/* U6: Session Timeline Bar */}
           <SessionTimelineBar detail={detail} session={activeSession} categories={categories} />
 
@@ -642,6 +645,15 @@ export default function CompteurPage() {
             {!activeLot && (() => {
               const closedLots = detail.lots.filter(l => l.status !== "active");
               const lastLot = closedLots[closedLots.length - 1];
+              const urgentUnclassified = (trsData?.aClasserMin ?? 0) >= 10;
+              if (urgentUnclassified) {
+                return (
+                  <button onClick={() => setView("add-downtime")}
+                    className={`flex-1 bg-amber-50 text-amber-800 border border-amber-300 ${BTN_PRIMARY} hover:bg-amber-100`}>
+                    <AlertTriangle className={BTN_ICON} /> Classez d'abord
+                  </button>
+                );
+              }
               return lastLot ? (
                 <button
                   onClick={() => { setPrefillProductId(lastLot.productId); setView("new-lot"); }}
@@ -674,6 +686,43 @@ export default function CompteurPage() {
           onCancel={() => setShowCloseModal(false)}
         />
       )}
+    </div>
+  );
+}
+
+// ─── TAED live status row ─────────────────────────────────
+// Always-visible 4-metric strip: Durée / Lots / TRS / À classer.
+// Inspired by the TAED (Target-Actual-Efficiency-Downtime) framework
+// from Vorne/OEE.com — gives the operator a one-glance shift picture.
+
+function LiveSessionBar({ elapsed, sessionTrs, aClasserMin }: {
+  elapsed: number;
+  sessionTrs: TrsMetrics | undefined;
+  aClasserMin: number;
+}) {
+  const dur = elapsed > 60 ? fmtDuration(Math.floor(elapsed / 60)) : elapsed > 0 ? `${elapsed}s` : "—";
+  const trs = sessionTrs?.TRS;
+  const lots = sessionTrs?.lotCount ?? 0;
+  const classOk = aClasserMin <= 1;
+
+  const metrics: Array<{ label: string; value: string; color?: string; warn?: boolean }> = [
+    { label: "Durée", value: dur },
+    { label: "Lots", value: lots > 0 ? String(lots) : "—" },
+    { label: "TRS", value: trs != null ? fmtPct(trs) : "—", color: trs != null ? trsColor(trs) : undefined },
+    { label: "Non classé", value: classOk ? "—" : fmtDuration(aClasserMin), warn: !classOk },
+  ];
+
+  return (
+    <div className="grid grid-cols-4 gap-2 mb-4">
+      {metrics.map(m => (
+        <div key={m.label}
+          className={`rounded-xl border px-2 py-2.5 text-center ${m.warn ? "border-amber-300 bg-amber-50" : "bg-white border-gray-200"}`}>
+          <div className="text-[10px] text-gray-500 uppercase tracking-wide leading-tight">{m.label}</div>
+          <div className="text-base font-bold mt-0.5 leading-tight" style={{ color: m.warn ? "#92400e" : m.color }}>
+            {m.value}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -1349,7 +1398,7 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
                 const sel = catId === c.id;
                 return (
                   <button key={c.id} type="button" onClick={() => setCatId(c.id)}
-                    className={`border rounded-lg px-2 py-3 text-sm text-center min-h-[48px] transition font-medium ${
+                    className={`border rounded-lg px-2 py-3 text-sm text-center min-h-[60px] transition font-medium ${
                       sel
                         ? "border-blue-500 bg-blue-50 text-blue-800"
                         : "border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700"
@@ -1383,7 +1432,7 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
                       : "border-red-500 bg-red-100 text-red-800 font-medium";
                     return (
                       <button key={c.id} type="button" onClick={() => setCatId(c.id)}
-                        className={`border rounded-lg px-2.5 py-3 text-sm text-left transition min-h-[44px] bg-white ${sel ? selCls : "hover:bg-gray-50"}`}>
+                        className={`border rounded-lg px-2.5 py-3 text-sm text-left transition min-h-[60px] bg-white ${sel ? selCls : "hover:bg-gray-50"}`}>
                         {c.label}
                       </button>
                     );
@@ -1397,11 +1446,11 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
         {/* U1: Mode selector (manual vs timer) */}
         <div className="flex gap-2">
           <button type="button" onClick={() => setMode("manual")}
-            className={`flex-1 border rounded-lg py-2.5 text-sm font-medium transition ${mode === "manual" ? "border-blue-500 bg-blue-50 text-blue-700" : "hover:bg-gray-50"}`}>
+            className={`flex-1 border rounded-lg py-2.5 text-sm font-medium transition min-h-[52px] ${mode === "manual" ? "border-blue-500 bg-blue-50 text-blue-700" : "hover:bg-gray-50"}`}>
             Saisie manuelle
           </button>
           <button type="button" onClick={() => setMode("timer")}
-            className={`flex-1 border rounded-lg py-2.5 text-sm font-medium transition ${mode === "timer" ? "border-blue-500 bg-blue-50 text-blue-700" : "hover:bg-gray-50"}`}>
+            className={`flex-1 border rounded-lg py-2.5 text-sm font-medium transition min-h-[52px] ${mode === "timer" ? "border-blue-500 bg-blue-50 text-blue-700" : "hover:bg-gray-50"}`}>
             Chronomètre
           </button>
         </div>
@@ -1415,7 +1464,7 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
                   key={d}
                   type="button"
                   onClick={() => setDuration(String(d))}
-                  className={`px-3 py-2 rounded-lg border text-sm font-medium transition min-w-[48px] ${
+                  className={`px-3 py-2 rounded-lg border text-sm font-medium transition min-w-[52px] min-h-[52px] ${
                     duration === String(d) ? "bg-orange-500 text-white border-orange-500" : "bg-white border-gray-200 hover:bg-gray-50"
                   }`}
                 >
@@ -1458,8 +1507,12 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
         </label>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Commentaire</label>
+          <label className="block text-sm font-medium mb-1">
+            Commentaire
+            <span className="ml-1.5 text-xs text-gray-400 font-normal">(raison obligatoire si modification — Annex 11)</span>
+          </label>
           <input value={comment} onChange={e => setComment(e.target.value)}
+            placeholder="Ex : changement de format, réglage cadence…"
             className="w-full border rounded-lg px-3 py-3 text-base" />
         </div>
         <button type="submit" disabled={loading || !catId || !duration}
