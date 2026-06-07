@@ -193,6 +193,10 @@ export default function CompteurPage() {
           sessionCtx.set(null, null);
           toast.error("Session précédente inaccessible — veuillez contacter l'administrateur.");
         }
+      } else {
+        // No active session on this equipment — clear any stale badge from a
+        // previous equipment selection or from a different user's session.
+        sessionCtx.set(null, null);
       }
       setView("timeline");
     } catch (err: any) {
@@ -368,7 +372,7 @@ export default function CompteurPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <button onClick={() => { setView("pick-room"); setActiveSession(null); setDetail(null); }}
+      <button onClick={() => { setView("pick-room"); setActiveSession(null); setDetail(null); sessionCtx.set(null, null); }}
         className="flex items-center gap-1 text-sm text-blue-600 mb-4">
         <ChevronLeft className="h-4 w-4" /> Retour
       </button>
@@ -1207,7 +1211,8 @@ const RECENT_DOWNTIMES_MAX = 3;
 
 function getRecentDowntimes(equipmentId: string): string[] {
   try {
-    return JSON.parse(localStorage.getItem(`recentDowntimes_${equipmentId}`) || "[]");
+    const v = JSON.parse(localStorage.getItem(`recentDowntimes_${equipmentId}`) || "[]");
+    return Array.isArray(v) ? v : [];
   } catch { return []; }
 }
 
