@@ -4,7 +4,7 @@ import { fmtPct, fmtDuration, trsColor, familleToNorme, computeOeeBenchmark } fr
 import type { BenchmarkRating } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { DashboardSkeleton } from "@/components/Skeleton";
-import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, ChevronUp, AlertTriangle, Info, FileText, RefreshCw } from "lucide-react";
+import { BarChart3, Calendar, Gauge, Download, ArrowLeftRight, ChevronDown, ChevronUp, AlertTriangle, Info, FileText, RefreshCw, Loader2 } from "lucide-react";
 // PDF is lazy-loaded on demand to reduce bundle size
 import TrsChart from "@/components/dashboard/TrsChart";
 import ParetoChart from "@/components/dashboard/ParetoChart";
@@ -59,6 +59,7 @@ export default function DashboardPage() {
   const [equipFailed, setEquipFailed] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const toast = useToast();
 
   const loadEquipments = useCallback(() => {
@@ -166,32 +167,41 @@ export default function DashboardPage() {
     a.download = `TRS_${sanitizeFilename(eq?.name || "export")}_${from}_${to}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    toast.success("Export CSV téléchargé");
   };
 
   const exportPdf = async () => {
-    if (!data) return;
-    const [{ pdf }, { default: PdfReport }] = await Promise.all([
-      import("@react-pdf/renderer"),
-      import("@/components/dashboard/PdfReport"),
-    ]);
-    const doc = (
-      <PdfReport
-        total={data.total}
-        daily={data.daily}
-        equipmentName={eq?.name || ""}
-        from={from}
-        to={to}
-        byProduct={byProductData?.byProduct}
-        sixLosses={sixLossesData?.total.losses}
-      />
-    );
-    const blob = await pdf(doc).toBlob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `TRS_${sanitizeFilename(eq?.name || "export")}_${from}_${to}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (!data || pdfLoading) return;
+    setPdfLoading(true);
+    try {
+      const [{ pdf }, { default: PdfReport }] = await Promise.all([
+        import("@react-pdf/renderer"),
+        import("@/components/dashboard/PdfReport"),
+      ]);
+      const doc = (
+        <PdfReport
+          total={data.total}
+          daily={data.daily}
+          equipmentName={eq?.name || ""}
+          from={from}
+          to={to}
+          byProduct={byProductData?.byProduct}
+          sixLosses={sixLossesData?.total.losses}
+        />
+      );
+      const blob = await pdf(doc).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `TRS_${sanitizeFilename(eq?.name || "export")}_${from}_${to}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Export PDF téléchargé");
+    } catch (err: any) {
+      toast.error("Génération PDF échouée");
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   return (
@@ -241,9 +251,10 @@ export default function DashboardPage() {
             className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border text-gray-600 hover:bg-gray-50">
             <Download className="h-4 w-4" /> CSV
           </button>
-          <button onClick={exportPdf}
-            className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border text-gray-600 hover:bg-gray-50">
-            <FileText className="h-4 w-4" /> PDF
+          <button onClick={exportPdf} disabled={pdfLoading}
+            className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+            {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+            {pdfLoading ? "PDF…" : "PDF"}
           </button>
         </div>
       </div>
@@ -702,7 +713,8 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
           <Download className="h-3 w-3" /> Export CSV
         </button>
       </div>
-      <div className="overflow-x-auto">
+      <div className="relative">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 text-gray-500">
@@ -810,6 +822,9 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
             </tr>
           </tbody>
         </table>
+        </div>
+        {/* Fade hint on mobile to indicate horizontal scroll */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent lg:hidden" />
       </div>
     </div>
   );
