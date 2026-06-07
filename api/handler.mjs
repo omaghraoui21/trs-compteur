@@ -41565,30 +41565,20 @@ function asyncHandler(fn) {
     fn(req, res, next).catch(next);
   };
 }
-function validate(schema) {
-  return (req, res, next) => {
-    const result = schema.safeParse(req.body);
+function makeValidator(field) {
+  return (schema) => (req, res, next) => {
+    const result = schema.safeParse(req[field]);
     if (!result.success) {
-      const message = result.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ");
+      const message = result.error.issues.map((i) => `${i.path.join(".") || field}: ${i.message}`).join("; ");
       res.status(400).json({ error: message });
       return;
     }
-    req.body = result.data;
+    req[field] = result.data;
     next();
   };
 }
-function validateQuery(schema) {
-  return (req, res, next) => {
-    const result = schema.safeParse(req.query);
-    if (!result.success) {
-      const message = result.error.issues.map((i) => `${i.path.join(".") || "query"}: ${i.message}`).join("; ");
-      res.status(400).json({ error: message });
-      return;
-    }
-    req.query = result.data;
-    next();
-  };
-}
+var validate = makeValidator("body");
+var validateQuery = makeValidator("query");
 
 // packages/api/src/lib/audit.ts
 async function audit(db2, req, action, entityType, entityId, payload) {
