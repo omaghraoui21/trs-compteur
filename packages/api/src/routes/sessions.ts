@@ -189,6 +189,47 @@ sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(
   res.status(201).json(dt);
 }));
 
+// ─── List session-level downtimes ─────────────────────────────
+// Returns only session-level stops (lotEntryId IS NULL) with category join —
+// same projection as GET /lots/:id/downtimes so the frontend uses LotDowntime.
+
+sessionsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
+  const { db } = req;
+  const data = await db.select({
+    id: downtimeEvents.id,
+    lotEntryId: downtimeEvents.lotEntryId,
+    categoryId: downtimeEvents.categoryId,
+    startedAt: downtimeEvents.startedAt,
+    endedAt: downtimeEvents.endedAt,
+    durationMinutes: downtimeEvents.durationMinutes,
+    comment: downtimeEvents.comment,
+    famille: downtimeCategories.famille,
+    reason: downtimeCategories.label,
+    isPlanned: downtimeCategories.isPlanned,
+  }).from(downtimeEvents)
+    .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+    .where(and(eq(downtimeEvents.sessionId, String(req.params.id)), isNull(downtimeEvents.lotEntryId)));
+  res.json(data);
+}));
+
+// ─── Delete a session-level downtime ──────────────────────────
+
+sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
+  const { db } = req;
+  const sessionId = String(req.params.id);
+  const dtId = String(req.params.dtId);
+
+  const [dt] = await db.select({ id: downtimeEvents.id, sessionId: downtimeEvents.sessionId, lotEntryId: downtimeEvents.lotEntryId })
+    .from(downtimeEvents).where(eq(downtimeEvents.id, dtId)).limit(1);
+  if (!dt) { res.status(404).json({ error: "Arrêt introuvable" }); return; }
+  if (dt.sessionId !== sessionId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à cette session" }); return; }
+  if (dt.lotEntryId !== null) { res.status(400).json({ error: "Cet arrêt est rattaché à un lot — utilisez DELETE /lots/:id/downtimes/:dtId" }); return; }
+
+  await audit(db, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });
+  await db.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
+  res.status(204).send();
+}));
+
 // ─── Get session TRS (computed) ───────────────────────────────
 
 sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {

@@ -16,11 +16,6 @@ const TABS: { key: Tab; label: string; icon: typeof Building2; adminOnly?: boole
   { key: "users", label: "Utilisateurs", icon: Users, adminOnly: true },
 ];
 
-// Phase category keys, labels, and selectable event types come from @trs/engine
-// (single source of truth shared with the API). "arret_planifie" = planned
-// stops (pause, APR) which reduce tR (not tF); unplanned stops live in the
-// Arrêts tab because they must be linked to a lot.
-
 const FAMILLES = [
   "Panne équipement",
   "Intervention maintenance",

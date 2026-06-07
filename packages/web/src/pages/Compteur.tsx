@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type ProductEquipmentCadence, type SessionTrsResponse, type TrsMetrics, type LotEntry } from "@/lib/api";
+import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type ProductEquipmentCadence, type SessionTrsResponse, type TrsMetrics, type LotEntry, type LotDowntime } from "@/lib/api";
 import { fmtDuration, fmtPct, trsColor } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { useActiveSession } from "@/lib/sessionContext";
 import { Onboarding } from "@/components/Onboarding";
 import { RateGauge } from "@/components/RateGauge";
-import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle, Zap, CheckCircle, XCircle, Wrench, Droplets, RotateCcw, Cpu, Loader2 } from "lucide-react";
+import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle, Zap, CheckCircle, XCircle, Wrench, Droplets, RotateCcw, Cpu, Loader2, Trash2 } from "lucide-react";
 import { ListSkeleton } from "@/components/Skeleton";
 import BackButton from "@/components/BackButton";
 
@@ -108,6 +108,7 @@ export default function CompteurPage() {
   const [cadences, setCadences] = useState<ProductEquipmentCadence[]>([]);
   const [trsData, setTrsData] = useState<SessionTrsResponse | null>(null);
   const [trsStale, setTrsStale] = useState(false);
+  const [sessionDts, setSessionDts] = useState<LotDowntime[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState("");
   const [elapsed, setElapsed] = useState(0);
@@ -160,9 +161,14 @@ export default function CompteurPage() {
   const loadDetail = useCallback(async (sessionId: string) => {
     setDetailLoading(true);
     try {
-      const [d, t] = await Promise.all([api.session(sessionId), api.sessionTrs(sessionId)]);
+      const [d, t, sdts] = await Promise.all([
+        api.session(sessionId),
+        api.sessionTrs(sessionId),
+        api.sessionDowntimes(sessionId),
+      ]);
       setDetail(d);
       setTrsData(t);
+      setSessionDts(sdts);
       setTrsStale(false);
     } finally {
       setDetailLoading(false);
@@ -348,6 +354,7 @@ export default function CompteurPage() {
       sessionId={activeSession.id}
       equipmentId={selectedEquipment?.id || ""}
       categories={categories}
+      aClasserMin={trsData?.aClasserMin}
       onAdded={() => { loadDetail(activeSession.id); setView("timeline"); }}
       onBack={() => setView("timeline")}
     />;
@@ -639,6 +646,21 @@ export default function CompteurPage() {
             />
           )}
 
+          {/* Session-level declared stops (inter-lot) — with inline delete */}
+          {sessionDts.length > 0 && (
+            <SessionDowntimesList
+              downtimes={sessionDts}
+              onDelete={async (dtId) => {
+                try {
+                  await api.deleteSessionDowntime(activeSession.id, dtId);
+                  await loadDetail(activeSession.id);
+                } catch (err: any) {
+                  toast.error(err.message || "Échec de la suppression");
+                }
+              }}
+            />
+          )}
+
           {/* Session TRS summary + U8: historical reference */}
           {sessionTrs && sessionTrs.lotCount > 0 && (
             <TrsSummaryCard sessionTrs={sessionTrs} equipmentId={selectedEquipment?.id || ""} trsObjective={Number(selectedEquipment?.trsObjective || 75)} />
@@ -776,7 +798,7 @@ function AClasserBanner({ minutes, onDeclare, categories, equipmentId, sessionId
     () => recentIds.map(id => categories.find(c => c.id === id)).filter(Boolean) as DowntimeCategory[],
     [recentIds, categories],
   );
-  const canQuickQualify = minutes >= 5 && recentCats.length > 0;
+  const canQuickQualify = minutes >= 2 && recentCats.length > 0;
 
   const quickQualify = async (categoryId: string) => {
     if (selecting) return;
@@ -995,6 +1017,12 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
   const [flashClose, triggerFlashClose] = useFlash();
   const toast = useToast();
 
+  const [lotDts, setLotDts] = useState<LotDowntime[]>([]);
+  const fetchLotDts = useCallback(async () => {
+    try { setLotDts(await api.lotDowntimes(lot.id)); } catch { /* non-critical */ }
+  }, [lot.id]);
+  useEffect(() => { fetchLotDts(); }, [fetchLotDts]);
+
   // Cadence can be adjusted mid-lot (logged for audit + time-weighted TRS).
   const [editingCadence, setEditingCadence] = useState(false);
   const [newCadence, setNewCadence] = useState("");
@@ -1117,6 +1145,25 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
             className="w-full border rounded-lg px-3 py-3 text-base" inputMode="numeric" />
         </div>
       </div>
+
+      {/* Declared lot stops with inline delete */}
+      {lotDts.length > 0 && (
+        <div className="mb-3">
+          <DeclaredDowntimesList
+            title="Arrêts du lot"
+            downtimes={lotDts}
+            onDelete={async (dtId) => {
+              try {
+                await api.deleteDowntime(lot.id, dtId);
+                await fetchLotDts();
+                onUpdate();
+              } catch (err: any) {
+                toast.error(err.message || "Échec de la suppression");
+              }
+            }}
+          />
+        </div>
+      )}
 
       {/* U4: Confirmation dialog */}
       {showConfirm && (
@@ -1347,6 +1394,53 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
 const QUICK_DURATIONS = [5, 10, 15, 30, 60];
 
 
+// ─── Shared declared-stops list with inline delete ───────────
+
+function DeclaredDowntimesList({ title, downtimes, onDelete }: {
+  title: string; downtimes: LotDowntime[]; onDelete: (dtId: string) => void;
+}) {
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  return (
+    <div className="bg-white rounded-xl border shadow-sm p-3 mb-4">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+        {title} ({downtimes.length})
+      </p>
+      <div className="space-y-1.5">
+        {downtimes.map(dt => (
+          <div key={dt.id} className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-gray-50">
+            {confirmId === dt.id ? (
+              <>
+                <span className="text-sm text-red-700 flex-1">Supprimer ?</span>
+                <button onClick={() => { onDelete(dt.id); setConfirmId(null); }}
+                  className="text-xs px-2.5 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">Oui</button>
+                <button onClick={() => setConfirmId(null)}
+                  className="text-xs px-2.5 py-1 border rounded-lg bg-white hover:bg-gray-50 transition">Annuler</button>
+              </>
+            ) : (
+              <>
+                <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-bold ${dt.isPlanned ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
+                  {dt.isPlanned ? "P" : "NP"}
+                </span>
+                <span className="text-xs text-gray-400 shrink-0">{dt.famille}</span>
+                <span className="text-sm font-medium text-gray-700 flex-1 truncate">{dt.reason}</span>
+                <span className="text-sm tabular-nums text-gray-500 shrink-0">{dt.durationMinutes} min</span>
+                <button onClick={() => setConfirmId(dt.id)} aria-label="Supprimer"
+                  className="p-1 rounded text-gray-400 hover:text-red-500 transition shrink-0">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SessionDowntimesList({ downtimes, onDelete }: { downtimes: LotDowntime[]; onDelete: (dtId: string) => void }) {
+  return <DeclaredDowntimesList title="Arrêts de la session" downtimes={downtimes} onDelete={onDelete} />;
+}
+
 // ─── Add Downtime Form (U1: timer auto, U2: large buttons) ─
 
 const RECENT_DOWNTIMES_MAX = 3;
@@ -1369,9 +1463,10 @@ function saveRecentDowntime(equipmentId: string, catId: string) {
   localStorage.setItem(recentDowntimesKey(equipmentId), JSON.stringify(next));
 }
 
-function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, onBack }: {
-  lotId?: string; sessionId: string; equipmentId: string; categories: DowntimeCategory[]; onAdded: () => void; onBack: () => void;
+function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMin, onAdded, onBack }: {
+  lotId?: string; sessionId: string; equipmentId: string; categories: DowntimeCategory[]; aClasserMin?: number; onAdded: () => void; onBack: () => void;
 }) {
+  const suggestedMin = aClasserMin != null && aClasserMin >= 1 ? Math.round(aClasserMin) : 0;
   const [catId, setCatId] = useState("");
   const [flashDowntime, triggerFlashDowntime] = useFlash();
   const toast = useToast();
@@ -1384,10 +1479,12 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
     () => recentIds.map(id => categories.find(c => c.id === id)).filter(Boolean) as DowntimeCategory[],
     [recentIds, categories],
   );
-  const [duration, setDuration] = useState("");
+  const [duration, setDuration] = useState(suggestedMin > 0 ? String(suggestedMin) : "");
   const [comment, setComment] = useState("");
   const [shortStop, setShortStop] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [familleFilterNP, setFamilleFilterNP] = useState<string | null>(null);
+  const [familleFilterP, setFamilleFilterP] = useState<string | null>(null);
 
   // U1: Timer state
   const [timerRunning, setTimerRunning] = useState(false);
@@ -1419,19 +1516,22 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
 
   // Two top-level sections — Non planifié then Planifié — each grouped by famille.
   const sections = useMemo(() => {
-    const build = (planned: boolean) => {
+    const build = (planned: boolean, filter: string | null) => {
       const grouped: Record<string, DowntimeCategory[]> = {};
       for (const c of categories) {
         if (c.isPlanned !== planned) continue;
+        if (filter && c.famille !== filter) continue;
         (grouped[c.famille] ??= []).push(c);
       }
       return Object.entries(grouped);
     };
+    const famillesOf = (planned: boolean) =>
+      [...new Set(categories.filter(c => c.isPlanned === planned).map(c => c.famille))];
     return [
-      { planned: false, title: "Arrêts non planifiés", hint: "Pannes, attentes, utilités, qualité…", familles: build(false) },
-      { planned: true, title: "Arrêts planifiés", hint: "Changement de série, nettoyage, pause, maintenance préventive…", familles: build(true) },
+      { planned: false, title: "Arrêts non planifiés", hint: "Pannes, attentes, utilités, qualité…", familles: build(false, familleFilterNP), allFamilles: famillesOf(false), filter: familleFilterNP, setFilter: setFamilleFilterNP },
+      { planned: true, title: "Arrêts planifiés", hint: "Changement de série, nettoyage, pause, maintenance préventive…", familles: build(true, familleFilterP), allFamilles: famillesOf(true), filter: familleFilterP, setFilter: setFamilleFilterP },
     ];
-  }, [categories]);
+  }, [categories, familleFilterNP, familleFilterP]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1498,14 +1598,28 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
         )}
 
         {/* Two clear sections: NON planifié (red) then planifié (orange).
-            The famille is a sub-group within each. */}
-        {sections.map(section => section.familles.length > 0 && (
+            Famille filter pills narrow the grid; TRS badge shows metric impact. */}
+        {sections.map(section => (
           <div key={section.title} className={`rounded-xl border p-3 ${section.planned ? "border-amber-200 bg-amber-50/40" : "border-red-200 bg-red-50/40"}`}>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-1">
               <span className={`h-2.5 w-2.5 rounded-full ${section.planned ? "bg-amber-500" : "bg-red-500"}`} />
               <span className={`text-sm font-bold ${section.planned ? "text-amber-800" : "text-red-800"}`}>{section.title}</span>
             </div>
             <p className="text-[11px] text-gray-500 mb-2">{section.hint}</p>
+            {section.allFamilles.length > 1 && (
+              <div className="flex gap-1.5 overflow-x-auto pb-1 mb-2 -mx-1 px-1">
+                <button type="button" onClick={() => section.setFilter(null)}
+                  className={`whitespace-nowrap text-xs px-2.5 py-1 rounded-full border transition ${!section.filter ? (section.planned ? "bg-amber-500 text-white border-amber-500" : "bg-red-500 text-white border-red-500") : "bg-white border-gray-200 hover:bg-gray-50"}`}>
+                  Tous
+                </button>
+                {section.allFamilles.map(f => (
+                  <button key={f} type="button" onClick={() => section.setFilter(f)}
+                    className={`whitespace-nowrap text-xs px-2.5 py-1 rounded-full border transition ${section.filter === f ? (section.planned ? "bg-amber-500 text-white border-amber-500" : "bg-red-500 text-white border-red-500") : "bg-white border-gray-200 hover:bg-gray-50"}`}>
+                    {f}
+                  </button>
+                ))}
+              </div>
+            )}
             {section.familles.map(([famille, cats]) => (
               <div key={famille} className="mb-2">
                 <div className="text-xs font-semibold text-gray-500 uppercase mb-1">{famille}</div>
@@ -1516,7 +1630,7 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
                       ? "border-amber-500 bg-amber-100 text-amber-800 font-medium"
                       : "border-red-500 bg-red-100 text-red-800 font-medium";
                     return (
-                      <button key={c.id} type="button" onClick={() => setCatId(c.id)}
+                      <button key={c.id} type="button" onClick={() => { setCatId(c.id); section.setFilter(null); }}
                         className={`border rounded-lg px-2.5 py-3 text-sm text-left transition min-h-[60px] bg-white ${sel ? selCls : "hover:bg-gray-50"}`}>
                         {c.label}
                       </button>
@@ -1527,6 +1641,23 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
             ))}
           </div>
         ))}
+
+        {/* TRS impact badge — shown once a category is selected */}
+        {catId && (() => {
+          const selCat = categories.find(c => c.id === catId);
+          if (!selCat) return null;
+          const { label, cls } = shortStop
+            ? { label: "↓ Performance (TP)", cls: "bg-orange-100 text-orange-700" }
+            : selCat.isPlanned
+              ? { label: "↓ Temps requis (tAP → tR)", cls: "bg-amber-100 text-amber-700" }
+              : { label: "↓ Disponibilité (tF)", cls: "bg-red-100 text-red-700" };
+          return (
+            <div className="flex items-center gap-2">
+              <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${cls}`}>{label}</span>
+              <span className="text-xs text-gray-500 truncate">{selCat.label}</span>
+            </div>
+          );
+        })()}
 
         {/* U1: Mode selector (manual vs timer) */}
         <div className="flex gap-2">
@@ -1544,6 +1675,14 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, onAdded, o
           <div className="space-y-2">
             <label className="block text-sm font-medium">Durée (minutes)</label>
             <div className="flex gap-2 flex-wrap">
+              {suggestedMin > 0 && !QUICK_DURATIONS.includes(suggestedMin) && (
+                <button type="button" onClick={() => setDuration(String(suggestedMin))}
+                  className={`px-3 py-2 rounded-lg border text-sm font-medium transition min-w-[52px] min-h-[52px] ${
+                    duration === String(suggestedMin) ? "bg-teal-500 text-white border-teal-500" : "bg-teal-50 border-teal-300 text-teal-700 hover:bg-teal-100"
+                  }`}>
+                  {suggestedMin}<span className="block text-[9px] leading-tight opacity-80">non classé</span>
+                </button>
+              )}
               {QUICK_DURATIONS.map(d => (
                 <button
                   key={d}

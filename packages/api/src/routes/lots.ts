@@ -224,6 +224,23 @@ lotsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
   res.json(data);
 }));
 
+// ─── Delete a downtime from a lot ────────────────────────────
+
+lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
+  const { db } = req;
+  const lotId = String(req.params.id);
+  const dtId = String(req.params.dtId);
+
+  const [dt] = await db.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId })
+    .from(downtimeEvents).where(eq(downtimeEvents.id, dtId)).limit(1);
+  if (!dt) { res.status(404).json({ error: "Arrêt introuvable" }); return; }
+  if (dt.lotEntryId !== lotId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à ce lot" }); return; }
+
+  await audit(db, req, "DELETE_DOWNTIME", "downtime", dtId, { lotId });
+  await db.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
+  res.status(204).send();
+}));
+
 // ─── Supervisor validate/reject lot ───────────────────────────
 
 lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(validateLotSchema), asyncHandler(async (req, res) => {

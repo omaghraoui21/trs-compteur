@@ -107,6 +107,11 @@ export const api = {
   addSessionDowntime: (sessionId: string, data: AddDowntimeInput) =>
     request<any>(`/sessions/${sessionId}/downtimes`, { method: "POST", body: JSON.stringify(data) }),
   lotDowntimes: (lotId: string) => request<LotDowntime[]>(`/lots/${lotId}/downtimes`),
+  deleteDowntime: (lotId: string, dtId: string) =>
+    request<void>(`/lots/${lotId}/downtimes/${dtId}`, { method: "DELETE" }),
+  sessionDowntimes: (sessionId: string) => request<LotDowntime[]>(`/sessions/${sessionId}/downtimes`),
+  deleteSessionDowntime: (sessionId: string, dtId: string) =>
+    request<void>(`/sessions/${sessionId}/downtimes/${dtId}`, { method: "DELETE" }),
   // Change the cadence (consigne) while a lot is running — logged for audit.
   changeCadence: (lotId: string, data: { newCadence: number; cadenceUnit?: string; reason?: string }) =>
     request<LotEntry>(`/lots/${lotId}/cadence`, { method: "POST", body: JSON.stringify(data) }),

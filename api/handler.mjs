@@ -46415,6 +46415,43 @@ sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(
   await audit(db2, req, "ADD_SESSION_DOWNTIME", "downtime", dt.id, { sessionId, categoryId, durationMinutes });
   res.status(201).json(dt);
 }));
+sessionsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
+  const { db: db2 } = req;
+  const data = await db2.select({
+    id: downtimeEvents.id,
+    lotEntryId: downtimeEvents.lotEntryId,
+    categoryId: downtimeEvents.categoryId,
+    startedAt: downtimeEvents.startedAt,
+    endedAt: downtimeEvents.endedAt,
+    durationMinutes: downtimeEvents.durationMinutes,
+    comment: downtimeEvents.comment,
+    famille: downtimeCategories.famille,
+    reason: downtimeCategories.label,
+    isPlanned: downtimeCategories.isPlanned
+  }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(and(eq(downtimeEvents.sessionId, String(req.params.id)), isNull(downtimeEvents.lotEntryId)));
+  res.json(data);
+}));
+sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
+  const { db: db2 } = req;
+  const sessionId = String(req.params.id);
+  const dtId = String(req.params.dtId);
+  const [dt] = await db2.select({ id: downtimeEvents.id, sessionId: downtimeEvents.sessionId, lotEntryId: downtimeEvents.lotEntryId }).from(downtimeEvents).where(eq(downtimeEvents.id, dtId)).limit(1);
+  if (!dt) {
+    res.status(404).json({ error: "Arr\xEAt introuvable" });
+    return;
+  }
+  if (dt.sessionId !== sessionId) {
+    res.status(403).json({ error: "Cet arr\xEAt n'appartient pas \xE0 cette session" });
+    return;
+  }
+  if (dt.lotEntryId !== null) {
+    res.status(400).json({ error: "Cet arr\xEAt est rattach\xE9 \xE0 un lot \u2014 utilisez DELETE /lots/:id/downtimes/:dtId" });
+    return;
+  }
+  await audit(db2, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });
+  await db2.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
+  res.status(204).send();
+}));
 sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const [session] = await db2.select().from(sessions).where(eq(sessions.id, String(req.params.id))).limit(1);
@@ -46650,6 +46687,23 @@ lotsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
     isPlanned: downtimeCategories.isPlanned
   }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(eq(downtimeEvents.lotEntryId, String(req.params.id)));
   res.json(data);
+}));
+lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
+  const { db: db2 } = req;
+  const lotId = String(req.params.id);
+  const dtId = String(req.params.dtId);
+  const [dt] = await db2.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId }).from(downtimeEvents).where(eq(downtimeEvents.id, dtId)).limit(1);
+  if (!dt) {
+    res.status(404).json({ error: "Arr\xEAt introuvable" });
+    return;
+  }
+  if (dt.lotEntryId !== lotId) {
+    res.status(403).json({ error: "Cet arr\xEAt n'appartient pas \xE0 ce lot" });
+    return;
+  }
+  await audit(db2, req, "DELETE_DOWNTIME", "downtime", dtId, { lotId });
+  await db2.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
+  res.status(204).send();
 }));
 lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(validateLotSchema), asyncHandler(async (req, res) => {
   const { db: db2, userId } = req;
