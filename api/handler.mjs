@@ -46895,7 +46895,9 @@ async function buildSessionsTrs(db2, sessionList) {
       unplannedStopsMin: sessionUnplannedMin,
       lots: lotResults
     });
-    out.set(session.id, { sessionTrs, lotDetails, productLots, plannedStopsMin, downtimeDetails });
+    const lotsDurationMin = lotResults.reduce((s, l) => s + (l.lotDurationMin ?? 0), 0);
+    const aClasserMin = Math.max(0, Math.round(sessionTrs.tO - lotsDurationMin - plannedStopsMin - sessionUnplannedMin));
+    out.set(session.id, { sessionTrs, lotDetails, productLots, plannedStopsMin, downtimeDetails, aClasserMin });
   }
   return out;
 }
@@ -46912,14 +46914,17 @@ dashboardRouter.get("/trs", validateQuery(dashboardRangeQuerySchema), asyncHandl
   )).orderBy(sessions.sessionDate);
   const sessionResults = [];
   const allDowntimes = [];
+  let totalAClasserMin = 0;
   const built = await buildSessionsTrs(db2, closedSessions);
   for (const session of closedSessions) {
-    const { sessionTrs, lotDetails, downtimeDetails } = built.get(session.id);
+    const { sessionTrs, lotDetails, downtimeDetails, aClasserMin } = built.get(session.id);
     allDowntimes.push(...downtimeDetails);
+    totalAClasserMin += aClasserMin ?? 0;
     sessionResults.push({
       date: session.sessionDate,
       notes: session.notes,
       ...sessionTrs,
+      aClasserMin: aClasserMin ?? 0,
       lots: lotDetails,
       reliability: computeMtbfMttr(downtimeDetails, sessionTrs.tF, microStopThreshold)
     });
@@ -46928,7 +46933,7 @@ dashboardRouter.get("/trs", validateQuery(dashboardRangeQuerySchema), asyncHandl
   res.json({
     period: { from, to, equipmentId },
     daily: sessionResults,
-    total: { ...zoom, reliability: computeMtbfMttr(allDowntimes, zoom.tF, microStopThreshold) }
+    total: { ...zoom, aClasserMin: totalAClasserMin, reliability: computeMtbfMttr(allDowntimes, zoom.tF, microStopThreshold) }
   });
 }));
 dashboardRouter.get("/pareto", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
@@ -47126,6 +47131,7 @@ dashboardRouter.get("/downtime-log", validateQuery(dashboardRangeQuerySchema), a
     famille: downtimeCategories.famille,
     reason: downtimeCategories.label,
     isPlanned: downtimeCategories.isPlanned,
+    categoryCode: downtimeCategories.code,
     batchNumber: lotEntries.batchNumber
   };
   const [lotRows, sessionRows] = await Promise.all([
