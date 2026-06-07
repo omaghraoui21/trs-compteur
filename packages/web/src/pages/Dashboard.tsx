@@ -475,20 +475,17 @@ function ClassificationQualityCard({ total }: { total: TrsMetrics & { aClasserMi
           {nonQualifie > 0 && (
             <div className="text-xs text-gray-500 mt-0.5">dont {fmtDuration(nonQualifie)} d'arrêts déclarés sans famille</div>
           )}
-          {/* Visual progress bar with threshold markers */}
+          {/* Visual progress bar — markers derived from CLASS_THRESHOLDS */}
           <div className="relative h-2 bg-white/60 rounded-full overflow-hidden mt-3 border border-black/10" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-            <div
-              className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: color }}
-            />
-            {/* 5% marker */}
-            <div className="absolute top-0 h-full w-px bg-black/20" style={{ left: "5%" }} />
-            {/* 15% marker */}
-            <div className="absolute top-0 h-full w-px bg-black/20" style={{ left: "15%" }} />
+            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: color }} />
+            {CLASS_THRESHOLDS.filter(t => t.min > 0).map(t => (
+              <div key={t.min} className="absolute top-0 h-full w-px bg-black/20" style={{ left: `${t.min}%` }} />
+            ))}
           </div>
-          <div className="flex justify-between text-[9px] text-gray-400 mt-0.5 px-0" style={{ paddingLeft: "4%", paddingRight: "0" }}>
-            <span>5%</span>
-            <span style={{ marginLeft: "calc(10% - 0.5rem)" }}>15%</span>
+          <div className="relative text-[9px] text-gray-400 mt-0.5 h-3">
+            {CLASS_THRESHOLDS.filter(t => t.min > 0).map(t => (
+              <span key={t.min} className="absolute" style={{ left: `${t.min}%`, transform: "translateX(-50%)" }}>{t.min}%</span>
+            ))}
           </div>
         </div>
         <div className="text-xs text-gray-400 max-w-[160px] text-right shrink-0">{statusLabel}</div>

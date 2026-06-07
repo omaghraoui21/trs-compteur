@@ -1,3 +1,5 @@
+const DASHBOARD_KPI_INDICES = [0, 1, 2, 3, 4];
+
 export function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`motion-safe:animate-pulse rounded-md bg-gray-200 ${className}`} />;
 }
@@ -8,7 +10,7 @@ export function DashboardSkeleton() {
     <div className="space-y-4" role="status" aria-label="Chargement…">
       <Skeleton className="h-28 w-full rounded-xl" />
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {Array.from({ length: 5 }).map((_, i) => (
+        {DASHBOARD_KPI_INDICES.map(i => (
           <Skeleton key={i} className="h-20 rounded-xl" />
         ))}
       </div>

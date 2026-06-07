@@ -7,6 +7,14 @@ import { useActiveSession } from "@/lib/sessionContext";
 import { fmtDuration, diffMinutes } from "@trs/engine";
 import { Timer, ClipboardCheck, BarChart3, Settings, LogOut, KeyRound } from "lucide-react";
 
+const HEADER_ICON_BTN = "p-1.5 rounded hover:bg-blue-600 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80";
+
+const ROLE_META: Record<string, { label: string; cls: string }> = {
+  admin:      { label: "Admin",      cls: "bg-purple-100 text-purple-700" },
+  supervisor: { label: "Superviseur",cls: "bg-blue-100 text-blue-700"    },
+  operator:   { label: "Opérateur",  cls: "bg-gray-100 text-gray-600"    },
+};
+
 const navItems = [
   { to: "/", label: "Session", short: "Session", icon: Timer },
   { to: "/supervisor", label: "Validation", short: "Validation", icon: ClipboardCheck },
@@ -49,18 +57,10 @@ export default function Layout({ children }: { children: ReactNode }) {
           ) : (
             <span className="hidden sm:inline text-sm opacity-80">{user?.displayName}</span>
           )}
-          <button
-            onClick={() => setPwOpen(true)}
-            className="p-1.5 rounded hover:bg-blue-600 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
-            aria-label="Changer mon mot de passe"
-          >
+          <button onClick={() => setPwOpen(true)} className={HEADER_ICON_BTN} aria-label="Changer mon mot de passe">
             <KeyRound className="h-4 w-4" />
           </button>
-          <button
-            onClick={logout}
-            className="p-1.5 rounded hover:bg-blue-600 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
-            aria-label="Déconnexion"
-          >
+          <button onClick={logout} className={HEADER_ICON_BTN} aria-label="Déconnexion">
             <LogOut className="h-4 w-4" />
           </button>
         </div>
@@ -88,20 +88,17 @@ export default function Layout({ children }: { children: ReactNode }) {
               </NavLink>
             ))}
           </div>
-          {user && (
-            <div className="border-t px-4 py-3 mt-auto">
-              <div className="text-xs font-medium text-gray-700 truncate">{user.displayName}</div>
-              <div className="mt-0.5">
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                  user.role === "admin" ? "bg-purple-100 text-purple-700" :
-                  user.role === "supervisor" ? "bg-blue-100 text-blue-700" :
-                  "bg-gray-100 text-gray-600"
-                }`}>
-                  {user.role === "admin" ? "Admin" : user.role === "supervisor" ? "Superviseur" : "Opérateur"}
-                </span>
+          {user && (() => {
+            const { label, cls } = ROLE_META[user.role] ?? ROLE_META.operator;
+            return (
+              <div className="border-t px-4 py-3 mt-auto">
+                <div className="text-xs font-medium text-gray-700 truncate">{user.displayName}</div>
+                <div className="mt-0.5">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cls}`}>{label}</span>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </nav>
 
         {/* extra bottom padding on mobile so the fixed tab bar (56px + safe area)
