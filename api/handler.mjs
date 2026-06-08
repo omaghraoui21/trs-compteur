@@ -45707,6 +45707,24 @@ var validateLotSchema = external_exports.object({
   comment: external_exports.string().optional(),
   // 21 CFR Part 11: signing requires re-authentication with the signer's password.
   password: external_exports.string().min(1, "Mot de passe requis pour signer")
+}).refine((d) => d.action !== "reject" || d.comment && d.comment.trim().length > 0, {
+  message: "Un commentaire est obligatoire pour le rejet",
+  path: ["comment"]
+});
+var correctLotSchema = external_exports.object({
+  quantityProduced: external_exports.number().int().min(0).optional(),
+  quantityConforming: external_exports.number().int().min(0).optional(),
+  quantityRejected: external_exports.number().int().min(0).optional(),
+  cadenceUsed: external_exports.number().positive().optional(),
+  cadenceUnit: cadenceUnit.optional(),
+  correctionReason: external_exports.string().min(1, "Raison de la correction obligatoire"),
+  password: external_exports.string().min(1, "Mot de passe requis pour signer")
+}).refine(
+  (d) => d.quantityConforming === void 0 || d.quantityProduced === void 0 || d.quantityConforming <= d.quantityProduced,
+  { message: "La quantit\xE9 conforme ne peut pas d\xE9passer la quantit\xE9 produite", path: ["quantityConforming"] }
+);
+var pendingLotsQuerySchema = external_exports.object({
+  status: external_exports.enum(["closed", "validated", "rejected", "all"]).optional().default("closed")
 });
 var equipmentType = external_exports.enum(["blistereuse", "geluleuse"]);
 var createRoomSchema = external_exports.object({
@@ -46719,6 +46737,48 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   await db2.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
   res.status(204).send();
 }));
+lotsRouter.post("/:id/correct", requireRole("supervisor", "admin"), validate(correctLotSchema), asyncHandler(async (req, res) => {
+  const { db: db2, userId } = req;
+  const { quantityProduced, quantityConforming, quantityRejected, cadenceUsed, cadenceUnit: cadenceUnit2, correctionReason, password } = req.body;
+  const lotId = String(req.params.id);
+  const [signer] = await db2.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!signer || !signer.isActive) throw new HttpError(401, "Signataire invalide");
+  const ok = await import_bcryptjs3.default.compare(password, signer.passwordHash);
+  if (!ok) throw new HttpError(401, "Signature \xE9lectronique invalide : mot de passe incorrect");
+  const [original] = await db2.select().from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  if (!original) {
+    res.status(404).json({ error: "Lot introuvable" });
+    return;
+  }
+  if (original.status !== "closed") throw new HttpError(409, "Seuls les lots cl\xF4tur\xE9s peuvent \xEAtre corrig\xE9s");
+  const updates = {};
+  if (quantityProduced !== void 0) updates.quantityProduced = quantityProduced;
+  if (quantityConforming !== void 0) updates.quantityConforming = quantityConforming;
+  if (quantityRejected !== void 0) updates.quantityRejected = quantityRejected;
+  if (cadenceUsed !== void 0) updates.cadenceUsed = String(cadenceUsed);
+  if (cadenceUnit2 !== void 0) updates.cadenceUnit = cadenceUnit2;
+  if (Object.keys(updates).length === 0) throw new HttpError(400, "Aucune valeur \xE0 corriger");
+  const [lot] = await db2.update(lotEntries).set(updates).where(eq(lotEntries.id, lotId)).returning();
+  const [signature] = await db2.insert(electronicSignatures).values({
+    userId: signer.id,
+    userEmail: signer.email,
+    userName: signer.displayName,
+    entityType: "lot",
+    entityId: lot.id,
+    meaning: "Correction des donn\xE9es du lot",
+    action: "correct",
+    comment: correctionReason,
+    ipAddress: req.ip ?? null
+  }).returning();
+  const originalValues = {
+    quantityProduced: original.quantityProduced,
+    quantityConforming: original.quantityConforming,
+    quantityRejected: original.quantityRejected,
+    cadenceUsed: original.cadenceUsed
+  };
+  await audit(db2, req, "CORRECT_LOT", "lot", lot.id, { originalValues, newValues: updates, correctionReason, signatureId: signature.id });
+  res.json({ lot, signature });
+}));
 lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(validateLotSchema), asyncHandler(async (req, res) => {
   const { db: db2, userId } = req;
   const { action, comment, password } = req.body;
@@ -47166,9 +47226,35 @@ dashboardRouter.get("/downtime-log", validateQuery(dashboardRangeQuerySchema), a
   const log = [...lotRows, ...sessionRows].sort((a, b2) => b2.startedAt.getTime() - a.startedAt.getTime()).map((r) => ({ ...r, startedAt: r.startedAt.toISOString() }));
   res.json({ period: { from, to, equipmentId }, log });
 }));
-dashboardRouter.get("/pending-lots", asyncHandler(async (req, res) => {
+dashboardRouter.get("/pending-lots", validateQuery(pendingLotsQuerySchema), asyncHandler(async (req, res) => {
   const { db: db2 } = req;
-  const lots = await db2.select().from(lotEntries).where(eq(lotEntries.status, "closed")).orderBy(desc(lotEntries.endedAt));
+  const { status } = req.query;
+  const whereClause = status === "all" ? or(eq(lotEntries.status, "closed"), eq(lotEntries.status, "validated"), eq(lotEntries.status, "rejected")) : eq(lotEntries.status, status);
+  const lots = await db2.select({
+    // All lotEntries columns
+    id: lotEntries.id,
+    sessionId: lotEntries.sessionId,
+    productId: lotEntries.productId,
+    batchNumber: lotEntries.batchNumber,
+    lotOrder: lotEntries.lotOrder,
+    cadenceUsed: lotEntries.cadenceUsed,
+    cadenceUnit: lotEntries.cadenceUnit,
+    quantityProduced: lotEntries.quantityProduced,
+    quantityConforming: lotEntries.quantityConforming,
+    quantityRejected: lotEntries.quantityRejected,
+    startedAt: lotEntries.startedAt,
+    endedAt: lotEntries.endedAt,
+    status: lotEntries.status,
+    operatorId: lotEntries.operatorId,
+    supervisorId: lotEntries.supervisorId,
+    supervisorComment: lotEntries.supervisorComment,
+    validatedAt: lotEntries.validatedAt,
+    // Joined context
+    operatorName: users.displayName,
+    sessionDate: sessions.sessionDate,
+    equipmentName: equipments.name,
+    equipmentCode: equipments.code
+  }).from(lotEntries).innerJoin(sessions, eq(lotEntries.sessionId, sessions.id)).innerJoin(users, eq(lotEntries.operatorId, users.id)).innerJoin(equipments, eq(sessions.equipmentId, equipments.id)).where(whereClause).orderBy(desc(lotEntries.endedAt));
   res.json(lots);
 }));
 

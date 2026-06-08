@@ -119,6 +119,9 @@ export const api = {
   // 21 CFR Part 11: validation/rejection requires re-authentication (password).
   validateLot: (id: string, action: "validate" | "reject", password: string, comment?: string) =>
     request<LotEntry & { signature: ElectronicSignature }>(`/lots/${id}/validate`, { method: "POST", body: JSON.stringify({ action, comment, password }) }),
+  // 21 CFR Part 11: supervisor correction of operator data with signed audit trail.
+  correctLot: (id: string, data: CorrectLotInput) =>
+    request<{ lot: LotEntry; signature: ElectronicSignature }>(`/lots/${id}/correct`, { method: "POST", body: JSON.stringify(data) }),
   lotSignatures: (id: string) => request<ElectronicSignature[]>(`/lots/${id}/signatures`),
 
   // Dashboard
@@ -136,7 +139,8 @@ export const api = {
     request<HeatmapResponse>(`/dashboard/heatmap?equipmentId=${equipmentId}&from=${from}&to=${to}`),
   dashboardDowntimeLog: (equipmentId: string, from: string, to: string) =>
     request<DowntimeLogResponse>(`/dashboard/downtime-log?equipmentId=${equipmentId}&from=${from}&to=${to}`),
-  pendingLots: () => request<LotEntry[]>("/dashboard/pending-lots"),
+  pendingLots: (status?: "closed" | "validated" | "rejected" | "all") =>
+    request<PendingLot[]>(`/dashboard/pending-lots${status ? `?status=${status}` : ""}`),
 
   // Admin CRUD
   admin: {
@@ -204,7 +208,7 @@ export interface DowntimeCategory { id: string; code: string; label: string; fam
 
 export interface Session { id: string; equipmentId: string; roomId: string; operatorId: string; sessionDate: string; openedAt: string; closedAt: string | null; status: string; notes: string | null }
 export interface SessionEvent { id: string; sessionId: string; eventType: string; label: string | null; startedAt: string; endedAt: string | null; durationMinutes: number | null; isPlanned: boolean; lotEntryId: string | null; sortOrder: number; comment: string | null }
-export interface LotEntry { id: string; sessionId: string; productId: string; batchNumber: string; lotOrder: number; cadenceUsed: string; cadenceUnit: string; quantityProduced: number; quantityConforming: number; quantityRejected: number; startedAt: string; endedAt: string | null; status: string }
+export interface LotEntry { id: string; sessionId: string; productId: string; batchNumber: string; lotOrder: number; cadenceUsed: string; cadenceUnit: string; quantityProduced: number; quantityConforming: number; quantityRejected: number; startedAt: string; endedAt: string | null; status: string; supervisorComment: string | null; validatedAt: string | null }
 export interface DowntimeEvent { id: string; lotEntryId: string; categoryId: string; startedAt: string; endedAt: string | null; durationMinutes: number; comment: string | null }
 // Returned by GET /lots/:id/downtimes — category joined server-side (famille/reason/isPlanned).
 export interface LotDowntime extends DowntimeEvent { famille: string; reason: string; isPlanned: boolean }
@@ -224,10 +228,22 @@ export interface ParetoResponse { pareto: ParetoItem[]; totalMin: number }
 export interface ComparisonEquipment { equipmentId: string; equipmentName: string; equipmentCode: string; equipmentType: string; trsObjective: number; daily: DailyTrs[]; total: TrsMetrics }
 export interface ComparisonResponse { period: { from: string; to: string }; equipments: ComparisonEquipment[] }
 
+export interface PendingLot extends LotEntry {
+  operatorName: string;
+  sessionDate: string;
+  equipmentName: string;
+  equipmentCode: string;
+}
+
 export interface AddEventInput { eventType: string; label?: string; durationMinutes?: number; isPlanned?: boolean; comment?: string }
 export interface StartLotInput { sessionId: string; productId: string; batchNumber: string; cadenceUsed: number; cadenceUnit?: string }
 export interface CloseLotInput { quantityProduced: number; quantityConforming: number; quantityRejected?: number }
 export interface AddDowntimeInput { categoryId: string; durationMinutes: number; isShortStop?: boolean; comment?: string }
+export interface CorrectLotInput {
+  quantityProduced?: number; quantityConforming?: number; quantityRejected?: number;
+  cadenceUsed?: number; cadenceUnit?: string;
+  correctionReason: string; password: string;
+}
 
 // Admin types (include all fields, not just active)
 export interface ElectronicSignature { id: string; userId: string | null; userEmail: string; userName: string; entityType: string; entityId: string; meaning: string; action: string; comment: string | null; ipAddress: string | null; signedAt: string }

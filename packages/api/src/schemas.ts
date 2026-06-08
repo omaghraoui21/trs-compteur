@@ -96,11 +96,35 @@ export const changeCadenceSchema = z.object({
   reason: z.string().optional(),
 });
 
-export const validateLotSchema = z.object({
-  action: z.enum(["validate", "reject"]),
-  comment: z.string().optional(),
-  // 21 CFR Part 11: signing requires re-authentication with the signer's password.
-  password: z.string().min(1, "Mot de passe requis pour signer"),
+export const validateLotSchema = z
+  .object({
+    action: z.enum(["validate", "reject"]),
+    comment: z.string().optional(),
+    // 21 CFR Part 11: signing requires re-authentication with the signer's password.
+    password: z.string().min(1, "Mot de passe requis pour signer"),
+  })
+  .refine(d => d.action !== "reject" || (d.comment && d.comment.trim().length > 0), {
+    message: "Un commentaire est obligatoire pour le rejet",
+    path: ["comment"],
+  });
+
+export const correctLotSchema = z
+  .object({
+    quantityProduced: z.number().int().min(0).optional(),
+    quantityConforming: z.number().int().min(0).optional(),
+    quantityRejected: z.number().int().min(0).optional(),
+    cadenceUsed: z.number().positive().optional(),
+    cadenceUnit: cadenceUnit.optional(),
+    correctionReason: z.string().min(1, "Raison de la correction obligatoire"),
+    password: z.string().min(1, "Mot de passe requis pour signer"),
+  })
+  .refine(
+    d => d.quantityConforming === undefined || d.quantityProduced === undefined || d.quantityConforming <= d.quantityProduced,
+    { message: "La quantité conforme ne peut pas dépasser la quantité produite", path: ["quantityConforming"] },
+  );
+
+export const pendingLotsQuerySchema = z.object({
+  status: z.enum(["closed", "validated", "rejected", "all"]).optional().default("closed"),
 });
 
 // ─── Admin schemas (M3) ─────────────────────────────────────────

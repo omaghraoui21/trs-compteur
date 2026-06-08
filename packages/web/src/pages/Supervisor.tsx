@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { api, type LotEntry, type Product, type LotDowntime, type CadenceChange } from "@/lib/api";
+import { api, type PendingLot, type Product, type LotDowntime, type CadenceChange, type CorrectLotInput } from "@/lib/api";
 import { fmtPct, trsColor, diffMinutes, fmtDuration as fmtMinutes } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton, Skeleton } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
-import { ClipboardCheck, Check, X, ChevronDown, ChevronUp, RefreshCw, Clock, AlertOctagon, ShieldCheck } from "lucide-react";
+import { ClipboardCheck, Check, X, ChevronDown, ChevronUp, RefreshCw, Clock, AlertOctagon, ShieldCheck, User, CalendarDays, Cpu, Pencil } from "lucide-react";
 
 const PULL_THRESHOLD = 60;
+
+type StatusFilter = "closed" | "validated" | "rejected";
+type SignAction = "validate" | "reject" | "correct";
 
 function fmtLotDuration(start: string, end: string | null): string {
   return end ? fmtMinutes(diffMinutes(start, end)) : "En cours";
@@ -26,27 +29,40 @@ function QualityBar({ tq }: { tq: number | null }) {
   );
 }
 
+const STATUS_TABS: { key: StatusFilter; label: string }[] = [
+  { key: "closed",    label: "En attente" },
+  { key: "validated", label: "Validés" },
+  { key: "rejected",  label: "Rejetés" },
+];
+
 export default function SupervisorPage() {
-  const [lots, setLots] = useState<LotEntry[]>([]);
+  const [lots, setLots] = useState<PendingLot[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("closed");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [lotDowntimes, setLotDowntimes] = useState<Record<string, LotDowntime[]>>({});
   const [lotCadence, setLotCadence] = useState<Record<string, CadenceChange[]>>({});
   const [loadingDowntimesId, setLoadingDowntimesId] = useState<string | null>(null);
   const [comment, setComment] = useState("");
-  const [pendingSign, setPendingSign] = useState<{ lotId: string; action: "validate" | "reject" } | null>(null);
+  const [commentError, setCommentError] = useState("");
+  const [pendingSign, setPendingSign] = useState<{ lotId: string; action: SignAction } | null>(null);
   const [signPassword, setSignPassword] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Correction form state
+  const [correcting, setCorrecting] = useState<string | null>(null);
+  const [correctionData, setCorrectionData] = useState({ qProd: "", qConf: "", qRej: "", cadence: "", cadenceUnit: "", reason: "" });
+
   const touchStartY = useRef(0);
   const toast = useToast();
 
-  const loadData = useCallback(async (showLoader = false) => {
+  const loadData = useCallback(async (filter: StatusFilter, showLoader = false) => {
     if (showLoader) setLoading(true);
     try {
-      const [l, p] = await Promise.all([api.pendingLots(), api.products()]);
+      const [l, p] = await Promise.all([api.pendingLots(filter), api.products()]);
       setLots(l);
       setProducts(p);
     } catch (err: any) {
@@ -57,12 +73,21 @@ export default function SupervisorPage() {
     }
   }, [toast]);
 
-  useEffect(() => { loadData(true); }, [loadData]);
+  useEffect(() => { loadData(statusFilter, true); }, [statusFilter, loadData]);
+
+  const handleTabChange = (tab: StatusFilter) => {
+    setStatusFilter(tab);
+    setExpanded(null);
+    setCorrecting(null);
+    setComment("");
+    setCommentError("");
+  };
 
   const expandLot = useCallback(async (lotId: string) => {
     if (expanded === lotId) { setExpanded(null); return; }
     setExpanded(lotId);
-    if (lotDowntimes[lotId] !== undefined) return; // cached
+    setCorrecting(null);
+    if (lotDowntimes[lotId] !== undefined) return;
     setLoadingDowntimesId(lotId);
     try {
       const [dts, cad] = await Promise.all([api.lotDowntimes(lotId), api.lotCadenceHistory(lotId)]);
@@ -84,20 +109,49 @@ export default function SupervisorPage() {
     if (delta > 0 && window.scrollY === 0) setPullDistance(Math.min(delta, 80));
   };
   const onTouchEnd = async () => {
-    if (pullDistance >= PULL_THRESHOLD) { setRefreshing(true); setPullDistance(0); await loadData(); }
+    if (pullDistance >= PULL_THRESHOLD) { setRefreshing(true); setPullDistance(0); await loadData(statusFilter); }
     else setPullDistance(0);
   };
 
-  const handleAction = async (lotId: string, action: "validate" | "reject", password: string) => {
+  const openSign = (lotId: string, action: SignAction) => {
+    if (action === "reject" && !comment.trim()) {
+      setCommentError("Un commentaire est obligatoire pour le rejet");
+      return;
+    }
+    setCommentError("");
+    setPendingSign({ lotId, action });
+    setSignPassword("");
+  };
+
+  const handleAction = async (lotId: string, action: SignAction, password: string) => {
     setSubmitting(true);
     try {
-      await api.validateLot(lotId, action, password, comment || undefined);
-      setLots(prev => prev.filter(l => l.id !== lotId));
-      setExpanded(null);
-      setComment("");
+      if (action === "correct") {
+        const payload: CorrectLotInput = {
+          correctionReason: correctionData.reason,
+          password,
+          ...(correctionData.qProd  !== "" && { quantityProduced:   Number(correctionData.qProd) }),
+          ...(correctionData.qConf  !== "" && { quantityConforming: Number(correctionData.qConf) }),
+          ...(correctionData.qRej   !== "" && { quantityRejected:   Number(correctionData.qRej) }),
+          ...(correctionData.cadence !== "" && { cadenceUsed:       Number(correctionData.cadence) }),
+          ...(correctionData.cadenceUnit !== "" && { cadenceUnit: correctionData.cadenceUnit }),
+        };
+        const { lot: updated } = await api.correctLot(lotId, payload);
+        setLots(prev => prev.map(l => l.id === lotId ? { ...l, ...updated } : l));
+        setCorrecting(null);
+        // Invalidate cached downtimes/cadence so expanded detail refreshes
+        setLotDowntimes(prev => { const n = { ...prev }; delete n[lotId]; return n; });
+        setLotCadence(prev => { const n = { ...prev }; delete n[lotId]; return n; });
+        toast.success("Données corrigées et signées");
+      } else {
+        await api.validateLot(lotId, action, password, comment || undefined);
+        setLots(prev => prev.filter(l => l.id !== lotId));
+        setExpanded(null);
+        setComment("");
+        toast.success(action === "validate" ? "Lot validé et signé" : "Lot rejeté et signé");
+      }
       setPendingSign(null);
       setSignPassword("");
-      toast.success(action === "validate" ? "Lot validé et signé" : "Lot rejeté et signé");
     } catch (err: any) {
       toast.error(err.message || "Échec de la signature");
     } finally {
@@ -107,8 +161,6 @@ export default function SupervisorPage() {
 
   const productMap = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
 
-  // Per-lot derived values + coherence checks, computed once per data change
-  // (not on every render). Keyed by lot id.
   const lotDerived = useMemo(() => {
     const m = new Map<string, {
       tq: number | null; errors: string[]; warnings: string[];
@@ -132,7 +184,6 @@ export default function SupervisorPage() {
       const cadChanges = lotCadence[lot.id] ?? [];
       const lotDurationMin = lot.endedAt ? diffMinutes(lot.startedAt, lot.endedAt) : null;
 
-      // Deeper coherence checks (available once details are loaded).
       if (lotDurationMin !== null && totalDowntimeMin !== null && totalDowntimeMin > lotDurationMin) {
         errors.push(`Arrêts (${totalDowntimeMin} min) > durée du lot (${lotDurationMin} min)`);
       }
@@ -143,6 +194,8 @@ export default function SupervisorPage() {
     }
     return m;
   }, [lots, lotDowntimes, lotCadence]);
+
+  const pendingCount = lots.length;
 
   return (
     <div
@@ -160,17 +213,39 @@ export default function SupervisorPage() {
         </div>
       )}
 
-      <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-        <ClipboardCheck className="h-5 w-5" /> Lots à valider
-        {lots.length > 0 && (
-          <span className="ml-1 text-sm font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{lots.length}</span>
-        )}
+      <h2 className="text-xl font-bold mb-3 flex items-center gap-2">
+        <ClipboardCheck className="h-5 w-5" /> Validation des lots
       </h2>
+
+      {/* Status filter tabs */}
+      <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1">
+        {STATUS_TABS.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => handleTabChange(tab.key)}
+            className={`flex-1 py-2 text-sm font-medium rounded-lg transition ${
+              statusFilter === tab.key
+                ? "bg-white shadow text-gray-800"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {tab.label}
+            {tab.key === "closed" && pendingCount > 0 && statusFilter === "closed" && (
+              <span className="ml-1.5 text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded-full">{pendingCount}</span>
+            )}
+          </button>
+        ))}
+      </div>
 
       {loading && <ListSkeleton />}
 
       {!loading && lots.length === 0 && (
-        <EmptyState icon={ShieldCheck} iconCls="text-green-400" title="Aucun lot en attente" description="Tous les lots ont été validés." />
+        <EmptyState
+          icon={ShieldCheck}
+          iconCls="text-green-400"
+          title={statusFilter === "closed" ? "Aucun lot en attente" : `Aucun lot ${statusFilter === "validated" ? "validé" : "rejeté"}`}
+          description={statusFilter === "closed" ? "Tous les lots ont été traités." : "Aucun lot dans cette catégorie."}
+        />
       )}
 
       <div className="space-y-3">
@@ -178,6 +253,8 @@ export default function SupervisorPage() {
           const product = productMap.get(lot.productId);
           const isExpanded = expanded === lot.id;
           const { tq, errors, warnings, dts, totalDowntimeMin, plannedMin, unplannedMin, cadChanges } = lotDerived.get(lot.id)!;
+          const isCorrecting = correcting === lot.id;
+          const isPending = lot.status === "closed";
 
           return (
             <div key={lot.id} className="bg-white rounded-xl border shadow-sm overflow-hidden">
@@ -200,14 +277,30 @@ export default function SupervisorPage() {
                       {warnings.length > 0 && (
                         <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full">{warnings.length} alerte{warnings.length > 1 ? "s" : ""}</span>
                       )}
+                      {lot.status === "validated" && (
+                        <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full flex items-center gap-0.5"><Check className="h-3 w-3" />Validé</span>
+                      )}
+                      {lot.status === "rejected" && (
+                        <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full flex items-center gap-0.5"><X className="h-3 w-3" />Rejeté</span>
+                      )}
                     </div>
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      {product?.name} · Lot #{lot.lotOrder}
+                    {/* Context: product · equipment · operator · date */}
+                    <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-2 flex-wrap">
+                      <span>{product?.name ?? "—"} · Lot #{lot.lotOrder}</span>
                       {lot.endedAt && (
-                        <span className="ml-2 inline-flex items-center gap-0.5">
+                        <span className="inline-flex items-center gap-0.5">
                           <Clock className="h-3 w-3" />{fmtLotDuration(lot.startedAt, lot.endedAt)}
                         </span>
                       )}
+                      <span className="inline-flex items-center gap-0.5">
+                        <Cpu className="h-3 w-3" />{lot.equipmentCode}
+                      </span>
+                      <span className="inline-flex items-center gap-0.5">
+                        <User className="h-3 w-3" />{lot.operatorName}
+                      </span>
+                      <span className="inline-flex items-center gap-0.5">
+                        <CalendarDays className="h-3 w-3" />{lot.sessionDate}
+                      </span>
                     </div>
                     <QualityBar tq={tq} />
                   </div>
@@ -294,6 +387,19 @@ export default function SupervisorPage() {
                     )}
                   </div>
 
+                  {/* Supervisor decision (validated/rejected) */}
+                  {lot.supervisorComment && (
+                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-2">
+                      <div className="text-xs font-semibold text-blue-800 mb-0.5">Décision superviseur</div>
+                      <div className="text-xs text-blue-700">{lot.supervisorComment}</div>
+                      {lot.validatedAt && (
+                        <div className="text-[10px] text-blue-400 mt-0.5">
+                          {new Date(lot.validatedAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Coherence warnings */}
                   {errors.length > 0 && (
                     <div className="bg-red-50 rounded-lg p-2 space-y-0.5">
@@ -306,34 +412,125 @@ export default function SupervisorPage() {
                     </div>
                   )}
 
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Commentaire superviseur</label>
-                    <input
-                      value={comment}
-                      onChange={e => setComment(e.target.value)}
-                      className="w-full border rounded-lg px-3 py-2 text-sm"
-                      placeholder="Optionnel…"
-                    />
-                  </div>
+                  {/* Actions — only for pending lots */}
+                  {isPending && (
+                    <>
+                      {/* Inline correction form */}
+                      {isCorrecting ? (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                          <div className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
+                            <Pencil className="h-3.5 w-3.5" /> Correction des données
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { key: "qProd" as const, label: "Qté produite", placeholder: String(lot.quantityProduced) },
+                              { key: "qConf" as const, label: "Qté conforme", placeholder: String(lot.quantityConforming) },
+                              { key: "qRej"  as const, label: "Rebut",          placeholder: String(lot.quantityRejected) },
+                            ].map(f => (
+                              <div key={f.key}>
+                                <label className="block text-[10px] text-amber-700 mb-0.5">{f.label}</label>
+                                <input
+                                  type="number" inputMode="numeric" min="0"
+                                  value={correctionData[f.key]}
+                                  placeholder={f.placeholder}
+                                  onChange={e => setCorrectionData(prev => ({ ...prev, [f.key]: e.target.value }))}
+                                  className="w-full border border-amber-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] text-amber-700 mb-0.5">Cadence</label>
+                              <input
+                                type="number" inputMode="numeric" min="0"
+                                value={correctionData.cadence}
+                                placeholder={String(lot.cadenceUsed)}
+                                onChange={e => setCorrectionData(prev => ({ ...prev, cadence: e.target.value }))}
+                                className="w-full border border-amber-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-amber-700 mb-0.5">Unité</label>
+                              <select
+                                value={correctionData.cadenceUnit || lot.cadenceUnit}
+                                onChange={e => setCorrectionData(prev => ({ ...prev, cadenceUnit: e.target.value }))}
+                                className="w-full border border-amber-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                              >
+                                <option value="u/min">u/min</option>
+                                <option value="u/h">u/h</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-amber-700 mb-0.5">Raison de la correction <span className="text-red-500">*</span></label>
+                            <input
+                              value={correctionData.reason}
+                              onChange={e => setCorrectionData(prev => ({ ...prev, reason: e.target.value }))}
+                              placeholder="Ex : erreur de saisie opérateur — lot A confirmé 420 unités"
+                              className="w-full border border-amber-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                            />
+                          </div>
+                          <div className="flex gap-2 justify-end pt-1">
+                            <button onClick={() => setCorrecting(null)}
+                              className="px-3 py-1.5 text-xs text-gray-600 border rounded-lg hover:bg-gray-50">
+                              Annuler
+                            </button>
+                            <button
+                              disabled={!correctionData.reason.trim()}
+                              onClick={() => openSign(lot.id, "correct")}
+                              className="px-3 py-1.5 text-xs bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-40 disabled:pointer-events-none"
+                            >
+                              Signer la correction
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setCorrecting(lot.id);
+                            setCorrectionData({ qProd: "", qConf: "", qRej: "", cadence: "", cadenceUnit: lot.cadenceUnit, reason: "" });
+                          }}
+                          className="w-full flex items-center justify-center gap-1.5 text-sm border border-amber-300 text-amber-700 rounded-lg py-2 hover:bg-amber-50 transition"
+                        >
+                          <Pencil className="h-3.5 w-3.5" /> Corriger les données
+                        </button>
+                      )}
 
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => { setPendingSign({ lotId: lot.id, action: "validate" }); setSignPassword(""); }}
-                      disabled={submitting || errors.length > 0}
-                      className="flex-1 bg-green-600 text-white rounded-lg py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-green-700 transition disabled:opacity-40 disabled:pointer-events-none"
-                    >
-                      <Check className="h-4 w-4" /> Valider
-                    </button>
-                    <button
-                      onClick={() => { setPendingSign({ lotId: lot.id, action: "reject" }); setSignPassword(""); }}
-                      disabled={submitting}
-                      className="flex-1 bg-red-100 text-red-700 rounded-lg py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-red-200 transition disabled:opacity-40 disabled:pointer-events-none"
-                    >
-                      <X className="h-4 w-4" /> Rejeter
-                    </button>
-                  </div>
-                  {errors.length > 0 && (
-                    <p className="text-xs text-red-500 text-center">Résolvez les erreurs avant de valider. Vous pouvez rejeter le lot.</p>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">
+                          Commentaire superviseur
+                          {" "}<span className="text-red-400 text-[10px]">(obligatoire pour le rejet)</span>
+                        </label>
+                        <input
+                          value={comment}
+                          onChange={e => { setComment(e.target.value); if (e.target.value.trim()) setCommentError(""); }}
+                          className={`w-full border rounded-lg px-3 py-2 text-sm ${commentError ? "border-red-400" : ""}`}
+                          placeholder="Observations, motif de rejet…"
+                        />
+                        {commentError && <p className="text-xs text-red-500 mt-0.5">{commentError}</p>}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => openSign(lot.id, "validate")}
+                          disabled={submitting || errors.length > 0}
+                          className="flex-1 bg-green-600 text-white rounded-lg py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-green-700 transition disabled:opacity-40 disabled:pointer-events-none"
+                        >
+                          <Check className="h-4 w-4" /> Valider
+                        </button>
+                        <button
+                          onClick={() => openSign(lot.id, "reject")}
+                          disabled={submitting}
+                          className="flex-1 bg-red-100 text-red-700 rounded-lg py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-red-200 transition disabled:opacity-40 disabled:pointer-events-none"
+                        >
+                          <X className="h-4 w-4" /> Rejeter
+                        </button>
+                      </div>
+                      {errors.length > 0 && (
+                        <p className="text-xs text-red-500 text-center">Résolvez les erreurs ou corrigez les données avant de valider.</p>
+                      )}
+                    </>
                   )}
 
                   <button
@@ -349,7 +546,7 @@ export default function SupervisorPage() {
         })}
       </div>
 
-      {/* 21 CFR Part 11 — electronic signature dialog (re-authentication) */}
+      {/* 21 CFR Part 11 — electronic signature dialog */}
       {pendingSign && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setPendingSign(null)}>
           <div className="bg-white rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
@@ -358,7 +555,9 @@ export default function SupervisorPage() {
               <h3 className="font-semibold">Signature électronique</h3>
             </div>
             <p className="text-sm text-gray-600 mb-1">
-              {pendingSign.action === "validate" ? "Validation du lot" : "Rejet du lot"}
+              {pendingSign.action === "validate" ? "Validation du lot"
+                : pendingSign.action === "reject" ? "Rejet du lot"
+                : "Correction des données du lot"}
             </p>
             <p className="text-xs text-gray-400 mb-4">
               Conformément au 21 CFR Part 11, saisissez votre mot de passe pour signer cette décision. Votre nom et l'horodatage seront enregistrés de façon inaltérable.
@@ -378,7 +577,11 @@ export default function SupervisorPage() {
               <button
                 onClick={() => handleAction(pendingSign.lotId, pendingSign.action, signPassword)}
                 disabled={submitting || !signPassword}
-                className={`px-4 py-2 text-sm text-white rounded-lg disabled:opacity-50 ${pendingSign.action === "validate" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}
+                className={`px-4 py-2 text-sm text-white rounded-lg disabled:opacity-50 ${
+                  pendingSign.action === "validate" ? "bg-green-600 hover:bg-green-700"
+                  : pendingSign.action === "reject" ? "bg-red-600 hover:bg-red-700"
+                  : "bg-amber-600 hover:bg-amber-700"
+                }`}
               >
                 {submitting ? "Signature…" : "Signer"}
               </button>

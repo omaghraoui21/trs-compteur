@@ -6,7 +6,7 @@ import { diffMinutes } from "@trs/engine";
 import { authenticate, requireRole } from "../middleware";
 import { asyncHandler, validate, HttpError } from "../lib/http";
 import { audit } from "../lib/audit";
-import { startLotSchema, closeLotSchema, updateLotSchema, addDowntimeSchema, validateLotSchema, changeCadenceSchema } from "../schemas";
+import { startLotSchema, closeLotSchema, updateLotSchema, addDowntimeSchema, validateLotSchema, changeCadenceSchema, correctLotSchema } from "../schemas";
 
 export const lotsRouter = Router();
 lotsRouter.use(authenticate);
@@ -239,6 +239,54 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   await audit(db, req, "DELETE_DOWNTIME", "downtime", dtId, { lotId });
   await db.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
   res.status(204).send();
+}));
+
+// ─── Supervisor correct lot data (21 CFR Part 11 signed amendment) ─────
+// Allows supervisors to fix operator data-entry errors before validation.
+// Original values are preserved in the audit trail payload.
+
+lotsRouter.post("/:id/correct", requireRole("supervisor", "admin"), validate(correctLotSchema), asyncHandler(async (req, res) => {
+  const { db, userId } = req;
+  const { quantityProduced, quantityConforming, quantityRejected, cadenceUsed, cadenceUnit, correctionReason, password } = req.body;
+  const lotId = String(req.params.id);
+
+  const [signer] = await db.select().from(users).where(eq(users.id, userId!)).limit(1);
+  if (!signer || !signer.isActive) throw new HttpError(401, "Signataire invalide");
+  const ok = await bcrypt.compare(password, signer.passwordHash);
+  if (!ok) throw new HttpError(401, "Signature électronique invalide : mot de passe incorrect");
+
+  const [original] = await db.select().from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  if (!original) { res.status(404).json({ error: "Lot introuvable" }); return; }
+  if (original.status !== "closed") throw new HttpError(409, "Seuls les lots clôturés peuvent être corrigés");
+
+  const updates: Record<string, any> = {};
+  if (quantityProduced !== undefined) updates.quantityProduced = quantityProduced;
+  if (quantityConforming !== undefined) updates.quantityConforming = quantityConforming;
+  if (quantityRejected !== undefined) updates.quantityRejected = quantityRejected;
+  if (cadenceUsed !== undefined) updates.cadenceUsed = String(cadenceUsed);
+  if (cadenceUnit !== undefined) updates.cadenceUnit = cadenceUnit;
+
+  if (Object.keys(updates).length === 0) throw new HttpError(400, "Aucune valeur à corriger");
+
+  const [lot] = await db.update(lotEntries).set(updates).where(eq(lotEntries.id, lotId)).returning();
+
+  const [signature] = await db.insert(electronicSignatures).values({
+    userId: signer.id, userEmail: signer.email, userName: signer.displayName,
+    entityType: "lot", entityId: lot.id,
+    meaning: "Correction des données du lot",
+    action: "correct",
+    comment: correctionReason,
+    ipAddress: req.ip ?? null,
+  }).returning();
+
+  const originalValues = {
+    quantityProduced: original.quantityProduced,
+    quantityConforming: original.quantityConforming,
+    quantityRejected: original.quantityRejected,
+    cadenceUsed: original.cadenceUsed,
+  };
+  await audit(db, req, "CORRECT_LOT", "lot", lot.id, { originalValues, newValues: updates, correctionReason, signatureId: signature.id });
+  res.json({ lot, signature });
 }));
 
 // ─── Supervisor validate/reject lot ───────────────────────────

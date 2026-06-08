@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, and, or, gte, lte, desc, sql, inArray, isNull } from "drizzle-orm";
-import { sessions, lotEntries, sessionEvents, downtimeEvents, downtimeCategories, equipments, products, lotCadenceChanges } from "@trs/db";
+import { sessions, lotEntries, sessionEvents, downtimeEvents, downtimeCategories, equipments, products, lotCadenceChanges, users } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, computeMtbfMttr, computeAClasserMin } from "@trs/engine";
 import type { ProductLotInput } from "@trs/engine";
 
@@ -8,7 +8,7 @@ import { authenticate } from "../middleware";
 import { asyncHandler, validateQuery } from "../lib/http";
 import { effectiveLotCadence } from "../lib/cadence";
 import { groupBy } from "../lib/group";
-import { dashboardRangeQuerySchema, comparisonQuerySchema } from "../schemas";
+import { dashboardRangeQuerySchema, comparisonQuerySchema, pendingLotsQuerySchema } from "../schemas";
 
 export const dashboardRouter = Router();
 dashboardRouter.use(authenticate);
@@ -506,11 +506,48 @@ dashboardRouter.get("/downtime-log", validateQuery(dashboardRangeQuerySchema), a
 }));
 
 // ─── Pending lots for supervisor validation ───────────────────
+// Accepts ?status=closed|validated|rejected|all (default: closed).
+// Joins sessions → equipments and users (operator) for context.
 
-dashboardRouter.get("/pending-lots", asyncHandler(async (req, res) => {
+dashboardRouter.get("/pending-lots", validateQuery(pendingLotsQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
-  const lots = await db.select().from(lotEntries)
-    .where(eq(lotEntries.status, "closed"))
+  const { status } = req.query as { status: "closed" | "validated" | "rejected" | "all" };
+
+  const whereClause = status === "all"
+    ? or(eq(lotEntries.status, "closed"), eq(lotEntries.status, "validated"), eq(lotEntries.status, "rejected"))
+    : eq(lotEntries.status, status);
+
+  const lots = await db.select({
+    // All lotEntries columns
+    id: lotEntries.id,
+    sessionId: lotEntries.sessionId,
+    productId: lotEntries.productId,
+    batchNumber: lotEntries.batchNumber,
+    lotOrder: lotEntries.lotOrder,
+    cadenceUsed: lotEntries.cadenceUsed,
+    cadenceUnit: lotEntries.cadenceUnit,
+    quantityProduced: lotEntries.quantityProduced,
+    quantityConforming: lotEntries.quantityConforming,
+    quantityRejected: lotEntries.quantityRejected,
+    startedAt: lotEntries.startedAt,
+    endedAt: lotEntries.endedAt,
+    status: lotEntries.status,
+    operatorId: lotEntries.operatorId,
+    supervisorId: lotEntries.supervisorId,
+    supervisorComment: lotEntries.supervisorComment,
+    validatedAt: lotEntries.validatedAt,
+    // Joined context
+    operatorName: users.displayName,
+    sessionDate: sessions.sessionDate,
+    equipmentName: equipments.name,
+    equipmentCode: equipments.code,
+  })
+    .from(lotEntries)
+    .innerJoin(sessions, eq(lotEntries.sessionId, sessions.id))
+    .innerJoin(users, eq(lotEntries.operatorId, users.id))
+    .innerJoin(equipments, eq(sessions.equipmentId, equipments.id))
+    .where(whereClause!)
     .orderBy(desc(lotEntries.endedAt));
+
   res.json(lots);
 }));
