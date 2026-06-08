@@ -7,6 +7,7 @@ import {
   type LotTrsResult,
   type SessionTrsResult,
 } from "./index";
+import { makeRng, addMinutes, CADENCES, weekdaysOfYear, assertSessionInvariants } from "./test-utils";
 
 // ──────────────────────────────────────────────────────────────────────────
 // E2E — a full year of PLANNED vs UNPLANNED stop management, including the
@@ -20,24 +21,8 @@ import {
 //   • famille → NF E 60-182 norme classification is reporting-only (no math impact)
 // ──────────────────────────────────────────────────────────────────────────
 
-function mulberry32(seed: number) {
-  return function () {
-    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-const rnd = mulberry32(0x5705);
-const rint = (lo: number, hi: number) => lo + Math.floor(rnd() * (hi - lo + 1));
-const pick = <T,>(a: T[]) => a[Math.floor(rnd() * a.length)];
-const pad = (n: number) => String(n).padStart(2, "0");
-const addMin = (iso: string, m: number) => new Date(new Date(iso).getTime() + m * 60_000).toISOString();
+const { next: rnd, rint, pick } = makeRng(0x5705);
 
-const CADENCES: { cadence: number; unit: "u/min" | "u/h" }[] = [
-  { cadence: 80, unit: "u/min" }, { cadence: 100, unit: "u/min" },
-  { cadence: 6000, unit: "u/h" }, { cadence: 7200, unit: "u/h" },
-];
 // Inter-lot transition phases (ex-"phases"), all PLANNED, with their famille.
 const PHASES: { name: string; famille: string; min: () => number }[] = [
   { name: "vide_ligne",  famille: "Attente et transition", min: () => rint(5, 12) },
@@ -45,6 +30,15 @@ const PHASES: { name: string; famille: string; min: () => number }[] = [
   { name: "CHSB",        famille: "Utilités",              min: () => rint(8, 20) },
   { name: "remplissage", famille: "Attente et transition", min: () => rint(5, 15) },
 ];
+
+// NF E 60-182 family → norme code (reporting-only classification).
+const FAMILLE_NORME: Record<string, string> = {
+  "Attente et transition": "AI",
+  "Nettoyage": "AP",
+  "Utilités": "UE",
+  "Contrôle qualité": "CQ",  // lot prélèvement (planned)
+  "Panne équipement": "AB",  // lot breakdown (unplanned)
+};
 
 // A re-evaluable spec for one lot so the same year can be replayed under policies.
 interface LotSpec {
@@ -57,10 +51,9 @@ interface LotSpec {
 interface DaySpec {
   date: string;
   lots: LotSpec[];
-  phaseMin: number;                       // Σ inter-lot planned phases  → tAP
-  phaseByFamille: Record<string, number>; // ex-phase breakdown (test-side report)
-  attenteMin: number;                     // inter-lot unplanned waiting → session unplanned
-  bufferMin: number;                      // "à classer" wall-clock
+  phaseMin: number;     // Σ inter-lot planned phases  → tAP
+  attenteMin: number;   // inter-lot unplanned waiting → session unplanned
+  bufferMin: number;    // "à classer" wall-clock
 }
 
 interface Policy { unplanned: boolean; plannedPhases: boolean }
@@ -80,27 +73,20 @@ function buildDaySpec(date: string): DaySpec {
       q: 0.90 + rnd() * 0.099,
     });
   }
-  // Each lot transition (n-1 of them) plus a start-of-day setup runs a couple of phases.
-  const phaseByFamille: Record<string, number> = {};
+  // Each lot transition (start-of-day + between lots) runs a couple of phases.
   let phaseMin = 0;
-  const transitions = nLots; // start-of-day + between lots
-  for (let t = 0; t < transitions; t++) {
+  for (let t = 0; t < nLots; t++) {
     const usePhases = [PHASES[0], PHASES[1], ...(rnd() < 0.5 ? [PHASES[2]] : []), ...(rnd() < 0.5 ? [PHASES[3]] : [])];
-    for (const ph of usePhases) {
-      const m = ph.min();
-      phaseByFamille[ph.famille] = (phaseByFamille[ph.famille] || 0) + m;
-      phaseMin += m;
-    }
+    for (const ph of usePhases) phaseMin += ph.min();
   }
-  return { date, lots, phaseMin, phaseByFamille, attenteMin: rnd() < 0.5 ? rint(0, 18) : 0, bufferMin: rint(0, 12) };
+  return { date, lots, phaseMin, attenteMin: rnd() < 0.5 ? rint(0, 18) : 0, bufferMin: rint(0, 12) };
 }
 
-// Evaluate a day spec under a policy. Returns the session result + the exact
+// Evaluate a day spec under a policy. Returns the session result plus the exact
 // stop buckets so the test can reconcile them.
 function evalDay(spec: DaySpec, policy: Policy): {
   session: SessionTrsResult & { date: string };
   tAP: number; lotPlanned: number; lotUnplanned: number; sessionUnplanned: number;
-  lotDowntimeMin: number;
 } {
   const openedAt = `${spec.date}T05:00:00Z`;
   let cursor = openedAt, sumDuration = 0, lotPlanned = 0, lotUnplanned = 0;
@@ -116,8 +102,8 @@ function evalDay(spec: DaySpec, policy: Policy): {
     const conforming = Math.floor(produced * ls.q);
 
     const startedAt = cursor;
-    const endedAt = addMin(startedAt, ls.durationMin);
-    cursor = addMin(endedAt, 1);
+    const endedAt = addMinutes(startedAt, ls.durationMin);
+    cursor = addMinutes(endedAt, 1);
 
     const downtimes = [
       ...(reglage > 0 ? [{ durationMinutes: reglage, isPlanned: true, famille: "Contrôle qualité" }] : []),
@@ -133,65 +119,45 @@ function evalDay(spec: DaySpec, policy: Policy): {
   const sessionUnplanned = policy.unplanned ? spec.attenteMin : 0;
   // tO covers lots + planned phases (when declared) + attente + buffer. When phases
   // are NOT declared planned, the machine simply isn't opened for them → tO shrinks.
-  const tO = sumDuration + (policy.plannedPhases ? spec.phaseMin : 0) + spec.attenteMin + spec.bufferMin;
-  const closedAt = addMin(openedAt, tO);
-
-  const lotDowntimeMin = Object.values(lotResults.reduce((acc, l) => {
-    for (const [k, v] of Object.entries(l.downtimeByFamille)) acc[k] = (acc[k] || 0) + v;
-    return acc;
-  }, {} as Record<string, number>)).reduce((s, v) => s + v, 0);
+  const tO = sumDuration + tAP + spec.attenteMin + spec.bufferMin;
+  const closedAt = addMinutes(openedAt, tO);
 
   const session = computeSessionTrs({ openedAt, closedAt, plannedStopsMin: tAP, unplannedStopsMin: sessionUnplanned, lots: lotResults });
-  return { session: { date: spec.date, ...session }, tAP, lotPlanned, lotUnplanned, sessionUnplanned, lotDowntimeMin };
-}
-
-function buildYear(policy: Policy, specs: DaySpec[]) {
-  return specs.map(s => evalDay(s, policy));
+  return { session: { date: spec.date, ...session }, tAP, lotPlanned, lotUnplanned, sessionUnplanned };
 }
 
 describe("E2E — planned/unplanned stops, ex-phases & lot transitions over a year", () => {
-  // One shared set of day specs, replayed under several policies.
-  const specs: DaySpec[] = [];
-  {
-    const d = new Date(Date.UTC(2026, 0, 1));
-    while (d.getUTCFullYear() === 2026) {
-      const dow = d.getUTCDay();
-      if (dow !== 0 && dow !== 6) {
-        specs.push(buildDaySpec(`${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`));
-      }
-      d.setUTCDate(d.getUTCDate() + 1);
-    }
-  }
+  // One shared set of day specs and its baseline evaluation, reused by every test.
+  const specs = weekdaysOfYear(2026).map(buildDaySpec);
+  const baseEvals = specs.map(s => evalDay(s, BASELINE));
+  const baseYear = computeZoomTrs({ sessions: baseEvals.map(e => e.session) });
 
   it("reconciles every stop bucket day by day and classifies ex-phases by norme", () => {
-    const FAMILLE_NORME: Record<string, string> = {
-      "Attente et transition": "AI", "Nettoyage": "AP", "Utilités": "UE",
-      "Contrôle qualité": "CQ", "Panne équipement": "AB",
-    };
     for (const [famille, norme] of Object.entries(FAMILLE_NORME)) {
       expect(familleToNorme(famille), `${famille}→${norme}`).toBe(norme);
     }
+    // Every ex-phase famille is a classified NF E 60-182 family.
+    for (const ph of PHASES) expect(FAMILLE_NORME[ph.famille], `phase ${ph.name}`).toBeDefined();
 
     let errorWarnings = 0;
-    for (const spec of specs) {
-      const ev = evalDay(spec, BASELINE);
+    for (const ev of baseEvals) {
       const s = ev.session;
 
       // (1) Planned phases (ex-phases) reduce tO→tR exactly.
-      expect(s.tAP, `${spec.date}: tAP=phaseMin`).toBe(spec.phaseMin);
-      expect(s.tR, `${spec.date}: tR=tO-tAP`).toBe(Math.max(0, s.tO - spec.phaseMin));
+      expect(s.tAP, `${s.date}: tAP=phaseMin`).toBe(ev.tAP);
+      expect(s.tR, `${s.date}: tR=tO-tAP`).toBe(Math.max(0, s.tO - ev.tAP));
 
       // (2) Lot réglage + all unplanned reduce tR→tF exactly (NF E 60-182 §2.2.6).
       const reduceToTf = ev.lotPlanned + ev.lotUnplanned + ev.sessionUnplanned;
-      expect(s.tF, `${spec.date}: tF=tR-arrets`).toBe(Math.max(0, s.tR - reduceToTf));
-      expect(s.audit.tF_norme, `${spec.date}: audit tF`).toBe(s.tF);
-      expect(s.totalUnplannedMin, `${spec.date}: ΣNP`).toBe(ev.lotUnplanned + ev.sessionUnplanned);
+      expect(s.tF, `${s.date}: tF=tR-arrets`).toBe(Math.max(0, s.tR - reduceToTf));
+      expect(s.audit.tF_norme, `${s.date}: audit tF`).toBe(s.tF);
+      expect(s.totalUnplannedMin, `${s.date}: ΣNP`).toBe(ev.lotUnplanned + ev.sessionUnplanned);
 
       // (3) famille classification (lot-level) reconciles and maps to the right norme.
       const famSum = Object.values(s.downtimeByFamille).reduce((a, b) => a + b, 0);
-      expect(famSum, `${spec.date}: Σfamille=lot downtime`).toBe(ev.lotPlanned + ev.lotUnplanned);
-      if (ev.lotUnplanned > 0) expect(s.downtimeByNorme["AB"], `${spec.date}: AB`).toBe(ev.lotUnplanned);
-      if (ev.lotPlanned > 0) expect(s.downtimeByNorme["CQ"], `${spec.date}: CQ`).toBe(ev.lotPlanned);
+      expect(famSum, `${s.date}: Σfamille=lot downtime`).toBe(ev.lotPlanned + ev.lotUnplanned);
+      if (ev.lotUnplanned > 0) expect(s.downtimeByNorme["AB"], `${s.date}: AB`).toBe(ev.lotUnplanned);
+      if (ev.lotPlanned > 0) expect(s.downtimeByNorme["CQ"], `${s.date}: CQ`).toBe(ev.lotPlanned);
 
       errorWarnings += s.warnings.filter(w => w.level === "error").length;
     }
@@ -199,7 +165,7 @@ describe("E2E — planned/unplanned stops, ex-phases & lot transitions over a ye
   });
 
   it("places ex-phases exactly in the TRS↔TRG wedge over the year", () => {
-    const year = computeZoomTrs({ sessions: buildYear(BASELINE, specs).map(e => e.session) });
+    const year = baseYear;
 
     // TRG = TRS · (tR/tO); the planned-phase loss share is exactly tAP/tO.
     expect(year.TRG).toBeCloseTo(year.TRS * (year.tR / year.tO), 9);
@@ -213,10 +179,10 @@ describe("E2E — planned/unplanned stops, ex-phases & lot transitions over a ye
   });
 
   it("quantifies the distinct TRS/TRG impact via controlled counterfactuals", () => {
-    const base = computeZoomTrs({ sessions: buildYear(BASELINE, specs).map(e => e.session) });
+    const base = baseYear;
 
     // A) Eliminate breakdowns (panne) → freed time produces more → TRS & TRG rise, DO rises.
-    const noUnplanned = computeZoomTrs({ sessions: buildYear({ unplanned: false, plannedPhases: true }, specs).map(e => e.session) });
+    const noUnplanned = computeZoomTrs({ sessions: specs.map(s => evalDay(s, { unplanned: false, plannedPhases: true }).session) });
     expect(noUnplanned.totalUnplannedMin).toBe(0);
     expect(noUnplanned.DO).toBeGreaterThan(base.DO);
     expect(noUnplanned.TRS).toBeGreaterThan(base.TRS);
@@ -225,7 +191,7 @@ describe("E2E — planned/unplanned stops, ex-phases & lot transitions over a ye
 
     // B) Stop declaring planned phases (machine not opened for them) → tR & TRS UNCHANGED,
     //    only TRG improves (smaller tO). Proves phases hit TRG, never TRS.
-    const noPhases = computeZoomTrs({ sessions: buildYear({ unplanned: true, plannedPhases: false }, specs).map(e => e.session) });
+    const noPhases = computeZoomTrs({ sessions: specs.map(s => evalDay(s, { unplanned: true, plannedPhases: false }).session) });
     expect(noPhases.tAP).toBe(0);
     expect(noPhases.tR).toBeCloseTo(base.tR, 6);   // tR preserved
     expect(noPhases.tU).toBeCloseTo(base.tU, 6);   // output preserved
@@ -233,15 +199,7 @@ describe("E2E — planned/unplanned stops, ex-phases & lot transitions over a ye
     expect(noPhases.tO).toBeLessThan(base.tO);
     expect(noPhases.TRG).toBeGreaterThan(base.TRG); // ← only TRG moves
 
-    // Sanity: every counterfactual is still internally coherent.
-    for (const y of [base, noUnplanned, noPhases]) {
-      expect(y.TRS).toBeCloseTo(y.tU / y.tR, 9);
-      expect(y.TRG).toBeCloseTo(y.tU / y.tO, 9);
-      for (const r of [y.DO, y.TP, y.TQ, y.TRS, y.TRG]) {
-        expect(Number.isFinite(r)).toBe(true);
-        expect(r).toBeGreaterThanOrEqual(-1e-6);
-        expect(r).toBeLessThanOrEqual(1 + 1e-6);
-      }
-    }
+    // Every counterfactual is still internally coherent.
+    for (const y of [base, noUnplanned, noPhases]) assertSessionInvariants(y, "counterfactual");
   });
 });
