@@ -46552,7 +46552,32 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
 
 // packages/api/src/routes/lots.ts
 var import_express3 = __toESM(require_express2(), 1);
+
+// packages/api/src/lib/sign.ts
 var import_bcryptjs3 = __toESM(require_bcryptjs(), 1);
+async function reauthSigner(db2, userId, password) {
+  const [signer] = await db2.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!signer || !signer.isActive) throw new HttpError(401, "Signataire invalide");
+  const ok = await import_bcryptjs3.default.compare(password, signer.passwordHash);
+  if (!ok) throw new HttpError(401, "Signature \xE9lectronique invalide : mot de passe incorrect");
+  return signer;
+}
+async function recordSignature(db2, req, signer, opts) {
+  const [signature] = await db2.insert(electronicSignatures).values({
+    userId: signer.id,
+    userEmail: signer.email,
+    userName: signer.displayName,
+    entityType: opts.entityType,
+    entityId: opts.entityId,
+    meaning: opts.meaning,
+    action: opts.action,
+    comment: opts.comment,
+    ipAddress: req.ip ?? null
+  }).returning();
+  return signature;
+}
+
+// packages/api/src/routes/lots.ts
 var lotsRouter = (0, import_express3.Router)();
 lotsRouter.use(authenticate);
 lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => {
@@ -46741,11 +46766,10 @@ lotsRouter.post("/:id/correct", requireRole("supervisor", "admin"), validate(cor
   const { db: db2, userId } = req;
   const { quantityProduced, quantityConforming, quantityRejected, cadenceUsed, cadenceUnit: cadenceUnit2, correctionReason, password } = req.body;
   const lotId = String(req.params.id);
-  const [signer] = await db2.select().from(users).where(eq(users.id, userId)).limit(1);
-  if (!signer || !signer.isActive) throw new HttpError(401, "Signataire invalide");
-  const ok = await import_bcryptjs3.default.compare(password, signer.passwordHash);
-  if (!ok) throw new HttpError(401, "Signature \xE9lectronique invalide : mot de passe incorrect");
-  const [original] = await db2.select().from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  const [signer, [original]] = await Promise.all([
+    reauthSigner(db2, userId, password),
+    db2.select().from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1)
+  ]);
   if (!original) {
     res.status(404).json({ error: "Lot introuvable" });
     return;
@@ -46758,18 +46782,19 @@ lotsRouter.post("/:id/correct", requireRole("supervisor", "admin"), validate(cor
   if (cadenceUsed !== void 0) updates.cadenceUsed = String(cadenceUsed);
   if (cadenceUnit2 !== void 0) updates.cadenceUnit = cadenceUnit2;
   if (Object.keys(updates).length === 0) throw new HttpError(400, "Aucune valeur \xE0 corriger");
+  const mergedProduced = quantityProduced ?? original.quantityProduced;
+  const mergedConforming = quantityConforming ?? original.quantityConforming;
+  if (mergedConforming > mergedProduced) {
+    throw new HttpError(400, "La quantit\xE9 conforme ne peut pas d\xE9passer la quantit\xE9 produite");
+  }
   const [lot] = await db2.update(lotEntries).set(updates).where(eq(lotEntries.id, lotId)).returning();
-  const [signature] = await db2.insert(electronicSignatures).values({
-    userId: signer.id,
-    userEmail: signer.email,
-    userName: signer.displayName,
+  const signature = await recordSignature(db2, req, signer, {
     entityType: "lot",
     entityId: lot.id,
     meaning: "Correction des donn\xE9es du lot",
     action: "correct",
-    comment: correctionReason,
-    ipAddress: req.ip ?? null
-  }).returning();
+    comment: correctionReason
+  });
   const originalValues = {
     quantityProduced: original.quantityProduced,
     quantityConforming: original.quantityConforming,
@@ -46784,10 +46809,7 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
   const { action, comment, password } = req.body;
   const status = action === "reject" ? "rejected" : "validated";
   const lotId = String(req.params.id);
-  const [signer] = await db2.select().from(users).where(eq(users.id, userId)).limit(1);
-  if (!signer || !signer.isActive) throw new HttpError(401, "Signataire invalide");
-  const ok = await import_bcryptjs3.default.compare(password, signer.passwordHash);
-  if (!ok) throw new HttpError(401, "Signature \xE9lectronique invalide : mot de passe incorrect");
+  const signer = await reauthSigner(db2, userId, password);
   const [lot] = await db2.update(lotEntries).set({
     status,
     supervisorId: userId,
@@ -46798,18 +46820,13 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
     res.status(404).json({ error: "Lot introuvable" });
     return;
   }
-  const meaning = action === "reject" ? "Rejet du lot" : "Validation du lot";
-  const [signature] = await db2.insert(electronicSignatures).values({
-    userId: signer.id,
-    userEmail: signer.email,
-    userName: signer.displayName,
+  const signature = await recordSignature(db2, req, signer, {
     entityType: "lot",
     entityId: lot.id,
-    meaning,
+    meaning: action === "reject" ? "Rejet du lot" : "Validation du lot",
     action,
-    comment: comment ?? null,
-    ipAddress: req.ip ?? null
-  }).returning();
+    comment: comment ?? null
+  });
   await audit(db2, req, action === "reject" ? "REJECT_LOT" : "VALIDATE_LOT", "lot", lot.id, { action, comment, signatureId: signature.id });
   res.json({ ...lot, signature });
 }));
@@ -47231,24 +47248,8 @@ dashboardRouter.get("/pending-lots", validateQuery(pendingLotsQuerySchema), asyn
   const { status } = req.query;
   const whereClause = status === "all" ? or(eq(lotEntries.status, "closed"), eq(lotEntries.status, "validated"), eq(lotEntries.status, "rejected")) : eq(lotEntries.status, status);
   const lots = await db2.select({
-    // All lotEntries columns
-    id: lotEntries.id,
-    sessionId: lotEntries.sessionId,
-    productId: lotEntries.productId,
-    batchNumber: lotEntries.batchNumber,
-    lotOrder: lotEntries.lotOrder,
-    cadenceUsed: lotEntries.cadenceUsed,
-    cadenceUnit: lotEntries.cadenceUnit,
-    quantityProduced: lotEntries.quantityProduced,
-    quantityConforming: lotEntries.quantityConforming,
-    quantityRejected: lotEntries.quantityRejected,
-    startedAt: lotEntries.startedAt,
-    endedAt: lotEntries.endedAt,
-    status: lotEntries.status,
-    operatorId: lotEntries.operatorId,
-    supervisorId: lotEntries.supervisorId,
-    supervisorComment: lotEntries.supervisorComment,
-    validatedAt: lotEntries.validatedAt,
+    ...getTableColumns(lotEntries),
+    // stays in sync with the schema
     // Joined context
     operatorName: users.displayName,
     sessionDate: sessions.sessionDate,

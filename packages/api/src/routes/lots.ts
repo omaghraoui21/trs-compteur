@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { eq, and, desc } from "drizzle-orm";
-import bcrypt from "bcryptjs";
-import { lotEntries, downtimeEvents, sessionEvents, downtimeCategories, users, electronicSignatures, lotCadenceChanges } from "@trs/db";
+import { lotEntries, downtimeEvents, sessionEvents, downtimeCategories, electronicSignatures, lotCadenceChanges } from "@trs/db";
 import { diffMinutes } from "@trs/engine";
 import { authenticate, requireRole } from "../middleware";
 import { asyncHandler, validate, HttpError } from "../lib/http";
 import { audit } from "../lib/audit";
+import { reauthSigner, recordSignature } from "../lib/sign";
 import { startLotSchema, closeLotSchema, updateLotSchema, addDowntimeSchema, validateLotSchema, changeCadenceSchema, correctLotSchema } from "../schemas";
 
 export const lotsRouter = Router();
@@ -250,12 +250,11 @@ lotsRouter.post("/:id/correct", requireRole("supervisor", "admin"), validate(cor
   const { quantityProduced, quantityConforming, quantityRejected, cadenceUsed, cadenceUnit, correctionReason, password } = req.body;
   const lotId = String(req.params.id);
 
-  const [signer] = await db.select().from(users).where(eq(users.id, userId!)).limit(1);
-  if (!signer || !signer.isActive) throw new HttpError(401, "Signataire invalide");
-  const ok = await bcrypt.compare(password, signer.passwordHash);
-  if (!ok) throw new HttpError(401, "Signature électronique invalide : mot de passe incorrect");
-
-  const [original] = await db.select().from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  // Re-authenticate the signer and load the lot in parallel — independent reads.
+  const [signer, [original]] = await Promise.all([
+    reauthSigner(db, userId!, password),
+    db.select().from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1),
+  ]);
   if (!original) { res.status(404).json({ error: "Lot introuvable" }); return; }
   if (original.status !== "closed") throw new HttpError(409, "Seuls les lots clôturés peuvent être corrigés");
 
@@ -268,16 +267,22 @@ lotsRouter.post("/:id/correct", requireRole("supervisor", "admin"), validate(cor
 
   if (Object.keys(updates).length === 0) throw new HttpError(400, "Aucune valeur à corriger");
 
+  // Coherence must hold against the MERGED (stored + incoming) values, not just
+  // the fields present in this request. A partial correction (e.g. only
+  // quantityConforming) would otherwise bypass the schema refine and persist
+  // quantityConforming > quantityProduced.
+  const mergedProduced = quantityProduced ?? original.quantityProduced;
+  const mergedConforming = quantityConforming ?? original.quantityConforming;
+  if (mergedConforming > mergedProduced) {
+    throw new HttpError(400, "La quantité conforme ne peut pas dépasser la quantité produite");
+  }
+
   const [lot] = await db.update(lotEntries).set(updates).where(eq(lotEntries.id, lotId)).returning();
 
-  const [signature] = await db.insert(electronicSignatures).values({
-    userId: signer.id, userEmail: signer.email, userName: signer.displayName,
+  const signature = await recordSignature(db, req, signer, {
     entityType: "lot", entityId: lot.id,
-    meaning: "Correction des données du lot",
-    action: "correct",
-    comment: correctionReason,
-    ipAddress: req.ip ?? null,
-  }).returning();
+    meaning: "Correction des données du lot", action: "correct", comment: correctionReason,
+  });
 
   const originalValues = {
     quantityProduced: original.quantityProduced,
@@ -297,11 +302,8 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
   const status = action === "reject" ? "rejected" : "validated";
   const lotId = String(req.params.id);
 
-  // ── 21 CFR Part 11: re-authenticate the signer at the moment of signing. ──
-  const [signer] = await db.select().from(users).where(eq(users.id, userId!)).limit(1);
-  if (!signer || !signer.isActive) throw new HttpError(401, "Signataire invalide");
-  const ok = await bcrypt.compare(password, signer.passwordHash);
-  if (!ok) throw new HttpError(401, "Signature électronique invalide : mot de passe incorrect");
+  // 21 CFR Part 11: re-authenticate the signer at the moment of signing.
+  const signer = await reauthSigner(db, userId!, password);
 
   const [lot] = await db.update(lotEntries).set({
     status,
@@ -312,12 +314,11 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
 
   if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
 
-  const meaning = action === "reject" ? "Rejet du lot" : "Validation du lot";
-  const [signature] = await db.insert(electronicSignatures).values({
-    userId: signer.id, userEmail: signer.email, userName: signer.displayName,
-    entityType: "lot", entityId: lot.id, meaning, action, comment: comment ?? null,
-    ipAddress: req.ip ?? null,
-  }).returning();
+  const signature = await recordSignature(db, req, signer, {
+    entityType: "lot", entityId: lot.id,
+    meaning: action === "reject" ? "Rejet du lot" : "Validation du lot",
+    action, comment: comment ?? null,
+  });
 
   await audit(db, req, action === "reject" ? "REJECT_LOT" : "VALIDATE_LOT", "lot", lot.id, { action, comment, signatureId: signature.id });
   res.json({ ...lot, signature });

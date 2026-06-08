@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { api, type PendingLot, type Product, type LotDowntime, type CadenceChange, type CorrectLotInput } from "@/lib/api";
+import { api, type PendingLot, type Product, type LotDowntime, type CadenceChange, type CorrectLotInput, type ElectronicSignature } from "@/lib/api";
 import { fmtPct, trsColor, diffMinutes, fmtDuration as fmtMinutes } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton, Skeleton } from "@/components/Skeleton";
@@ -42,6 +42,7 @@ export default function SupervisorPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [lotDowntimes, setLotDowntimes] = useState<Record<string, LotDowntime[]>>({});
   const [lotCadence, setLotCadence] = useState<Record<string, CadenceChange[]>>({});
+  const [lotSignatures, setLotSignatures] = useState<Record<string, ElectronicSignature[]>>({});
   const [loadingDowntimesId, setLoadingDowntimesId] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [commentError, setCommentError] = useState("");
@@ -90,12 +91,14 @@ export default function SupervisorPage() {
     if (lotDowntimes[lotId] !== undefined) return;
     setLoadingDowntimesId(lotId);
     try {
-      const [dts, cad] = await Promise.all([api.lotDowntimes(lotId), api.lotCadenceHistory(lotId)]);
+      const [dts, cad, sigs] = await Promise.all([api.lotDowntimes(lotId), api.lotCadenceHistory(lotId), api.lotSignatures(lotId)]);
       setLotDowntimes(prev => ({ ...prev, [lotId]: dts }));
       setLotCadence(prev => ({ ...prev, [lotId]: cad }));
+      setLotSignatures(prev => ({ ...prev, [lotId]: sigs }));
     } catch {
       setLotDowntimes(prev => ({ ...prev, [lotId]: [] }));
       setLotCadence(prev => ({ ...prev, [lotId]: [] }));
+      setLotSignatures(prev => ({ ...prev, [lotId]: [] }));
     } finally {
       setLoadingDowntimesId(null);
     }
@@ -136,12 +139,14 @@ export default function SupervisorPage() {
           ...(correctionData.cadence !== "" && { cadenceUsed:       Number(correctionData.cadence) }),
           ...(correctionData.cadenceUnit !== "" && { cadenceUnit: correctionData.cadenceUnit }),
         };
-        const { lot: updated } = await api.correctLot(lotId, payload);
+        const { lot: updated, signature } = await api.correctLot(lotId, payload);
         setLots(prev => prev.map(l => l.id === lotId ? { ...l, ...updated } : l));
         setCorrecting(null);
-        // Invalidate cached downtimes/cadence so expanded detail refreshes
+        // Invalidate cached downtimes/cadence so expanded detail refreshes;
+        // surface the new signed correction immediately in the signatures list.
         setLotDowntimes(prev => { const n = { ...prev }; delete n[lotId]; return n; });
         setLotCadence(prev => { const n = { ...prev }; delete n[lotId]; return n; });
+        setLotSignatures(prev => ({ ...prev, [lotId]: [signature, ...(prev[lotId] ?? [])] }));
         toast.success("Données corrigées et signées");
       } else {
         await api.validateLot(lotId, action, password, comment || undefined);
@@ -399,6 +404,19 @@ export default function SupervisorPage() {
                       )}
                     </div>
                   )}
+
+                  {/* Signed corrections (21 CFR Part 11 amendments) */}
+                  {(lotSignatures[lot.id] ?? []).filter(s => s.action === "correct").map(sig => (
+                    <div key={sig.id} className="bg-amber-50 border border-amber-100 rounded-lg p-2">
+                      <div className="text-xs font-semibold text-amber-800 mb-0.5 flex items-center gap-1">
+                        <Pencil className="h-3 w-3" /> Correction signée — {sig.userName}
+                      </div>
+                      {sig.comment && <div className="text-xs text-amber-700">{sig.comment}</div>}
+                      <div className="text-[10px] text-amber-400 mt-0.5">
+                        {new Date(sig.signedAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    </div>
+                  ))}
 
                   {/* Coherence warnings */}
                   {errors.length > 0 && (
