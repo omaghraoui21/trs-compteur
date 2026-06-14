@@ -77,9 +77,9 @@ function ToastItem({ t, onRemove }: { t: Toast; onRemove: () => void }) {
       }`}
     >
       {t.variant === "error" ? (
-        <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+        <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" aria-hidden="true" />
       ) : (
-        <CheckCircle className="h-5 w-5 shrink-0 mt-0.5" />
+        <CheckCircle className="h-5 w-5 shrink-0 mt-0.5" aria-hidden="true" />
       )}
       <span className="flex-1">{t.message}</span>
       <button
@@ -87,7 +87,7 @@ function ToastItem({ t, onRemove }: { t: Toast; onRemove: () => void }) {
         aria-label="Fermer la notification"
         className="shrink-0 opacity-80 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white rounded"
       >
-        <X className="h-4 w-4" />
+        <X className="h-4 w-4" aria-hidden="true" />
       </button>
     </div>
   );

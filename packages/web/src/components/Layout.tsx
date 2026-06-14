@@ -70,7 +70,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <div className="min-h-screen flex flex-col">
       <header className="bg-blue-700 text-white px-4 py-3 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-3">
-          <Timer className="h-6 w-6" />
+          <Timer className="h-6 w-6" aria-hidden="true" />
           <h1 className="text-lg font-bold">TRS Compteur</h1>
         </div>
         <div className="flex items-center gap-4">
@@ -95,7 +95,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       <div className="flex-1 flex">
         {/* ── Desktop sidebar (lg+) ── */}
-        <nav className="hidden lg:flex w-48 bg-white border-r flex-col py-2 shrink-0">
+        <nav className="hidden lg:flex w-48 bg-white border-r flex-col py-2 shrink-0" aria-label="Navigation principale">
           <div className="flex-1">
             {items.map((item) => (
               <NavLink
@@ -108,10 +108,10 @@ export default function Layout({ children }: { children: ReactNode }) {
                   }`
                 }
               >
-                <item.icon className="h-4 w-4 shrink-0" />
+                <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span className="flex-1">{item.label}</span>
                 {item.to === "/supervisor" && pendingCount > 0 && (
-                  <span className="ml-auto text-[10px] bg-red-500 text-white font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  <span className="ml-auto text-[10px] bg-red-500 text-white font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center" aria-label={`${pendingCount} lot${pendingCount > 1 ? "s" : ""} en attente`}>
                     {pendingCount > 99 ? "99+" : pendingCount}
                   </span>
                 )}
@@ -137,7 +137,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       </div>
 
       {/* ── Mobile/tablet bottom tab bar (< lg) ── */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t flex z-40 shadow-[0_-1px_3px_rgba(0,0,0,0.08)] pb-[env(safe-area-inset-bottom)]">
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t flex z-40 shadow-[0_-1px_3px_rgba(0,0,0,0.08)] pb-[env(safe-area-inset-bottom)]" aria-label="Navigation principale">
         {items.map((item) => (
           <NavLink
             key={item.to}
@@ -150,12 +150,12 @@ export default function Layout({ children }: { children: ReactNode }) {
             }
           >
             <div className="relative">
-              <item.icon className="h-5 w-5" />
+              <item.icon className="h-5 w-5" aria-hidden="true" />
               {item.to === "/" && equipmentName && (
                 <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-green-500 animate-pulse" />
               )}
               {item.to === "/supervisor" && pendingCount > 0 && (
-                <span className="absolute -top-1 -right-2 text-[9px] bg-red-500 text-white font-bold px-1 py-px rounded-full min-w-[15px] text-center leading-none">
+                <span className="absolute -top-1 -right-2 text-[9px] bg-red-500 text-white font-bold px-1 py-px rounded-full min-w-[15px] text-center leading-none" aria-label={`${pendingCount} lot${pendingCount > 1 ? "s" : ""} en attente`}>
                   {pendingCount > 99 ? "99+" : pendingCount}
                 </span>
               )}
