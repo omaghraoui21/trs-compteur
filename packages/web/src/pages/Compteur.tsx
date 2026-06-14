@@ -863,6 +863,7 @@ function AClasserBanner({ minutes, onDeclare, categories, equipmentId, sessionId
       urgent ? "border-red-300 bg-red-50" : "border-amber-300 bg-amber-50"
     }`}>
       <button onClick={() => (canQuickQualify ? setExpanded(e => !e) : onDeclare())}
+        aria-expanded={canQuickQualify ? expanded : undefined}
         className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition rounded-xl ${
           urgent ? "hover:bg-red-100" : "hover:bg-amber-100"
         }`}>

@@ -778,7 +778,7 @@ function DowntimesPanel() {
             </select>
           </div>
           <div className="flex items-center gap-3">
-            <button type="button" onClick={() => setForm({ ...form, isPlanned: !form.isPlanned })} className="flex items-center gap-2">
+            <button type="button" onClick={() => setForm({ ...form, isPlanned: !form.isPlanned })} aria-pressed={form.isPlanned} className="flex items-center gap-2">
               {form.isPlanned ? <ToggleRight className="h-6 w-6 text-amber-600" /> : <ToggleLeft className="h-6 w-6 text-gray-400" />}
               <span className="text-sm">{form.isPlanned ? "Arrêt planifié" : "Arrêt non planifié"}</span>
             </button>
@@ -805,7 +805,7 @@ function DowntimesPanel() {
                     <td data-label="Label" className="py-2 px-3 font-medium">{c.label}</td>
                     <td data-label="Équipement" className="py-2 px-3 capitalize">{c.appliesToEquipmentType || "Tous"}</td>
                     <td data-label="Planifié" className="py-2 px-3 text-center">
-                      <button onClick={() => togglePlanned(c)} className="inline-flex items-center gap-1" title={c.isPlanned ? "Planifié → cliquez pour changer" : "Non planifié → cliquez pour changer"}>
+                      <button onClick={() => togglePlanned(c)} aria-pressed={c.isPlanned} className="inline-flex items-center gap-1" title={c.isPlanned ? "Planifié → cliquez pour changer" : "Non planifié → cliquez pour changer"}>
                         {c.isPlanned ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
                             <ToggleRight className="h-3.5 w-3.5" /> Planifié
