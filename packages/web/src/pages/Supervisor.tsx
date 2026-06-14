@@ -223,10 +223,12 @@ export default function SupervisorPage() {
       </h2>
 
       {/* Status filter tabs */}
-      <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1">
+      <div role="tablist" aria-label="Filtre des lots" className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1">
         {STATUS_TABS.map(tab => (
           <button
             key={tab.key}
+            role="tab"
+            aria-selected={statusFilter === tab.key}
             onClick={() => handleTabChange(tab.key)}
             className={`flex-1 py-2 text-sm font-medium rounded-lg transition ${
               statusFilter === tab.key
@@ -434,16 +436,23 @@ export default function SupervisorPage() {
                   {isPending && (
                     <>
                       {/* Inline correction form */}
-                      {isCorrecting ? (
+                      {isCorrecting ? (() => {
+                        const effProd = correctionData.qProd !== "" ? Number(correctionData.qProd) : lot.quantityProduced;
+                        const effConf = correctionData.qConf !== "" ? Number(correctionData.qConf) : lot.quantityConforming;
+                        const effRej  = correctionData.qRej  !== "" ? Number(correctionData.qRej)  : lot.quantityRejected;
+                        const confErr = correctionData.qConf !== "" && effConf > effProd;
+                        const rejErr  = correctionData.qRej  !== "" && effRej  > effProd;
+                        const hasFormErr = confErr || rejErr;
+                        return (
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
                           <div className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
                             <Pencil className="h-3.5 w-3.5" /> Correction des données
                           </div>
                           <div className="grid grid-cols-3 gap-2">
                             {[
-                              { key: "qProd" as const, label: "Qté produite", placeholder: String(lot.quantityProduced) },
-                              { key: "qConf" as const, label: "Qté conforme", placeholder: String(lot.quantityConforming) },
-                              { key: "qRej"  as const, label: "Rebut",          placeholder: String(lot.quantityRejected) },
+                              { key: "qProd" as const, label: "Qté produite",  placeholder: String(lot.quantityProduced),    hasErr: false },
+                              { key: "qConf" as const, label: "Qté conforme",  placeholder: String(lot.quantityConforming),  hasErr: confErr },
+                              { key: "qRej"  as const, label: "Rebut",         placeholder: String(lot.quantityRejected),    hasErr: rejErr },
                             ].map(f => (
                               <div key={f.key}>
                                 <label className="block text-[10px] text-amber-700 mb-0.5">{f.label}</label>
@@ -451,12 +460,20 @@ export default function SupervisorPage() {
                                   type="number" inputMode="numeric" min="0"
                                   value={correctionData[f.key]}
                                   placeholder={f.placeholder}
+                                  aria-invalid={f.hasErr}
                                   onChange={e => setCorrectionData(prev => ({ ...prev, [f.key]: e.target.value }))}
-                                  className="w-full border border-amber-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                                  className={`w-full border rounded-lg px-2 py-1.5 text-sm bg-white ${f.hasErr ? "border-red-400 focus:ring-red-300" : "border-amber-300"}`}
                                 />
                               </div>
                             ))}
                           </div>
+                          {hasFormErr && (
+                            <p className="text-xs text-red-600 font-medium">
+                              {confErr && "Qté conforme ne peut pas dépasser Qté produite."}
+                              {confErr && rejErr && " "}
+                              {rejErr && "Rebut ne peut pas dépasser Qté produite."}
+                            </p>
+                          )}
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <label className="block text-[10px] text-amber-700 mb-0.5">Cadence</label>
@@ -484,9 +501,10 @@ export default function SupervisorPage() {
                             <label className="block text-[10px] text-amber-700 mb-0.5">Raison de la correction <span className="text-red-500">*</span></label>
                             <input
                               value={correctionData.reason}
+                              aria-required="true"
                               onChange={e => setCorrectionData(prev => ({ ...prev, reason: e.target.value }))}
                               placeholder="Ex : erreur de saisie opérateur — lot A confirmé 420 unités"
-                              className="w-full border border-amber-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                              className={`w-full border rounded-lg px-2 py-1.5 text-sm bg-white ${!correctionData.reason.trim() ? "border-amber-400" : "border-amber-300"}`}
                             />
                           </div>
                           <div className="flex gap-2 justify-end pt-1">
@@ -495,7 +513,7 @@ export default function SupervisorPage() {
                               Annuler
                             </button>
                             <button
-                              disabled={!correctionData.reason.trim()}
+                              disabled={!correctionData.reason.trim() || hasFormErr}
                               onClick={() => openSign(lot.id, "correct")}
                               className="px-3 py-1.5 text-xs bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-40 disabled:pointer-events-none"
                             >
@@ -503,7 +521,8 @@ export default function SupervisorPage() {
                             </button>
                           </div>
                         </div>
-                      ) : (
+                        );
+                      })() : (
                         <button
                           onClick={() => {
                             setCorrecting(lot.id);

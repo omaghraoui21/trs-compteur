@@ -71,7 +71,7 @@ export default function WaterfallChart({ metrics }: Props) {
   }));
 
   return (
-    <div className="bg-white rounded-xl border shadow-sm p-4">
+    <div className="bg-white rounded-xl border shadow-sm p-4" role="region" aria-label="Cascade NF E 60-182">
       <h3 className="font-semibold text-sm mb-1">Cascade NF E 60-182</h3>
       <p className="text-xs text-gray-500 mb-3">Décomposition des pertes de temps</p>
 

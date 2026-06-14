@@ -26,7 +26,7 @@ const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 export default function HeatmapChart({ heatmap }: Props) {
   if (heatmap.length === 0) {
     return (
-      <div className="bg-white rounded-xl border shadow-sm p-4">
+      <div className="bg-white rounded-xl border shadow-sm p-4" role="region" aria-label="Heatmap TRS horaire">
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
           <Grid className="h-4 w-4 text-blue-600" /> Heatmap TRS
         </h3>
@@ -60,7 +60,7 @@ export default function HeatmapChart({ heatmap }: Props) {
   const sortedWeeks = [...weeks.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
   return (
-    <div className="bg-white rounded-xl border shadow-sm p-4">
+    <div className="bg-white rounded-xl border shadow-sm p-4" role="region" aria-label="Heatmap TRS horaire">
       <h3 className="font-semibold text-sm mb-1 flex items-center gap-2">
         <Grid className="h-4 w-4 text-blue-600" /> Heatmap TRS
       </h3>

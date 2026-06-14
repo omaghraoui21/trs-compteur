@@ -87,7 +87,7 @@ export default function TrsVerificationPanel({ metrics }: Props) {
   const errorWarnings = (metrics.warnings ?? []).filter(w => w.level === "error");
 
   return (
-    <div className="bg-white rounded-xl border shadow-sm p-4 mb-4">
+    <div className="bg-white rounded-xl border shadow-sm p-4 mb-4" role="region" aria-label="Vérification TRS NF E 60-182">
       <div className="flex items-center justify-between gap-2 mb-1">
         <h3 className="font-semibold text-sm flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-blue-600" /> Vérification TRS (NF E 60-182)

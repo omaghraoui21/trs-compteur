@@ -15,7 +15,7 @@ interface Props {
 
 export default function ParetoChart({ pareto, totalMin, onSelectCode }: Props) {
   if (pareto.length === 0) return (
-    <div className="bg-white rounded-xl border shadow-sm p-4">
+    <div className="bg-white rounded-xl border shadow-sm p-4" role="region" aria-label="Pareto des arrêts">
       <h3 className="font-semibold text-sm mb-3">Pareto des arrêts</h3>
       <div className="text-center text-gray-400 py-8 text-sm">Aucun arrêt enregistré</div>
     </div>
@@ -24,7 +24,7 @@ export default function ParetoChart({ pareto, totalMin, onSelectCode }: Props) {
   const top10 = pareto.slice(0, 10);
 
   return (
-    <div className="bg-white rounded-xl border shadow-sm p-4">
+    <div className="bg-white rounded-xl border shadow-sm p-4" role="region" aria-label="Pareto des arrêts">
       <h3 className="font-semibold text-sm mb-1">Pareto des arrêts</h3>
       <p className="text-xs text-gray-500 mb-3">Total : {fmtDuration(totalMin)} — Top {top10.length} causes</p>
 

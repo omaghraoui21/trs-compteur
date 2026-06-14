@@ -12,7 +12,7 @@ interface Props {
 export default function ByProductChart({ byProduct }: Props) {
   if (byProduct.length === 0) {
     return (
-      <div className="bg-white rounded-xl border shadow-sm p-4">
+      <div className="bg-white rounded-xl border shadow-sm p-4" role="region" aria-label="TRS par produit">
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
           <Package className="h-4 w-4 text-blue-600" /> TRS par produit
         </h3>
@@ -34,7 +34,7 @@ export default function ByProductChart({ byProduct }: Props) {
   }));
 
   return (
-    <div className="bg-white rounded-xl border shadow-sm p-4">
+    <div className="bg-white rounded-xl border shadow-sm p-4" role="region" aria-label="TRS par produit">
       <h3 className="font-semibold text-sm mb-1 flex items-center gap-2">
         <Package className="h-4 w-4 text-blue-600" /> TRS par produit
       </h3>
