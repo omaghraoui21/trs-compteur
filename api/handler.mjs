@@ -509,8 +509,8 @@ var require_depd = __commonJS({
       return deprecate;
     }
     function eehaslisteners(emitter, type) {
-      var count = typeof emitter.listenerCount !== "function" ? emitter.listeners(type).length : emitter.listenerCount(type);
-      return count > 0;
+      var count2 = typeof emitter.listenerCount !== "function" ? emitter.listeners(type).length : emitter.listenerCount(type);
+      return count2 > 0;
     }
     function isignored(namespace) {
       if (process.noDeprecation) {
@@ -17533,16 +17533,16 @@ var require_urlencoded = __commonJS({
       }
     }
     function parameterCount(body, limit) {
-      var count = 0;
+      var count2 = 0;
       var index2 = -1;
       do {
-        count++;
-        if (count > limit) {
+        count2++;
+        if (count2 > limit) {
           return void 0;
         }
         index2 = body.indexOf("&", index2 + 1);
       } while (index2 !== -1);
-      return count;
+      return count2;
     }
     function parser(name) {
       var mod = parsers2[name];
@@ -19993,8 +19993,8 @@ var require_send = __commonJS({
       return typeof res.getHeaderNames !== "function" ? Object.keys(res._headers || {}) : res.getHeaderNames();
     }
     function hasListeners(emitter, type) {
-      var count = typeof emitter.listenerCount !== "function" ? emitter.listeners(type).length : emitter.listenerCount(type);
-      return count > 0;
+      var count2 = typeof emitter.listenerCount !== "function" ? emitter.listeners(type).length : emitter.listenerCount(type);
+      return count2 > 0;
     }
     function headersSent(res) {
       return typeof res.headersSent !== "boolean" ? Boolean(res._header) : res.headersSent;
@@ -21683,13 +21683,13 @@ var require_mediaType = __commonJS({
       return spec.q > 0;
     }
     function quoteCount(string) {
-      var count = 0;
+      var count2 = 0;
       var index2 = 0;
       while ((index2 = string.indexOf('"', index2)) !== -1) {
-        count++;
+        count2++;
         index2++;
       }
-      return count;
+      return count2;
     }
     function splitKeyValuePair(str) {
       var index2 = str.indexOf("=");
@@ -35450,6 +35450,11 @@ function mapRelationalRow(tablesConfig, tableConfig, row, buildQueryResultSelect
   return result;
 }
 
+// node_modules/.pnpm/drizzle-orm@0.38.4_@types+react@19.2.15_postgres@3.4.9_react@19.2.6/node_modules/drizzle-orm/sql/functions/aggregate.js
+function count(expression) {
+  return sql`count(${expression || sql.raw("*")})`.mapWith(Number);
+}
+
 // node_modules/.pnpm/drizzle-orm@0.38.4_@types+react@19.2.15_postgres@3.4.9_react@19.2.6/node_modules/drizzle-orm/migrator.js
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -47257,6 +47262,11 @@ dashboardRouter.get("/pending-lots", validateQuery(pendingLotsQuerySchema), asyn
     equipmentCode: equipments.code
   }).from(lotEntries).innerJoin(sessions, eq(lotEntries.sessionId, sessions.id)).innerJoin(users, eq(lotEntries.operatorId, users.id)).innerJoin(equipments, eq(sessions.equipmentId, equipments.id)).where(whereClause).orderBy(desc(lotEntries.endedAt));
   res.json(lots);
+}));
+dashboardRouter.get("/pending-lots/count", asyncHandler(async (req, res) => {
+  const { db: db2 } = req;
+  const [row] = await db2.select({ count: count() }).from(lotEntries).where(eq(lotEntries.status, "closed"));
+  res.json({ count: row?.count ?? 0 });
 }));
 
 // packages/api/src/routes/admin.ts

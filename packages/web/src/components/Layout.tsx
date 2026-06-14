@@ -1,5 +1,5 @@
-import { type ReactNode, useState, useEffect } from "react";
-import { NavLink } from "react-router-dom";
+import { type ReactNode, useState, useEffect, useCallback } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/Toast";
@@ -22,6 +22,30 @@ const navItems = [
   { to: "/admin", label: "Configuration", short: "Réglages", icon: Settings, roles: ["admin", "supervisor"] },
 ];
 
+const POLL_MS = 60_000;
+
+function usePendingCount(role: string | undefined): number {
+  const [count, setCount] = useState(0);
+  const location = useLocation();
+  const onSupervisorPage = location.pathname === "/supervisor";
+
+  const fetch = useCallback(() => {
+    if (!role || (role !== "supervisor" && role !== "admin")) return;
+    api.pendingLotsCount().then(r => setCount(r.count)).catch(() => {});
+  }, [role]);
+
+  useEffect(() => {
+    fetch();
+    const id = setInterval(fetch, POLL_MS);
+    return () => clearInterval(id);
+  }, [fetch]);
+
+  // Reset badge when supervisor navigates to the page
+  useEffect(() => { if (onSupervisorPage) setCount(0); }, [onSupervisorPage]);
+
+  return count;
+}
+
 function useElapsed(openedAt: Date | null): string {
   const [elapsed, setElapsed] = useState("");
   useEffect(() => {
@@ -39,6 +63,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [pwOpen, setPwOpen] = useState(false);
   const { equipmentName, openedAt } = useActiveSession();
   const elapsed = useElapsed(openedAt);
+  const pendingCount = usePendingCount(user?.role);
   const items = navItems.filter(item => !item.roles || item.roles.includes(user?.role || ""));
 
   return (
@@ -83,8 +108,13 @@ export default function Layout({ children }: { children: ReactNode }) {
                   }`
                 }
               >
-                <item.icon className="h-4 w-4" />
-                {item.label}
+                <item.icon className="h-4 w-4 shrink-0" />
+                <span className="flex-1">{item.label}</span>
+                {item.to === "/supervisor" && pendingCount > 0 && (
+                  <span className="ml-auto text-[10px] bg-red-500 text-white font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                    {pendingCount > 99 ? "99+" : pendingCount}
+                  </span>
+                )}
               </NavLink>
             ))}
           </div>
@@ -123,6 +153,11 @@ export default function Layout({ children }: { children: ReactNode }) {
               <item.icon className="h-5 w-5" />
               {item.to === "/" && equipmentName && (
                 <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              )}
+              {item.to === "/supervisor" && pendingCount > 0 && (
+                <span className="absolute -top-1 -right-2 text-[9px] bg-red-500 text-white font-bold px-1 py-px rounded-full min-w-[15px] text-center leading-none">
+                  {pendingCount > 99 ? "99+" : pendingCount}
+                </span>
               )}
             </div>
             {item.short}
