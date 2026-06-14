@@ -244,6 +244,7 @@ export interface ComparisonResponse { period: { from: string; to: string }; equi
 export interface PendingLot extends LotEntry {
   operatorName: string;
   sessionDate: string;
+  sessionNotes: string | null;
   equipmentName: string;
   equipmentCode: string;
 }

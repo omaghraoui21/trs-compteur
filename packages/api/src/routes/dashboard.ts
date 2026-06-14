@@ -522,6 +522,7 @@ dashboardRouter.get("/pending-lots", validateQuery(pendingLotsQuerySchema), asyn
     // Joined context
     operatorName: users.displayName,
     sessionDate: sessions.sessionDate,
+    sessionNotes: sessions.notes,
     equipmentName: equipments.name,
     equipmentCode: equipments.code,
   })

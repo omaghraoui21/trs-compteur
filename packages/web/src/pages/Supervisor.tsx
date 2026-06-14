@@ -318,6 +318,13 @@ export default function SupervisorPage() {
               {/* Expanded detail */}
               {isExpanded && (
                 <div id={`lot-detail-${lot.id}`} className="border-t px-4 py-3 space-y-3">
+                  {/* Session notes from operator end-of-shift */}
+                  {lot.sessionNotes && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex items-start gap-2">
+                      <span className="shrink-0">📝</span>
+                      <span><span className="font-semibold text-gray-700">Note de poste (opérateur) : </span>{lot.sessionNotes}</span>
+                    </div>
+                  )}
                   {/* Quantities */}
                   <div className="grid grid-cols-3 gap-3 text-sm">
                     {[
