@@ -916,17 +916,24 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                       expandedDay === d.date ? <ChevronUp className="h-3 w-3 text-gray-400" /> : <ChevronDown className="h-3 w-3 text-gray-400" />
                     )}
                   </td>
-                  <td className="px-3 py-2 font-medium flex items-center gap-1">
-                    {d.date}
-                    {d.warnings && d.warnings.filter(w => w.level === "error").length > 0 && (
-                      <span className="inline-flex items-center bg-red-100 text-red-700 rounded px-1 text-[10px] font-bold">
-                        {d.warnings.filter(w => w.level === "error").length} err
-                      </span>
-                    )}
-                    {d.warnings && d.warnings.filter(w => w.level === "warning").length > 0 && (
-                      <span className="inline-flex items-center bg-amber-100 text-amber-700 rounded px-1 text-[10px] font-bold">
-                        {d.warnings.filter(w => w.level === "warning").length} warn
-                      </span>
+                  <td className="px-3 py-2 font-medium">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {d.date}
+                      {d.warnings && d.warnings.filter(w => w.level === "error").length > 0 && (
+                        <span className="inline-flex items-center bg-red-100 text-red-700 rounded px-1 text-[10px] font-bold">
+                          {d.warnings.filter(w => w.level === "error").length} err
+                        </span>
+                      )}
+                      {d.warnings && d.warnings.filter(w => w.level === "warning").length > 0 && (
+                        <span className="inline-flex items-center bg-amber-100 text-amber-700 rounded px-1 text-[10px] font-bold">
+                          {d.warnings.filter(w => w.level === "warning").length} warn
+                        </span>
+                      )}
+                    </div>
+                    {(d as any).notes && (
+                      <div className="text-[10px] text-gray-400 mt-0.5 truncate max-w-[14rem]" title={(d as any).notes}>
+                        📝 {(d as any).notes}
+                      </div>
                     )}
                   </td>
                   <td className="px-3 py-2 text-right text-gray-500">{fmtDuration(d.tO)}</td>
