@@ -1143,14 +1143,16 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
 
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <label className="block text-xs text-gray-600 mb-1">Qté produite (NPR)</label>
-          <input type="number" value={produced} onChange={e => setProduced(e.target.value)}
+          <label htmlFor={`lot-produced-${lot.id}`} className="block text-xs text-gray-600 mb-1">Qté produite (NPR)</label>
+          <input id={`lot-produced-${lot.id}`} type="number" value={produced} onChange={e => setProduced(e.target.value)}
             className="w-full border rounded-lg px-3 py-3 text-base" inputMode="numeric" />
         </div>
         <div>
-          <label className="block text-xs text-gray-600 mb-1">Qté conforme (NPB)</label>
-          <input type="number" value={conforming} onChange={e => setConforming(e.target.value)}
-            className="w-full border rounded-lg px-3 py-3 text-base" inputMode="numeric" />
+          <label htmlFor={`lot-conforming-${lot.id}`} className="block text-xs text-gray-600 mb-1">Qté conforme (NPB)</label>
+          <input id={`lot-conforming-${lot.id}`} type="number" value={conforming} onChange={e => setConforming(e.target.value)}
+            aria-invalid={errors.some(e => e.msg.startsWith("Conforme"))}
+            className={`w-full border rounded-lg px-3 py-3 text-base ${errors.some(e => e.msg.startsWith("Conforme")) ? "border-red-400" : ""}`}
+            inputMode="numeric" />
         </div>
       </div>
 

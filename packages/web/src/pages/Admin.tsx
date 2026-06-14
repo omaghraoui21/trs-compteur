@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type ProductEquipmentCadence, type AdminUser, type AuditLogEntry } from "@/lib/api";
 import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, List, Network, ChevronDown, ChevronRight, Users, KeyRound, ScrollText, ChevronLeft } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
+import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/components/Toast";
 
@@ -286,28 +287,32 @@ function RoomsPanel() {
         </FormCard>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="rtable w-full text-sm">
-          <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Nom</th><th className="py-2 px-3">Description</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
-          <tbody>
-            {rooms.map((r) => (
-              <tr key={r.id} className={`border-b hover:bg-gray-50 ${!r.isActive ? "opacity-50" : ""}`}>
-                <td data-label="Code" className="py-2 px-3 font-mono text-xs">{r.code}</td>
-                <td data-label="Nom" className="py-2 px-3 font-medium">{r.name}</td>
-                <td data-label="Description" className="py-2 px-3 text-gray-500">{r.description || "—"}</td>
-                <td data-label="Statut" className="py-2 px-3"><StatusBadge active={r.isActive} /></td>
-                <td data-label="Actions" className="py-2 px-3">
-                  <div className="flex gap-1">
-                    <IconBtn icon={Pencil} onClick={() => startEdit(r)} title="Modifier" />
-                    {r.isActive && <IconBtn icon={Trash2} onClick={() => remove(r.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                    {!r.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateRoom(r.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {rooms.length === 0 && !showForm ? (
+        <EmptyState icon={Building2} title="Aucun local" description="Cliquez sur Ajouter pour créer votre premier local." />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="rtable w-full text-sm">
+            <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Nom</th><th className="py-2 px-3">Description</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
+            <tbody>
+              {rooms.map((r) => (
+                <tr key={r.id} className={`border-b hover:bg-gray-50 ${!r.isActive ? "opacity-50" : ""}`}>
+                  <td data-label="Code" className="py-2 px-3 font-mono text-xs">{r.code}</td>
+                  <td data-label="Nom" className="py-2 px-3 font-medium">{r.name}</td>
+                  <td data-label="Description" className="py-2 px-3 text-gray-500">{r.description || "—"}</td>
+                  <td data-label="Statut" className="py-2 px-3"><StatusBadge active={r.isActive} /></td>
+                  <td data-label="Actions" className="py-2 px-3">
+                    <div className="flex gap-1">
+                      <IconBtn icon={Pencil} onClick={() => startEdit(r)} title="Modifier" />
+                      {r.isActive && <IconBtn icon={Trash2} onClick={() => remove(r.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
+                      {!r.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateRoom(r.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -402,31 +407,35 @@ function EquipmentsPanel() {
         </FormCard>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="rtable w-full text-sm">
-          <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Nom</th><th className="py-2 px-3">Local</th><th className="py-2 px-3">Type</th><th className="py-2 px-3">Obj. TRS</th><th className="py-2 px-3">Micro-arrêt</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
-          <tbody>
-            {items.map((e) => (
-              <tr key={e.id} className={`border-b hover:bg-gray-50 ${!e.isActive ? "opacity-50" : ""}`}>
-                <td data-label="Code" className="py-2 px-3 font-mono text-xs">{e.code}</td>
-                <td data-label="Nom" className="py-2 px-3 font-medium">{e.name}</td>
-                <td data-label="Local" className="py-2 px-3">{roomName(e.roomId)}</td>
-                <td data-label="Type" className="py-2 px-3 capitalize">{e.equipmentType || "—"}</td>
-                <td data-label="Obj. TRS" className="py-2 px-3">{e.trsObjective}%</td>
-                <td data-label="Micro-arrêt" className="py-2 px-3">{e.microStopThresholdMin ?? 5} min</td>
-                <td data-label="Statut" className="py-2 px-3"><StatusBadge active={e.isActive} /></td>
-                <td data-label="Actions" className="py-2 px-3">
-                  <div className="flex gap-1">
-                    <IconBtn icon={Pencil} onClick={() => startEdit(e)} title="Modifier" />
-                    {e.isActive && <IconBtn icon={Trash2} onClick={() => remove(e.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                    {!e.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateEquipment(e.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {items.length === 0 && !showForm ? (
+        <EmptyState icon={Cpu} title="Aucun équipement" description="Cliquez sur Ajouter pour configurer votre premier équipement." />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="rtable w-full text-sm">
+            <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Nom</th><th className="py-2 px-3">Local</th><th className="py-2 px-3">Type</th><th className="py-2 px-3">Obj. TRS</th><th className="py-2 px-3">Micro-arrêt</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
+            <tbody>
+              {items.map((e) => (
+                <tr key={e.id} className={`border-b hover:bg-gray-50 ${!e.isActive ? "opacity-50" : ""}`}>
+                  <td data-label="Code" className="py-2 px-3 font-mono text-xs">{e.code}</td>
+                  <td data-label="Nom" className="py-2 px-3 font-medium">{e.name}</td>
+                  <td data-label="Local" className="py-2 px-3">{roomName(e.roomId)}</td>
+                  <td data-label="Type" className="py-2 px-3 capitalize">{e.equipmentType || "—"}</td>
+                  <td data-label="Obj. TRS" className="py-2 px-3">{e.trsObjective}%</td>
+                  <td data-label="Micro-arrêt" className="py-2 px-3">{e.microStopThresholdMin ?? 5} min</td>
+                  <td data-label="Statut" className="py-2 px-3"><StatusBadge active={e.isActive} /></td>
+                  <td data-label="Actions" className="py-2 px-3">
+                    <div className="flex gap-1">
+                      <IconBtn icon={Pencil} onClick={() => startEdit(e)} title="Modifier" />
+                      {e.isActive && <IconBtn icon={Trash2} onClick={() => remove(e.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
+                      {!e.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateEquipment(e.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -500,29 +509,33 @@ function ProductsPanel() {
         </FormCard>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="rtable w-full text-sm">
-          <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Nom</th><th className="py-2 px-3">Cadence</th><th className="py-2 px-3">Unité</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
-          <tbody>
-            {items.map((p) => (
-              <tr key={p.id} className={`border-b hover:bg-gray-50 ${!p.isActive ? "opacity-50" : ""}`}>
-                <td data-label="Code" className="py-2 px-3 font-mono text-xs">{p.code}</td>
-                <td data-label="Nom" className="py-2 px-3 font-medium">{p.name}</td>
-                <td data-label="Cadence" className="py-2 px-3">{p.defaultCadence ? `${p.defaultCadence} ${p.cadenceUnit}` : "—"}</td>
-                <td data-label="Unité" className="py-2 px-3">{p.unit}</td>
-                <td data-label="Statut" className="py-2 px-3"><StatusBadge active={p.isActive} /></td>
-                <td data-label="Actions" className="py-2 px-3">
-                  <div className="flex gap-1">
-                    <IconBtn icon={Pencil} onClick={() => startEdit(p)} title="Modifier" />
-                    {p.isActive && <IconBtn icon={Trash2} onClick={() => remove(p.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                    {!p.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateProduct(p.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {items.length === 0 && !showForm ? (
+        <EmptyState icon={Package} title="Aucun produit" description="Cliquez sur Ajouter pour enregistrer votre premier produit." />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="rtable w-full text-sm">
+            <thead><tr className="border-b text-left text-gray-500"><th className="py-2 px-3">Code</th><th className="py-2 px-3">Nom</th><th className="py-2 px-3">Cadence</th><th className="py-2 px-3">Unité</th><th className="py-2 px-3">Statut</th><th className="py-2 px-3 w-24">Actions</th></tr></thead>
+            <tbody>
+              {items.map((p) => (
+                <tr key={p.id} className={`border-b hover:bg-gray-50 ${!p.isActive ? "opacity-50" : ""}`}>
+                  <td data-label="Code" className="py-2 px-3 font-mono text-xs">{p.code}</td>
+                  <td data-label="Nom" className="py-2 px-3 font-medium">{p.name}</td>
+                  <td data-label="Cadence" className="py-2 px-3">{p.defaultCadence ? `${p.defaultCadence} ${p.cadenceUnit}` : "—"}</td>
+                  <td data-label="Unité" className="py-2 px-3">{p.unit}</td>
+                  <td data-label="Statut" className="py-2 px-3"><StatusBadge active={p.isActive} /></td>
+                  <td data-label="Actions" className="py-2 px-3">
+                    <div className="flex gap-1">
+                      <IconBtn icon={Pencil} onClick={() => startEdit(p)} title="Modifier" />
+                      {p.isActive && <IconBtn icon={Trash2} onClick={() => remove(p.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
+                      {!p.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateProduct(p.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
