@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type ProductEquipmentCadence, type AdminUser } from "@/lib/api";
-import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, List, Network, ChevronDown, ChevronRight, Users, KeyRound } from "lucide-react";
+import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type ProductEquipmentCadence, type AdminUser, type AuditLogEntry } from "@/lib/api";
+import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, List, Network, ChevronDown, ChevronRight, Users, KeyRound, ScrollText, ChevronLeft } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/components/Toast";
 
-type Tab = "rooms" | "equipments" | "products" | "cadences" | "downtimes" | "users";
+type Tab = "rooms" | "equipments" | "products" | "cadences" | "downtimes" | "users" | "audit";
 
 const TABS: { key: Tab; label: string; icon: typeof Building2; adminOnly?: boolean }[] = [
   { key: "rooms", label: "Locaux", icon: Building2 },
@@ -14,6 +14,7 @@ const TABS: { key: Tab; label: string; icon: typeof Building2; adminOnly?: boole
   { key: "cadences", label: "Cadences", icon: Gauge },
   { key: "downtimes", label: "Arrêts", icon: AlertTriangle },
   { key: "users", label: "Utilisateurs", icon: Users, adminOnly: true },
+  { key: "audit", label: "Journal d'audit", icon: ScrollText },
 ];
 
 const FAMILLES = [
@@ -59,6 +60,7 @@ export default function AdminPage() {
       {activeTab === "cadences" && <CadencesPanel />}
       {activeTab === "downtimes" && <DowntimesPanel />}
       {activeTab === "users" && user?.role === "admin" && <UsersPanel currentUserId={user.id} />}
+      {activeTab === "audit" && <AuditLogPanel />}
     </div>
   );
 }
@@ -979,6 +981,178 @@ function Field({ label, value, onChange, placeholder, type = "text" }: { label: 
         className="input-field"
         inputMode={type === "number" ? "numeric" : undefined}
       />
+    </div>
+  );
+}
+
+// ─── Audit Log panel (GMP traceability, 21 CFR Part 11) ──────────────────────
+
+const ACTION_LABELS: Record<string, string> = {
+  CORRECT_LOT: "Correction lot", VALIDATE_LOT: "Validation lot", REJECT_LOT: "Rejet lot",
+  START_LOT: "Démarrage lot", CLOSE_LOT: "Clôture lot", OPEN_SESSION: "Ouverture session",
+  CLOSE_SESSION: "Clôture session", CREATE_USER: "Création user", UPDATE_USER: "MàJ user",
+  RESET_PASSWORD: "Reset mdp", ADD_DOWNTIME: "Ajout arrêt", DELETE_DOWNTIME: "Suppression arrêt",
+  CHANGE_CADENCE: "Changement cadence",
+};
+
+const ACTION_COLOR: Record<string, string> = {
+  CORRECT_LOT: "bg-amber-100 text-amber-800",
+  VALIDATE_LOT: "bg-green-100 text-green-800",
+  REJECT_LOT: "bg-red-100 text-red-800",
+  RESET_PASSWORD: "bg-purple-100 text-purple-800",
+};
+
+const PAGE_SIZE = 50;
+
+function AuditLogPanel() {
+  const toast = useToast();
+  const [entries, setEntries] = useState<AuditLogEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [actionFilter, setActionFilter] = useState("");
+  const [entityFilter, setEntityFilter] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const load = useCallback(async (off: number) => {
+    setLoading(true);
+    try {
+      const rows = await api.admin.auditLog({
+        action: actionFilter || undefined,
+        entityType: entityFilter || undefined,
+        from: fromDate || undefined,
+        to: toDate || undefined,
+        limit: PAGE_SIZE,
+        offset: off,
+      });
+      setEntries(rows);
+      setOffset(off);
+    } catch (err: any) {
+      toast.error(err.message || "Chargement du journal échoué");
+    } finally {
+      setLoading(false);
+    }
+  }, [actionFilter, entityFilter, fromDate, toDate, toast]);
+
+  useEffect(() => { load(0); }, [load]);
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <ScrollText className="h-5 w-5 text-blue-700" />
+        <h2 className="font-semibold text-gray-800">Journal d'audit — traçabilité GMP (21 CFR Part 11)</h2>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white border rounded-xl p-4 mb-4 flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Action</label>
+          <select value={actionFilter} onChange={e => setActionFilter(e.target.value)}
+            className="border rounded-lg px-2 py-1.5 text-sm">
+            <option value="">Toutes</option>
+            {Object.keys(ACTION_LABELS).map(a => <option key={a} value={a}>{ACTION_LABELS[a]}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Entité</label>
+          <select value={entityFilter} onChange={e => setEntityFilter(e.target.value)}
+            className="border rounded-lg px-2 py-1.5 text-sm">
+            <option value="">Toutes</option>
+            {["lot", "session", "downtime", "user", "equipment"].map(e => <option key={e} value={e}>{e}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Du</label>
+          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+            className="border rounded-lg px-2 py-1.5 text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Au</label>
+          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+            className="border rounded-lg px-2 py-1.5 text-sm" />
+        </div>
+        <button onClick={() => { setActionFilter(""); setEntityFilter(""); setFromDate(""); setToDate(""); }}
+          className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 border rounded-lg">
+          Réinitialiser
+        </button>
+      </div>
+
+      {loading && <TableSkeleton />}
+
+      {!loading && (
+        <>
+          <div className="bg-white rounded-xl border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b text-xs text-gray-500 uppercase tracking-wide">
+                  <th className="text-left px-4 py-2.5">Date / Heure</th>
+                  <th className="text-left px-4 py-2.5">Action</th>
+                  <th className="text-left px-4 py-2.5">Acteur</th>
+                  <th className="text-left px-4 py-2.5">Entité</th>
+                  <th className="text-left px-4 py-2.5">IP</th>
+                  <th className="px-4 py-2.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {entries.length === 0 && (
+                  <tr><td colSpan={6} className="text-center py-8 text-gray-400">Aucune entrée pour ces filtres.</td></tr>
+                )}
+                {entries.map(e => {
+                  const isExpanded = expanded === e.id;
+                  const actionCls = ACTION_COLOR[e.action] ?? "bg-gray-100 text-gray-700";
+                  return (
+                    <>
+                      <tr key={e.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpanded(isExpanded ? null : e.id)}>
+                        <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap font-mono">
+                          {new Date(e.createdAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${actionCls}`}>
+                            {ACTION_LABELS[e.action] ?? e.action}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-gray-700">{e.actorEmail}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-500">
+                          {e.entityType}{e.entityId && <span className="text-gray-300 ml-1">#{e.entityId.slice(0, 8)}</span>}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-gray-400 font-mono">{e.ipAddress ?? "—"}</td>
+                        <td className="px-4 py-2.5">
+                          {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
+                        </td>
+                      </tr>
+                      {isExpanded && e.payload && (
+                        <tr key={`${e.id}-payload`}>
+                          <td colSpan={6} className="px-4 py-2 bg-gray-50 border-b">
+                            <pre className="text-[11px] text-gray-600 whitespace-pre-wrap break-all font-mono max-h-40 overflow-auto">
+                              {JSON.stringify(JSON.parse(e.payload), null, 2)}
+                            </pre>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          <div className="flex items-center justify-between mt-3 text-sm text-gray-500">
+            <span>{entries.length === 0 ? "Aucun résultat" : `${offset + 1}–${offset + entries.length}`}</span>
+            <div className="flex gap-2">
+              <button disabled={offset === 0} onClick={() => load(Math.max(0, offset - PAGE_SIZE))}
+                className="flex items-center gap-1 px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50">
+                <ChevronLeft className="h-4 w-4" /> Préc.
+              </button>
+              <button disabled={entries.length < PAGE_SIZE} onClick={() => load(offset + PAGE_SIZE)}
+                className="flex items-center gap-1 px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50">
+                Suiv. <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
