@@ -10,7 +10,7 @@ const s = StyleSheet.create({
   row: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: "#eee", paddingVertical: 2 },
   headerRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#333", paddingVertical: 3, fontWeight: "bold", backgroundColor: "#f3f4f6" },
   cell: { flex: 1, textAlign: "right", paddingHorizontal: 2 },
-  cellLeft: { flex: 2, textAlign: "left", paddingHorizontal: 2 },
+  cellLeft: { flex: 2, textAlign: "left", paddingHorizontal: 2, flexWrap: "wrap" },
   kpiRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
   kpiCard: { flex: 1, borderWidth: 1, borderColor: "#ddd", borderRadius: 4, padding: 6, alignItems: "center" },
   kpiLabel: { fontSize: 8, color: "#666", marginBottom: 2 },

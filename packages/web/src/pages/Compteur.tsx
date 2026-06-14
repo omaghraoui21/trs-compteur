@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type ProductEquipmentCadence, type SessionTrsResponse, type TrsMetrics, type LotEntry, type LotDowntime } from "@/lib/api";
-import { fmtDuration, fmtPct, trsColor } from "@trs/engine";
+import { fmtDuration, fmtPct, trsColor, diffMinutes } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { useActiveSession } from "@/lib/sessionContext";
 import { Onboarding } from "@/components/Onboarding";
@@ -578,7 +578,7 @@ export default function CompteurPage() {
                         {new Date(ev.startedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                       </div>
                       {ev.durationMinutes != null && (
-                        <div className="text-xs font-medium text-gray-600">{ev.durationMinutes} min</div>
+                        <div className="text-xs font-medium text-gray-600">{fmtDuration(ev.durationMinutes)}</div>
                       )}
                     </div>
                   </div>
@@ -613,25 +613,31 @@ export default function CompteurPage() {
                   const product = products.find(p => p.id === lot.productId);
                   const lotTrs = trsData?.lots?.find(t => t.lotId === lot.id);
                   const rejectQty = lot.quantityProduced - lot.quantityConforming;
+                  const lotDuration = lot.endedAt ? fmtDuration(diffMinutes(lot.startedAt, lot.endedAt)) : null;
                   return (
                     <div key={lot.id} className="px-4 py-3">
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="font-semibold truncate">Lot {lot.batchNumber}</span>
                           {product && <span className="text-gray-400 text-xs truncate">{product.name}</span>}
+                          {lotDuration && (
+                            <span className="text-gray-300 text-xs flex items-center gap-0.5 shrink-0">
+                              <Clock className="h-3 w-3" />{lotDuration}
+                            </span>
+                          )}
                         </div>
                         <ValidationBadge status={lot.status} />
                       </div>
                       <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
                         <span className="flex items-center gap-1">
-                          <span className="font-medium text-gray-700">{lot.quantityProduced}</span> produits
+                          <span className="font-medium text-gray-700">{lot.quantityProduced.toLocaleString("fr-FR")}</span> produits
                         </span>
                         <span className="flex items-center gap-1 text-green-700">
-                          <CheckCircle className="h-3 w-3" /> {lot.quantityConforming} conformes
+                          <CheckCircle className="h-3 w-3" /> {lot.quantityConforming.toLocaleString("fr-FR")} conformes
                         </span>
                         {rejectQty > 0 && (
                           <span className="flex items-center gap-1 text-red-600">
-                            <XCircle className="h-3 w-3" /> {rejectQty} rebuts
+                            <XCircle className="h-3 w-3" /> {rejectQty.toLocaleString("fr-FR")} rebuts
                           </span>
                         )}
                         {lotTrs && (
@@ -927,18 +933,19 @@ function SessionTimelineBar({ detail, session }: { detail: SessionDetail; sessio
   const colorMap = { planned: "bg-amber-400", lot: "bg-green-500", unplanned: "bg-red-500" };
 
   return (
-    <div className="mb-4">
-      <div className="relative h-6 bg-gray-100 rounded-full overflow-hidden">
+    <div className="mb-4" role="region" aria-label="Frise temporelle de la session">
+      <div className="relative h-6 bg-gray-100 rounded-full overflow-hidden" role="img" aria-label="Barre de temps — vert : production, orange : arrêt planifié, rouge : arrêt non planifié">
         {segments.map((seg, i) => (
           <div
             key={i}
             className={`absolute top-0 h-full ${colorMap[seg.type]} opacity-80`}
             style={{ left: `${seg.leftPct}%`, width: `${seg.widthPct}%` }}
             title={seg.label}
+            aria-label={seg.label}
           />
         ))}
       </div>
-      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500" aria-hidden="true">
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-green-500" /> Production</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-400" /> Arrêt planifié</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-red-500" /> Arrêt non planifié</span>
@@ -1122,9 +1129,9 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3 space-y-2">
           <div className="text-xs font-medium text-blue-800">Nouvelle cadence ({lot.cadenceUnit})</div>
           <div className="flex gap-2">
-            <input type="number" inputMode="numeric" min="1" value={newCadence} onChange={e => setNewCadence(e.target.value)}
+            <input aria-label={`Nouvelle cadence en ${lot.cadenceUnit}`} type="number" inputMode="numeric" min="1" value={newCadence} onChange={e => setNewCadence(e.target.value)}
               className="w-28 border rounded-lg px-3 py-2 text-base" autoFocus />
-            <input value={cadenceReason} onChange={e => setCadenceReason(e.target.value)} placeholder="Motif (optionnel)"
+            <input aria-label="Motif de modification de cadence" value={cadenceReason} onChange={e => setCadenceReason(e.target.value)} placeholder="Motif (optionnel)"
               className="flex-1 border rounded-lg px-3 py-2 text-sm" />
           </div>
           <div className="flex gap-2 justify-end">
@@ -1239,6 +1246,12 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
   const [error, setError] = useState("");
   const [step, setStep] = useState<"form" | "confirm">("form");
   const [flashStart, triggerFlashStart] = useFlash();
+
+  // Warn if batch number was already used in this session
+  const batchDuplicate = useMemo(
+    () => batch !== "" && previousLots.some(l => l.batchNumber === batch),
+    [previousLots, batch],
+  );
 
   // U5: Auto-fill cadence from product×equipment reference
   useEffect(() => {
@@ -1361,8 +1374,8 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border p-4 space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Produit</label>
-          <select value={productId} onChange={e => setProductId(e.target.value)}
+          <label htmlFor="lot-product" className="block text-sm font-medium mb-1">Produit</label>
+          <select id="lot-product" value={productId} onChange={e => setProductId(e.target.value)}
             className="w-full border rounded-lg px-3 py-3 text-base" required>
             <option value="">Choisir...</option>
             {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -1370,32 +1383,35 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">N° de lot</label>
-          <input value={batch} onChange={e => setBatch(e.target.value.toUpperCase())}
+          <label htmlFor="lot-batch" className="block text-sm font-medium mb-1">N° de lot</label>
+          <input id="lot-batch" value={batch} onChange={e => setBatch(e.target.value.toUpperCase())}
             maxLength={30}
-            aria-invalid={!!(batch && !/^[A-Z0-9-_./]{1,30}$/.test(batch))}
-            className={`w-full border rounded-lg px-3 py-3 text-base ${batch && !/^[A-Z0-9-_./]{1,30}$/.test(batch) ? "border-red-400" : ""}`}
+            aria-invalid={!!(batch && !/^[A-Z0-9-_./]{1,30}$/.test(batch)) || batchDuplicate}
+            className={`w-full border rounded-lg px-3 py-3 text-base ${batch && !/^[A-Z0-9-_./]{1,30}$/.test(batch) ? "border-red-400" : batchDuplicate ? "border-amber-400" : ""}`}
             placeholder={suggestedBatch || "26019"} required />
           {batch && !/^[A-Z0-9-_./]{1,30}$/.test(batch) && (
             <p className="text-xs text-red-600 mt-1">Format invalide — lettres majuscules, chiffres, tirets, points et "/" uniquement (30 car. max.)</p>
           )}
-          {suggestedBatch && batch === suggestedBatch && /^[A-Z0-9-_./]{1,30}$/.test(batch) && (
+          {batchDuplicate && /^[A-Z0-9-_./]{1,30}$/.test(batch) && (
+            <p className="text-xs text-amber-600 mt-1">⚠ Ce numéro de lot a déjà été utilisé dans cette session.</p>
+          )}
+          {suggestedBatch && batch === suggestedBatch && /^[A-Z0-9-_./]{1,30}$/.test(batch) && !batchDuplicate && (
             <p className="text-xs text-blue-600 mt-1">Auto-suggéré : {suggestedBatch}</p>
           )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium mb-1">Cadence</label>
-            <input type="number" value={cadence} onChange={e => setCadence(e.target.value)}
+            <label htmlFor="lot-cadence" className="block text-sm font-medium mb-1">Cadence</label>
+            <input id="lot-cadence" type="number" value={cadence} onChange={e => setCadence(e.target.value)}
               className="w-full border rounded-lg px-3 py-3 text-base" placeholder="120" required inputMode="numeric" />
             {refCadence && (
               <p className="text-xs text-green-600 mt-1">Ref: {refCadence} {cadenceUnit}</p>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Unité</label>
-            <select value={cadenceUnit} onChange={e => setCadenceUnit(e.target.value)}
+            <label htmlFor="lot-cadence-unit" className="block text-sm font-medium mb-1">Unité</label>
+            <select id="lot-cadence-unit" value={cadenceUnit} onChange={e => setCadenceUnit(e.target.value)}
               className="w-full border rounded-lg px-3 py-3 text-base">
               <option value="u/min">u/min</option>
               <option value="u/h">u/h</option>
@@ -1453,7 +1469,7 @@ function DeclaredDowntimesList({ title, downtimes, onDelete }: {
                 </span>
                 <span className="text-xs text-gray-400 shrink-0">{dt.famille}</span>
                 <span className="text-sm font-medium text-gray-700 flex-1 truncate">{dt.reason}</span>
-                <span className="text-sm tabular-nums text-gray-500 shrink-0">{dt.durationMinutes} min</span>
+                <span className="text-sm tabular-nums text-gray-500 shrink-0">{fmtDuration(dt.durationMinutes)}</span>
                 <button onClick={() => setConfirmId(dt.id)} aria-label="Supprimer"
                   className="p-1 rounded text-gray-400 hover:text-red-500 transition shrink-0">
                   <Trash2 className="h-4 w-4" />

@@ -248,11 +248,11 @@ export default function DashboardPage() {
 
         <div>
           <label className="block text-xs text-gray-500 mb-1">Période</label>
-          <div className="flex border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-400">
+          <div className="flex border rounded-lg overflow-hidden">
             {(["day", "week", "month", "custom"] as ZoomLevel[]).map(z => (
               <button key={z} onClick={() => setZoom(z)}
                 aria-pressed={zoom === z}
-                className={`px-3 py-2 text-sm transition ${zoom === z ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
+                className={`px-3 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${zoom === z ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
                 {z === "day" ? "Jour" : z === "week" ? "Sem." : z === "month" ? "Mois" : "Libre"}
               </button>
             ))}
@@ -271,7 +271,8 @@ export default function DashboardPage() {
 
         <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
           <button onClick={() => setShowComparison(!showComparison)}
-            className={`flex items-center gap-1 px-3 py-2 text-sm rounded-lg border ${showComparison ? "bg-blue-50 border-blue-300 text-blue-700" : "text-gray-600 hover:bg-gray-50"}`}>
+            aria-pressed={showComparison}
+            className={`flex items-center gap-1 px-3 py-2 text-sm rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${showComparison ? "bg-blue-50 border-blue-300 text-blue-700" : "text-gray-600 hover:bg-gray-50"}`}>
             <ArrowLeftRight className="h-4 w-4" /> Comparer
           </button>
           <button onClick={exportCsv}
@@ -996,7 +997,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                   <td className="px-3 py-2 text-right text-gray-500">{fmtDuration(Math.round(d.tF))}</td>
                   <td className="px-3 py-2 text-right">{d.lotCount}</td>
                   <td className="px-3 py-2 text-right">{d.totalProduced.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-red-600">{d.totalRebut}</td>
+                  <td className="px-3 py-2 text-right text-red-600">{d.totalRebut.toLocaleString("fr-FR")}</td>
                   <td className="px-3 py-2 text-right">{fmtPct(d.DO)}</td>
                   <td className="px-3 py-2 text-right">{fmtPct(d.TP)}</td>
                   <td className="px-3 py-2 text-right">{fmtPct(d.TQ)}</td>
@@ -1027,7 +1028,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                     <td className="px-3 py-1.5 text-right text-gray-400">{fmtDuration(Math.round(lot.tF))}</td>
                     <td className="px-3 py-1.5 text-right">1</td>
                     <td className="px-3 py-1.5 text-right">{lot.quantityProduced?.toLocaleString()}</td>
-                    <td className="px-3 py-1.5 text-right text-red-500">{lot.rebut}</td>
+                    <td className="px-3 py-1.5 text-right text-red-500">{lot.rebut?.toLocaleString("fr-FR") ?? 0}</td>
                     <td className="px-3 py-1.5 text-right">—</td>
                     <td className="px-3 py-1.5 text-right" style={{ color: lot.TP > 1 ? "#d97706" : undefined }}>{fmtPct(lot.TP)}</td>
                     <td className="px-3 py-1.5 text-right" style={{ color: lot.TQ > 1 ? "#dc2626" : undefined }}>{fmtPct(lot.TQ)}</td>
@@ -1047,7 +1048,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
               <td className="px-3 py-2 text-right">{fmtDuration(Math.round(total.tF))}</td>
               <td className="px-3 py-2 text-right">{total.lotCount}</td>
               <td className="px-3 py-2 text-right">{total.totalProduced.toLocaleString()}</td>
-              <td className="px-3 py-2 text-right text-red-600">{total.totalRebut}</td>
+              <td className="px-3 py-2 text-right text-red-600">{total.totalRebut.toLocaleString("fr-FR")}</td>
               <td className="px-3 py-2 text-right">{fmtPct(total.DO)}</td>
               <td className="px-3 py-2 text-right">{fmtPct(total.TP)}</td>
               <td className="px-3 py-2 text-right">{fmtPct(total.TQ)}</td>

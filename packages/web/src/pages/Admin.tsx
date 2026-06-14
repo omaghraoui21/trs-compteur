@@ -139,8 +139,8 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
           <Field label="Nom affiché" value={form.displayName} onChange={(v) => setForm({ ...form, displayName: v })} placeholder="Jean Dupont" />
           <Field label="Mot de passe" type="password" value={form.password} onChange={(v) => setForm({ ...form, password: v })} placeholder="6 caractères min." />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
-            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="input-field">
+            <label htmlFor="user-role" className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
+            <select id="user-role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="input-field">
               <option value="operator">Opérateur</option>
               <option value="supervisor">Superviseur</option>
               <option value="admin">Admin</option>
@@ -382,15 +382,15 @@ function EquipmentsPanel() {
           <Field label="Code" value={form.code} onChange={(v) => setForm({ ...form, code: v })} placeholder="BLI-XXX" />
           <Field label="Nom" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="Nom de l'équipement" />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Local</label>
-            <select value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })} className="input-field">
+            <label htmlFor="equip-room" className="block text-sm font-medium text-gray-700 mb-1">Local</label>
+            <select id="equip-room" value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })} className="input-field">
               <option value="">Sélectionner un local</option>
               {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-            <select value={form.equipmentType} onChange={(e) => setForm({ ...form, equipmentType: e.target.value })} className="input-field">
+            <label htmlFor="equip-type" className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+            <select id="equip-type" value={form.equipmentType} onChange={(e) => setForm({ ...form, equipmentType: e.target.value })} className="input-field">
               <option value="blistereuse">Blistéreuse</option>
               <option value="geluleuse">Géluleuse</option>
             </select>
@@ -398,8 +398,8 @@ function EquipmentsPanel() {
           <Field label="Objectif TRS (%)" value={form.trsObjective} onChange={(v) => setForm({ ...form, trsObjective: v })} type="number" />
           <Field label="Seuil micro-arrêts (min)" value={form.microStopThresholdMin} onChange={(v) => setForm({ ...form, microStopThresholdMin: v })} type="number" />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Unité cadence</label>
-            <select value={form.defaultCadenceUnit} onChange={(e) => setForm({ ...form, defaultCadenceUnit: e.target.value })} className="input-field">
+            <label htmlFor="equip-cadence-unit" className="block text-sm font-medium text-gray-700 mb-1">Unité cadence</label>
+            <select id="equip-cadence-unit" value={form.defaultCadenceUnit} onChange={(e) => setForm({ ...form, defaultCadenceUnit: e.target.value })} className="input-field">
               <option value="u/min">u/min</option>
               <option value="u/h">u/h</option>
             </select>
@@ -499,8 +499,8 @@ function ProductsPanel() {
           <Field label="Nom" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="Nom du produit" />
           <Field label="Cadence par défaut" value={form.defaultCadence} onChange={(v) => setForm({ ...form, defaultCadence: v })} type="number" placeholder="100" />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Unité cadence</label>
-            <select value={form.cadenceUnit} onChange={(e) => setForm({ ...form, cadenceUnit: e.target.value })} className="input-field">
+            <label htmlFor="prod-cadence-unit" className="block text-sm font-medium text-gray-700 mb-1">Unité cadence</label>
+            <select id="prod-cadence-unit" value={form.cadenceUnit} onChange={(e) => setForm({ ...form, cadenceUnit: e.target.value })} className="input-field">
               <option value="u/min">u/min</option>
               <option value="u/h">u/h</option>
             </select>
@@ -605,15 +605,15 @@ function CadencesPanel() {
       {showForm && (
         <FormCard title="Cadence produit × équipement" onCancel={resetForm} onSave={save}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Produit</label>
-            <select value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} className="input-field">
+            <label htmlFor="cad-product" className="block text-sm font-medium text-gray-700 mb-1">Produit</label>
+            <select id="cad-product" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} className="input-field">
               <option value="">Sélectionner un produit</option>
               {productsList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Équipement</label>
-            <select value={form.equipmentId} onChange={(e) => setForm({ ...form, equipmentId: e.target.value })} className="input-field">
+            <label htmlFor="cad-equip" className="block text-sm font-medium text-gray-700 mb-1">Équipement</label>
+            <select id="cad-equip" value={form.equipmentId} onChange={(e) => setForm({ ...form, equipmentId: e.target.value })} className="input-field">
               <option value="">Sélectionner un équipement</option>
               {equipmentsList.map(eq => <option key={eq.id} value={eq.id}>{eq.name}</option>)}
             </select>
@@ -621,8 +621,8 @@ function CadencesPanel() {
           <Field label="Cadence" value={form.cadenceValue} onChange={(v) => setForm({ ...form, cadenceValue: v })} type="number" placeholder="100" />
           <Field label="Objectif TRS (%) — optionnel" value={form.trsObjective} onChange={(v) => setForm({ ...form, trsObjective: v })} type="number" placeholder="85" />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Unité</label>
-            <select value={form.cadenceUnit} onChange={(e) => setForm({ ...form, cadenceUnit: e.target.value })} className="input-field">
+            <label htmlFor="cad-unit" className="block text-sm font-medium text-gray-700 mb-1">Unité</label>
+            <select id="cad-unit" value={form.cadenceUnit} onChange={(e) => setForm({ ...form, cadenceUnit: e.target.value })} className="input-field">
               <option value="u/min">u/min</option>
               <option value="u/h">u/h</option>
             </select>
@@ -764,14 +764,14 @@ function DowntimesPanel() {
           <Field label="Code" value={form.code} onChange={(v) => setForm({ ...form, code: v })} placeholder="XX-CODE" />
           <Field label="Label" value={form.label} onChange={(v) => setForm({ ...form, label: v })} placeholder="Nom de l'arrêt" />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Famille</label>
-            <select value={form.famille} onChange={(e) => setForm({ ...form, famille: e.target.value })} className="input-field">
+            <label htmlFor="dt-famille" className="block text-sm font-medium text-gray-700 mb-1">Famille</label>
+            <select id="dt-famille" value={form.famille} onChange={(e) => setForm({ ...form, famille: e.target.value })} className="input-field">
               {FAMILLES.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Équipement cible</label>
-            <select value={form.appliesToEquipmentType} onChange={(e) => setForm({ ...form, appliesToEquipmentType: e.target.value })} className="input-field">
+            <label htmlFor="dt-equip-target" className="block text-sm font-medium text-gray-700 mb-1">Équipement cible</label>
+            <select id="dt-equip-target" value={form.appliesToEquipmentType} onChange={(e) => setForm({ ...form, appliesToEquipmentType: e.target.value })} className="input-field">
               <option value="">Tous les équipements</option>
               <option value="blistereuse">Blistéreuse uniquement</option>
               <option value="geluleuse">Géluleuse uniquement</option>
@@ -1075,29 +1075,29 @@ function AuditLogPanel() {
       {/* Filters */}
       <div className="bg-white border rounded-xl p-4 mb-4 flex flex-wrap gap-3 items-end">
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Action</label>
-          <select value={actionFilter} onChange={e => setActionFilter(e.target.value)}
+          <label htmlFor="audit-action" className="block text-xs text-gray-500 mb-1">Action</label>
+          <select id="audit-action" value={actionFilter} onChange={e => setActionFilter(e.target.value)}
             className="border rounded-lg px-2 py-1.5 text-sm">
             <option value="">Toutes</option>
             {Object.keys(ACTION_LABELS).map(a => <option key={a} value={a}>{ACTION_LABELS[a]}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Entité</label>
-          <select value={entityFilter} onChange={e => setEntityFilter(e.target.value)}
+          <label htmlFor="audit-entity" className="block text-xs text-gray-500 mb-1">Entité</label>
+          <select id="audit-entity" value={entityFilter} onChange={e => setEntityFilter(e.target.value)}
             className="border rounded-lg px-2 py-1.5 text-sm">
             <option value="">Toutes</option>
             {["lot", "session", "downtime", "user", "equipment"].map(e => <option key={e} value={e}>{e}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Du</label>
-          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+          <label htmlFor="audit-from" className="block text-xs text-gray-500 mb-1">Du</label>
+          <input id="audit-from" type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
             className="border rounded-lg px-2 py-1.5 text-sm" />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Au</label>
-          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+          <label htmlFor="audit-to" className="block text-xs text-gray-500 mb-1">Au</label>
+          <input id="audit-to" type="date" value={toDate} onChange={e => setToDate(e.target.value)}
             className="border rounded-lg px-2 py-1.5 text-sm" />
         </div>
         <button onClick={() => { setActionFilter(""); setEntityFilter(""); setFromDate(""); setToDate(""); }}
