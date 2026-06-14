@@ -162,7 +162,7 @@ export default function DashboardPage() {
   const sanitizeFilename = (s: string) => s.replace(/[/\\:*?"<>|]/g, "_");
 
   const exportCsv = () => {
-    if (!data?.daily?.length) return;
+    if (!data?.daily?.length) { toast.error("Aucune donnée à exporter pour cette période."); return; }
     const headers = ["Date", "Produit", "Lot", "tT", "tO", "Fermeture", "tAP", "tR", "tF", "tN", "tU", "Lots", "NPR", "NPB", "NPC", "DO", "TP", "TQ", "TRS", "TRG", "Non classé (min)"];
     const rows = data.daily.map(d => {
       const lots = d.lots || [];
@@ -265,8 +265,15 @@ export default function DashboardPage() {
             <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
               aria-label="Date de début" className="border rounded-lg px-2 py-2 text-sm" />
             <span className="text-gray-400" aria-hidden="true">→</span>
-            <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-              aria-label="Date de fin" className="border rounded-lg px-2 py-2 text-sm" />
+            <input type="date" value={customTo}
+              onChange={e => setCustomTo(e.target.value)}
+              min={customFrom || undefined}
+              aria-label="Date de fin"
+              aria-invalid={!!customFrom && !!customTo && customTo < customFrom}
+              className={`border rounded-lg px-2 py-2 text-sm ${customFrom && customTo && customTo < customFrom ? "border-red-400" : ""}`} />
+            {customFrom && customTo && customTo < customFrom && (
+              <p role="alert" className="text-xs text-red-600 w-full">La date de fin doit être égale ou postérieure à la date de début.</p>
+            )}
           </div>
         )}
 
