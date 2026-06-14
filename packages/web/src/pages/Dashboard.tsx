@@ -20,6 +20,26 @@ function dateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+function shiftDays(iso: string, days: number): string {
+  const d = new Date(iso);
+  d.setUTCDate(d.getUTCDate() + days);
+  return dateStr(d);
+}
+
+function getPreviousPeriod(from: string, to: string, zoom: ZoomLevel): { from: string; to: string } {
+  if (zoom === "day") return { from: shiftDays(from, -1), to: shiftDays(to, -1) };
+  if (zoom === "week") return { from: shiftDays(from, -7), to: shiftDays(to, -7) };
+  if (zoom === "month") {
+    const d = new Date(from);
+    const first = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1));
+    const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 0));
+    return { from: dateStr(first), to: dateStr(last) };
+  }
+  // custom: shift back by the same duration
+  const days = Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000) + 1;
+  return { from: shiftDays(from, -days), to: shiftDays(to, -days) };
+}
+
 function getPresetDates(zoom: ZoomLevel, ref = new Date()): { from: string; to: string } {
   if (zoom === "day") {
     const s = dateStr(ref);
@@ -54,6 +74,7 @@ export default function DashboardPage() {
   const [sixLossesData, setSixLossesData] = useState<SixLossesResponse | null>(null);
   const [heatmapData, setHeatmapData] = useState<HeatmapResponse | null>(null);
   const [downtimeLog, setDowntimeLog] = useState<DowntimeLogResponse | null>(null);
+  const [prevData, setPrevData] = useState<DashboardTrsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [equipFailed, setEquipFailed] = useState(false);
@@ -86,13 +107,15 @@ export default function DashboardPage() {
     setLoading(true);
     setLoadFailed(false);
     try {
-      const [trsRes, paretoRes, prodRes, lossesRes, heatRes, logRes] = await Promise.all([
+      const prev = getPreviousPeriod(from, to, zoom);
+      const [trsRes, paretoRes, prodRes, lossesRes, heatRes, logRes, prevRes] = await Promise.all([
         api.dashboardTrs(selectedEquipment, from, to),
         api.dashboardPareto(selectedEquipment, from, to),
         api.dashboardByProduct(selectedEquipment, from, to).catch(() => null),
         api.dashboardSixLosses(selectedEquipment, from, to).catch(() => null),
         api.dashboardHeatmap(selectedEquipment, from, to).catch(() => null),
         api.dashboardDowntimeLog(selectedEquipment, from, to).catch(() => null),
+        api.dashboardTrs(selectedEquipment, prev.from, prev.to).catch(() => null),
       ]);
       setData(trsRes);
       setParetoData(paretoRes);
@@ -100,6 +123,7 @@ export default function DashboardPage() {
       setSixLossesData(lossesRes);
       setHeatmapData(heatRes);
       setDowntimeLog(logRes);
+      setPrevData(prevRes);
 
       if (showComparison) {
         try {
@@ -118,10 +142,11 @@ export default function DashboardPage() {
       setSixLossesData(null);
       setHeatmapData(null);
       setDowntimeLog(null);
+      setPrevData(null);
     } finally {
       setLoading(false);
     }
-  }, [selectedEquipment, from, to, showComparison]);
+  }, [selectedEquipment, from, to, zoom, showComparison]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -301,7 +326,7 @@ export default function DashboardPage() {
 
           {/* ─── Main KPI card ───────────────────────────────── */}
           {!showComparison && (
-            <KpiCard metrics={data.total} title={eq?.name || ""} objective={objective} />
+            <KpiCard metrics={data.total} title={eq?.name || ""} objective={objective} prevMetrics={prevData?.total ?? undefined} />
           )}
 
           {/* ─── Line Performance band ───────────────────────── */}
@@ -641,7 +666,18 @@ function StatStrip({ metrics }: { metrics: TrsMetrics }) {
   );
 }
 
-function KpiCard({ metrics, title, objective }: { metrics: TrsMetrics; title: string; objective?: number }) {
+function Delta({ curr, prev }: { curr: number; prev: number }) {
+  const pp = (curr - prev) * 100;
+  if (Math.abs(pp) < 0.05) return null;
+  const up = pp > 0;
+  return (
+    <span className={`text-[10px] font-semibold ${up ? "text-green-600" : "text-red-500"}`}>
+      {up ? "↑" : "↓"}{Math.abs(pp).toFixed(1)} pp
+    </span>
+  );
+}
+
+function KpiCard({ metrics, title, objective, prevMetrics }: { metrics: TrsMetrics; title: string; objective?: number; prevMetrics?: TrsMetrics }) {
   if (metrics.lotCount === 0) {
     return (
       <div className="bg-white rounded-xl border shadow-sm p-6 mb-4">
@@ -674,17 +710,20 @@ function KpiCard({ metrics, title, objective }: { metrics: TrsMetrics; title: st
       {/* Primary OEE grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-center mb-3">
         {([
-          { label: "TRS",  value: metrics.TRS,  rating: bench.ratings.TRS },
-          { label: "TRG",  value: metrics.TRG,  rating: null },
-          { label: "DO",   value: metrics.DO,   rating: bench.ratings.DO },
-          { label: "TP",   value: metrics.TP,   rating: bench.ratings.TP },
-          { label: "TQ",   value: metrics.TQ,   rating: bench.ratings.TQ },
-        ] as { label: string; value: number; rating: BenchmarkRating | null }[]).map(item => (
+          { label: "TRS",  value: metrics.TRS,  prev: prevMetrics?.TRS,  rating: bench.ratings.TRS },
+          { label: "TRG",  value: metrics.TRG,  prev: prevMetrics?.TRG,  rating: null },
+          { label: "DO",   value: metrics.DO,   prev: prevMetrics?.DO,   rating: bench.ratings.DO },
+          { label: "TP",   value: metrics.TP,   prev: prevMetrics?.TP,   rating: bench.ratings.TP },
+          { label: "TQ",   value: metrics.TQ,   prev: prevMetrics?.TQ,   rating: bench.ratings.TQ },
+        ] as { label: string; value: number; prev?: number; rating: BenchmarkRating | null }[]).map(item => (
           <div key={item.label} className="bg-gray-50 rounded-xl p-3">
             <div className="text-xs text-gray-500 mb-1">{item.label}</div>
             <div className="text-2xl font-bold" style={{ color: ["TRS", "TRG"].includes(item.label) ? trsColor(item.value) : undefined }}>
               {fmtPct(item.value)}
             </div>
+            {item.prev != null && prevMetrics && prevMetrics.lotCount > 0 && (
+              <div className="mt-0.5 flex justify-center"><Delta curr={item.value} prev={item.prev} /></div>
+            )}
             {item.rating && <div className="mt-1"><BenchmarkBadge rating={item.rating} /></div>}
           </div>
         ))}
