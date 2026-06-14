@@ -198,10 +198,32 @@ export default function PdfReport({ total, daily, equipmentName, from, to, byPro
 
         <Text style={s.normeNote}>Calculs conformes NF E 60-182 — TRS = DO × TP × TQ = tU/tR</Text>
 
+        {/* GMP Signature block */}
+        <View style={{ marginTop: 20, borderTopWidth: 1, borderTopColor: "#ccc", paddingTop: 10 }}>
+          <Text style={{ fontSize: 9, fontWeight: "bold", marginBottom: 8 }}>Signatures — Confidentiel</Text>
+          <View style={{ flexDirection: "row", gap: 24 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 8, color: "#555", marginBottom: 2 }}>Rédigé par :</Text>
+              <View style={{ borderBottomWidth: 0.5, borderBottomColor: "#333", height: 20, marginBottom: 2 }} />
+              <Text style={{ fontSize: 7, color: "#888" }}>Nom / Date</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 8, color: "#555", marginBottom: 2 }}>Vérifié par :</Text>
+              <View style={{ borderBottomWidth: 0.5, borderBottomColor: "#333", height: 20, marginBottom: 2 }} />
+              <Text style={{ fontSize: 7, color: "#888" }}>Nom / Date</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 8, color: "#555", marginBottom: 2 }}>Approuvé par :</Text>
+              <View style={{ borderBottomWidth: 0.5, borderBottomColor: "#333", height: 20, marginBottom: 2 }} />
+              <Text style={{ fontSize: 7, color: "#888" }}>Nom / Date</Text>
+            </View>
+          </View>
+        </View>
+
         {/* Footer */}
         <View style={s.footer}>
           <Text>TRS Compteur — DPI</Text>
-          <Text>Confidentiel</Text>
+          <Text>Confidentiel — Usage interne uniquement</Text>
         </View>
       </Page>
     </Document>

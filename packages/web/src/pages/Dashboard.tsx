@@ -326,7 +326,17 @@ export default function DashboardPage() {
 
           {/* ─── Main KPI card ───────────────────────────────── */}
           {!showComparison && (
-            <KpiCard metrics={data.total} title={eq?.name || ""} objective={objective} prevMetrics={prevData?.total ?? undefined} />
+            <>
+              {prevData && prevData.total.lotCount > 0 && (() => {
+                const prev = getPreviousPeriod(from, to, zoom);
+                return (
+                  <p className="text-xs text-gray-400 mb-2 text-right">
+                    ↑↓ vs période précédente : {prev.from} → {prev.to}
+                  </p>
+                );
+              })()}
+              <KpiCard metrics={data.total} title={eq?.name || ""} objective={objective} prevMetrics={prevData?.total ?? undefined} />
+            </>
           )}
 
           {/* ─── Line Performance band ───────────────────────── */}
