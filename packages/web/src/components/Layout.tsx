@@ -1,11 +1,11 @@
-import { type ReactNode, useState, useEffect, useCallback } from "react";
+import { type ReactNode, useState, useEffect, useCallback, useRef } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/Toast";
 import { useActiveSession } from "@/lib/sessionContext";
 import { fmtDuration, diffMinutes } from "@trs/engine";
-import { Timer, ClipboardCheck, BarChart3, Settings, LogOut, KeyRound } from "lucide-react";
+import { Timer, ClipboardCheck, BarChart3, Settings, LogOut, KeyRound, Loader2 } from "lucide-react";
 
 const HEADER_ICON_BTN = "p-1.5 rounded hover:bg-blue-600 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80";
 
@@ -174,6 +174,9 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [saving, setSaving] = useState(false);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => { titleRef.current?.focus(); }, []);
 
   const submit = async () => {
     if (newPassword !== confirm) { toast.error("Les mots de passe ne correspondent pas"); return; }
@@ -189,20 +192,38 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape" && !saving) onClose();
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 text-gray-800" onClick={onClose}>
-      <div className="bg-white rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-        <h3 className="font-semibold mb-3 flex items-center gap-2"><KeyRound className="h-5 w-5 text-blue-600" /> Changer mon mot de passe</h3>
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 text-gray-800"
+      onClick={() => { if (!saving) onClose(); }}
+      onKeyDown={handleKeyDown}
+      role="presentation"
+    >
+      <div
+        className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pw-dialog-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 ref={titleRef} id="pw-dialog-title" tabIndex={-1} className="font-semibold mb-3 flex items-center gap-2 outline-none">
+          <KeyRound className="h-5 w-5 text-blue-600" aria-hidden="true" /> Changer mon mot de passe
+        </h3>
         <div className="space-y-3">
-          <input type="password" autoFocus value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} placeholder="Mot de passe actuel" className="w-full border rounded-lg px-3 py-2 text-sm" />
-          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nouveau mot de passe (6 car. min.)" className="w-full border rounded-lg px-3 py-2 text-sm" />
-          <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Confirmer le nouveau mot de passe" className="w-full border rounded-lg px-3 py-2 text-sm" />
+          <input type="password" autoFocus value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} placeholder="Mot de passe actuel" className="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Mot de passe actuel" />
+          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nouveau mot de passe (6 car. min.)" className="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Nouveau mot de passe" />
+          <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !saving && oldPassword && newPassword.length >= 6) submit(); }} placeholder="Confirmer le nouveau mot de passe" className="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Confirmation du nouveau mot de passe" />
         </div>
         <div className="flex gap-2 justify-end mt-4">
-          <button onClick={onClose} className="px-3 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50">Annuler</button>
+          <button onClick={onClose} disabled={saving} className="px-3 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50 disabled:opacity-50">Annuler</button>
           <button onClick={submit} disabled={saving || !oldPassword || newPassword.length < 6}
-            className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
-            {saving ? "Enregistrement…" : "Changer"}
+            aria-busy={saving}
+            className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
+            {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Enregistrement…</> : "Changer"}
           </button>
         </div>
       </div>
