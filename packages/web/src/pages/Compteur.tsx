@@ -1648,6 +1648,7 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
                 const sel = catId === c.id;
                 return (
                   <button key={c.id} type="button" onClick={() => setCatId(c.id)}
+                    aria-pressed={sel}
                     className={`border rounded-lg px-2 py-3 text-sm text-center min-h-[64px] transition font-medium ${
                       sel
                         ? "border-blue-500 bg-blue-50 text-blue-800"
@@ -1674,11 +1675,13 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
             {section.allFamilles.length > 1 && (
               <div className="flex gap-1.5 overflow-x-auto pb-1 mb-2 -mx-1 px-1">
                 <button type="button" onClick={() => section.setFilter(null)}
+                  aria-pressed={!section.filter}
                   className={`whitespace-nowrap text-xs px-2.5 py-1 rounded-full border transition ${!section.filter ? (section.planned ? "bg-amber-500 text-white border-amber-500" : "bg-red-500 text-white border-red-500") : "bg-white border-gray-200 hover:bg-gray-50"}`}>
                   Tous
                 </button>
                 {section.allFamilles.map(f => (
                   <button key={f} type="button" onClick={() => section.setFilter(f)}
+                    aria-pressed={section.filter === f}
                     className={`whitespace-nowrap text-xs px-2.5 py-1 rounded-full border transition ${section.filter === f ? (section.planned ? "bg-amber-500 text-white border-amber-500" : "bg-red-500 text-white border-red-500") : "bg-white border-gray-200 hover:bg-gray-50"}`}>
                     {f}
                   </button>
@@ -1696,6 +1699,7 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
                       : "border-red-500 bg-red-100 text-red-800 font-medium";
                     return (
                       <button key={c.id} type="button" onClick={() => { setCatId(c.id); section.setFilter(null); }}
+                        aria-pressed={sel}
                         className={`border rounded-lg px-2.5 py-3 text-sm text-left transition min-h-[64px] bg-white ${sel ? selCls : "hover:bg-gray-50"}`}>
                         <span className="line-clamp-2 leading-snug">{c.label}</span>
                       </button>
@@ -1727,10 +1731,12 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
         {/* U1: Mode selector (manual vs timer) */}
         <div className="flex gap-2">
           <button type="button" onClick={() => setMode("manual")}
+            aria-pressed={mode === "manual"}
             className={`flex-1 border rounded-lg py-2.5 text-sm font-medium transition min-h-[52px] ${mode === "manual" ? "border-blue-500 bg-blue-50 text-blue-700" : "hover:bg-gray-50"}`}>
             Saisie manuelle
           </button>
           <button type="button" onClick={() => setMode("timer")}
+            aria-pressed={mode === "timer"}
             className={`flex-1 border rounded-lg py-2.5 text-sm font-medium transition min-h-[52px] ${mode === "timer" ? "border-blue-500 bg-blue-50 text-blue-700" : "hover:bg-gray-50"}`}>
             Chronomètre
           </button>
@@ -1738,7 +1744,7 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
 
         {mode === "manual" ? (
           <div className="space-y-2">
-            <label className="block text-sm font-medium">Durée (minutes)</label>
+            <label htmlFor="dt-duration" className="block text-sm font-medium">Durée (minutes)</label>
             <div className="flex gap-2 flex-wrap">
               {suggestedMin > 0 && !QUICK_DURATIONS.includes(suggestedMin) && (
                 <button type="button" onClick={() => setDuration(String(suggestedMin))}
@@ -1761,7 +1767,7 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
                 </button>
               ))}
             </div>
-            <input type="number" value={duration} onChange={e => setDuration(e.target.value)}
+            <input id="dt-duration" type="number" value={duration} onChange={e => setDuration(e.target.value)}
               aria-invalid={!!(duration && (Number(duration) < 1 || Number(duration) > 1440))}
               className={`w-full border rounded-lg px-3 py-3 text-base ${duration && (Number(duration) < 1 || Number(duration) > 1440) ? "border-red-400" : ""}`}
               placeholder="Autre durée…" inputMode="numeric" min="1" max="1440" />
@@ -1800,11 +1806,11 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
         </label>
 
         <div>
-          <label className="block text-sm font-medium mb-1">
+          <label htmlFor="dt-comment" className="block text-sm font-medium mb-1">
             Commentaire
             <span className="ml-1.5 text-xs text-gray-400 font-normal">(raison obligatoire si modification — Annex 11)</span>
           </label>
-          <input value={comment} onChange={e => setComment(e.target.value)}
+          <input id="dt-comment" value={comment} onChange={e => setComment(e.target.value)}
             placeholder="Ex : changement de format, réglage cadence…"
             className="w-full border rounded-lg px-3 py-3 text-base" />
         </div>
