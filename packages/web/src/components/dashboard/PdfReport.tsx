@@ -115,15 +115,22 @@ export default function PdfReport({ total, daily, equipmentName, from, to, byPro
             <Text style={s.cell}>TRS</Text>
           </View>
           {daily.map((d, i) => (
-            <View key={i} style={s.row}>
-              <Text style={s.cellLeft}>{d.date}</Text>
-              <Text style={s.cell}>{d.lotCount}</Text>
-              <Text style={s.cell}>{d.totalProduced.toLocaleString()}</Text>
-              <Text style={s.cell}>{d.tR}</Text>
-              <Text style={s.cell}>{pct(d.DO)}</Text>
-              <Text style={s.cell}>{pct(d.TP)}</Text>
-              <Text style={s.cell}>{pct(d.TQ)}</Text>
-              <Text style={s.cell}>{pct(d.TRS)}</Text>
+            <View key={i} wrap={false}>
+              <View style={s.row}>
+                <Text style={s.cellLeft}>{d.date}</Text>
+                <Text style={s.cell}>{d.lotCount}</Text>
+                <Text style={s.cell}>{d.totalProduced.toLocaleString()}</Text>
+                <Text style={s.cell}>{dur(Math.round(d.tR))}</Text>
+                <Text style={s.cell}>{pct(d.DO)}</Text>
+                <Text style={s.cell}>{pct(d.TP)}</Text>
+                <Text style={s.cell}>{pct(d.TQ)}</Text>
+                <Text style={s.cell}>{pct(d.TRS)}</Text>
+              </View>
+              {d.notes && (
+                <View style={{ paddingLeft: 8, paddingBottom: 2 }}>
+                  <Text style={{ fontSize: 7, color: "#6b7280", fontStyle: "italic" }}>📝 {d.notes}</Text>
+                </View>
+              )}
             </View>
           ))}
           {/* Total row */}
