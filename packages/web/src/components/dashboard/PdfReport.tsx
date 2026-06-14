@@ -74,24 +74,24 @@ export default function PdfReport({ total, daily, equipmentName, from, to, byPro
           <Text style={s.sectionTitle}>Décomposition NF E 60-182</Text>
           <View style={s.headerRow}>
             <Text style={s.cellLeft}>Indicateur</Text>
-            <Text style={s.cell}>Valeur</Text>
-            <Text style={s.cell}>Minutes</Text>
+            <Text style={s.cell}>Durée</Text>
+            <Text style={s.cell}>% de tT</Text>
           </View>
           {[
-            ["tT (24h×jours)", pct(1), `${total.tT}`],
-            ["Fermeture", `${((total.fermeture / total.tT) * 100).toFixed(1)}%`, `${total.fermeture}`],
-            ["tO (Ouverture)", `${((total.tO / total.tT) * 100).toFixed(1)}%`, `${total.tO}`],
-            ["tAP (Arrêts P.)", dur(total.tAP), `${total.tAP}`],
-            ["tR (Requis)", dur(total.tR), `${total.tR}`],
-            ["Arrêts NP", dur(total.totalUnplannedMin), `${total.totalUnplannedMin}`],
-            ["tF (Fonctionnement)", dur(Math.round(total.tF)), `${Math.round(total.tF)}`],
-            ["tN (Nominal)", dur(Math.round(total.tN)), `${Math.round(total.tN)}`],
-            ["tU (Utile)", dur(Math.round(total.tU)), `${Math.round(total.tU)}`],
-          ].map(([label, val, min], i) => (
+            ["tT (Temps total 24h)", dur(total.tT), "100 %"],
+            ["  Fermeture", dur(total.fermeture), `${((total.fermeture / total.tT) * 100).toFixed(1)} %`],
+            ["tO (Ouverture)", dur(total.tO), `${((total.tO / total.tT) * 100).toFixed(1)} %`],
+            ["  tAP (Arrêts planifiés)", dur(total.tAP), `${((total.tAP / total.tT) * 100).toFixed(1)} %`],
+            ["tR (Temps requis)", dur(Math.round(total.tR)), `${((total.tR / total.tT) * 100).toFixed(1)} %`],
+            ["  Arrêts non planifiés", dur(total.totalUnplannedMin), `${((total.totalUnplannedMin / total.tT) * 100).toFixed(1)} %`],
+            ["tF (Fonctionnement)", dur(Math.round(total.tF)), `${((total.tF / total.tT) * 100).toFixed(1)} %`],
+            ["tN (Nominal)", dur(Math.round(total.tN)), `${((total.tN / total.tT) * 100).toFixed(1)} %`],
+            ["tU (Utile / Valeur ajoutée)", dur(Math.round(total.tU)), `${((total.tU / total.tT) * 100).toFixed(1)} %`],
+          ].map(([label, duration, pctOfTT], i) => (
             <View key={i} style={s.row}>
               <Text style={s.cellLeft}>{label}</Text>
-              <Text style={s.cell}>{val}</Text>
-              <Text style={s.cell}>{min}</Text>
+              <Text style={s.cell}>{duration}</Text>
+              <Text style={s.cell}>{pctOfTT}</Text>
             </View>
           ))}
           <View style={s.row}>
@@ -138,7 +138,7 @@ export default function PdfReport({ total, daily, equipmentName, from, to, byPro
             <Text style={[s.cellLeft, { fontWeight: "bold" }]}>TOTAL</Text>
             <Text style={[s.cell, { fontWeight: "bold" }]}>{total.lotCount}</Text>
             <Text style={[s.cell, { fontWeight: "bold" }]}>{total.totalProduced.toLocaleString()}</Text>
-            <Text style={[s.cell, { fontWeight: "bold" }]}>{total.tR}</Text>
+            <Text style={[s.cell, { fontWeight: "bold" }]}>{dur(Math.round(total.tR))}</Text>
             <Text style={[s.cell, { fontWeight: "bold" }]}>{pct(total.DO)}</Text>
             <Text style={[s.cell, { fontWeight: "bold" }]}>{pct(total.TP)}</Text>
             <Text style={[s.cell, { fontWeight: "bold" }]}>{pct(total.TQ)}</Text>
