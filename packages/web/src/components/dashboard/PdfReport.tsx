@@ -99,7 +99,7 @@ export default function PdfReport({ total, daily, equipmentName, equipmentCode, 
           <View style={s.row}>
             <Text style={[s.cellLeft, { fontWeight: "bold" }]}>Lots / NPR / NPB / NPC</Text>
             <Text style={s.cell}>{total.lotCount}</Text>
-            <Text style={s.cell}>{total.totalProduced.toLocaleString()} / {total.totalConforming.toLocaleString()} / {total.totalRebut.toLocaleString()}</Text>
+            <Text style={s.cell}>{total.totalProduced.toLocaleString("fr-FR")} / {total.totalConforming.toLocaleString("fr-FR")} / {total.totalRebut.toLocaleString("fr-FR")}</Text>
           </View>
         </View>
 
@@ -121,7 +121,7 @@ export default function PdfReport({ total, daily, equipmentName, equipmentCode, 
               <View style={s.row}>
                 <Text style={s.cellLeft}>{d.date}</Text>
                 <Text style={s.cell}>{d.lotCount}</Text>
-                <Text style={s.cell}>{d.totalProduced.toLocaleString()}</Text>
+                <Text style={s.cell}>{d.totalProduced.toLocaleString("fr-FR")}</Text>
                 <Text style={s.cell}>{dur(Math.round(d.tR))}</Text>
                 <Text style={s.cell}>{pct(d.DO)}</Text>
                 <Text style={s.cell}>{pct(d.TP)}</Text>
@@ -139,7 +139,7 @@ export default function PdfReport({ total, daily, equipmentName, equipmentCode, 
           <View style={[s.row, { fontWeight: "bold", borderTopWidth: 1, borderTopColor: "#333" }]}>
             <Text style={[s.cellLeft, { fontWeight: "bold" }]}>TOTAL</Text>
             <Text style={[s.cell, { fontWeight: "bold" }]}>{total.lotCount}</Text>
-            <Text style={[s.cell, { fontWeight: "bold" }]}>{total.totalProduced.toLocaleString()}</Text>
+            <Text style={[s.cell, { fontWeight: "bold" }]}>{total.totalProduced.toLocaleString("fr-FR")}</Text>
             <Text style={[s.cell, { fontWeight: "bold" }]}>{dur(Math.round(total.tR))}</Text>
             <Text style={[s.cell, { fontWeight: "bold" }]}>{pct(total.DO)}</Text>
             <Text style={[s.cell, { fontWeight: "bold" }]}>{pct(total.TP)}</Text>
@@ -166,8 +166,8 @@ export default function PdfReport({ total, daily, equipmentName, equipmentCode, 
               <View key={i} style={s.row}>
                 <Text style={s.cellLeft}>{p.productName}</Text>
                 <Text style={s.cell}>{p.lotCount}</Text>
-                <Text style={s.cell}>{p.totalProduced.toLocaleString()}</Text>
-                <Text style={s.cell}>{p.totalRebut.toLocaleString()}</Text>
+                <Text style={s.cell}>{p.totalProduced.toLocaleString("fr-FR")}</Text>
+                <Text style={s.cell}>{p.totalRebut.toLocaleString("fr-FR")}</Text>
                 <Text style={s.cell}>{pct(p.DO)}</Text>
                 <Text style={s.cell}>{pct(p.TP)}</Text>
                 <Text style={s.cell}>{pct(p.TQ)}</Text>

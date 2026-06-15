@@ -101,10 +101,10 @@ export default function SixLossesChart({ data }: Props) {
         <table className="w-full text-xs">
           <thead>
             <tr className="text-gray-500 border-b">
-              <th className="text-left py-1 px-2">Perte</th>
-              <th className="text-left py-1 px-2">Composante</th>
-              <th className="text-right py-1 px-2">Durée</th>
-              <th className="text-right py-1 px-2">% de tT</th>
+              <th scope="col" className="text-left py-1 px-2">Perte</th>
+              <th scope="col" className="text-left py-1 px-2">Composante</th>
+              <th scope="col" className="text-right py-1 px-2">Durée</th>
+              <th scope="col" className="text-right py-1 px-2">% de tT</th>
             </tr>
           </thead>
           <tbody>
