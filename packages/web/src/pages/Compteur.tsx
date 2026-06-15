@@ -1259,14 +1259,19 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
     }
   }, [productId, products, cadences, equipmentId]);
 
-  // U5: Cadence deviation warning (>20% from reference)
+  // U5: Cadence warnings — absolute range check + deviation from reference
   const cadenceWarning = useMemo(() => {
-    if (!refCadence || !cadence) return null;
-    const ref = Number(refCadence);
+    if (!cadence) return null;
     const current = Number(cadence);
-    if (ref <= 0) return null;
-    const deviation = Math.abs(current - ref) / ref;
-    if (deviation > 0.2) return `Écart de ${(deviation * 100).toFixed(0)}% vs cadence théorique (${refCadence} ${cadenceUnit})`;
+    const maxReasonable = cadenceUnit === "u/h" ? 300_000 : 5_000;
+    if (current > maxReasonable) return `Cadence anormalement élevée (${current} ${cadenceUnit}) — vérifiez la saisie.`;
+    if (refCadence) {
+      const ref = Number(refCadence);
+      if (ref > 0) {
+        const deviation = Math.abs(current - ref) / ref;
+        if (deviation > 0.2) return `Écart de ${(deviation * 100).toFixed(0)}% vs cadence théorique (${refCadence} ${cadenceUnit})`;
+      }
+    }
     return null;
   }, [cadence, refCadence, cadenceUnit]);
 
@@ -1725,7 +1730,11 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
               ))}
             </div>
             <input type="number" value={duration} onChange={e => setDuration(e.target.value)}
-              className="w-full border rounded-lg px-3 py-3 text-base" placeholder="Autre durée…" inputMode="numeric" min="1" />
+              aria-invalid={!!(duration && (Number(duration) < 1 || Number(duration) > 1440))}
+              className={`w-full border rounded-lg px-3 py-3 text-base ${duration && (Number(duration) < 1 || Number(duration) > 1440) ? "border-red-400" : ""}`}
+              placeholder="Autre durée…" inputMode="numeric" min="1" max="1440" />
+            {duration && Number(duration) < 1 && <p className="text-xs text-red-600 mt-0.5">La durée doit être d'au moins 1 minute.</p>}
+            {duration && Number(duration) > 1440 && <p className="text-xs text-red-600 mt-0.5">La durée ne peut pas dépasser 24h (1440 min).</p>}
           </div>
         ) : (
           <div className="text-center">
@@ -1767,7 +1776,7 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
             placeholder="Ex : changement de format, réglage cadence…"
             className="w-full border rounded-lg px-3 py-3 text-base" />
         </div>
-        <button type="submit" disabled={loading || !catId || !duration}
+        <button type="submit" disabled={loading || !catId || !duration || Number(duration) < 1 || Number(duration) > 1440}
           className={`w-full bg-orange-500 text-white ${BTN_PRIMARY} hover:bg-orange-600 disabled:opacity-50 ${flashDowntime ? "btn-flash" : ""}`}>
           Enregistrer l'arrêt
         </button>
