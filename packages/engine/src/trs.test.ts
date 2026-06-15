@@ -257,6 +257,41 @@ describe("computeLotTrs", () => {
     // tN = 1000/10 = 100min, tF = 60min → TP = 100/60 = 1.667
     expect(result!.TP).toBeCloseTo(100 / 60, 3);
   });
+
+  it("warns STOPS_GT_DURATION when unplanned stops exceed lot duration", () => {
+    // Impossible data entry: 90 min of stops inside a 60-min lot.
+    const result = computeLotTrs({
+      cadence: 120,
+      cadenceUnit: "u/min",
+      produced: 1000,
+      conforming: 1000,
+      startedAt: new Date("2026-05-04T09:00:00Z"),
+      endedAt: new Date("2026-05-04T10:00:00Z"), // 60 min
+      downtimes: [{ durationMinutes: 90, isPlanned: false, famille: "Panne équipement" }],
+    });
+    expect(result).not.toBeNull();
+    expect(result!.tF).toBe(0); // clamped by Math.max(0, …)
+    expect(result!.warnings.some(w => w.code === "STOPS_GT_DURATION")).toBe(true);
+    expect(result!.warnings.find(w => w.code === "STOPS_GT_DURATION")!.level).toBe("error");
+  });
+
+  it("classifies downtimes without famille into Non classé (unplanned) or Planifié (planned)", () => {
+    const result = computeLotTrs({
+      cadence: 120,
+      cadenceUnit: "u/min",
+      produced: 5000,
+      conforming: 5000,
+      startedAt: new Date("2026-05-04T09:00:00Z"),
+      endedAt: new Date("2026-05-04T11:00:00Z"), // 120 min
+      downtimes: [
+        { durationMinutes: 10, isPlanned: false }, // no famille → "Non classé"
+        { durationMinutes: 5,  isPlanned: true  }, // no famille → "Planifié"
+      ],
+    });
+    expect(result).not.toBeNull();
+    expect(result!.downtimeByFamille["Non classé"]).toBe(10);
+    expect(result!.downtimeByFamille["Planifié"]).toBe(5);
+  });
 });
 
 describe("computeSessionTrs", () => {
