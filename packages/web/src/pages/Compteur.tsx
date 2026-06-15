@@ -46,18 +46,18 @@ const EVENT_TYPE_ICON: Record<string, React.ComponentType<{ className?: string }
 function ValidationBadge({ status }: { status: string }) {
   if (status === "validated") return (
     <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium shrink-0">
-      <CheckCircle className="h-3 w-3" /> Validé
+      <CheckCircle className="h-3 w-3" aria-hidden="true" /> Validé
     </span>
   );
   if (status === "rejected") return (
     <span className="inline-flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium shrink-0">
-      <XCircle className="h-3 w-3" /> Rejeté
+      <XCircle className="h-3 w-3" aria-hidden="true" /> Rejeté
     </span>
   );
   // "closed" = awaiting supervisor validation
   return (
     <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium shrink-0">
-      <Clock className="h-3 w-3" /> En attente
+      <Clock className="h-3 w-3" aria-hidden="true" /> En attente
     </span>
   );
 }
@@ -80,7 +80,7 @@ function RetryError({ message, onRetry }: { message: string; onRetry: () => void
   const isServer = /erreur serveur/i.test(message) || /^HTTP 5/.test(message);
   return (
     <div className="bg-white rounded-2xl border border-red-200 shadow-sm p-6 text-center max-w-md mx-auto mt-6">
-      <AlertTriangle className="h-9 w-9 text-red-500 mx-auto mb-3" />
+      <AlertTriangle className="h-9 w-9 text-red-500 mx-auto mb-3" aria-hidden="true" />
       <p className="text-base font-semibold text-gray-800 mb-1">Connexion serveur impossible</p>
       <p className="text-sm text-gray-500 mb-5">
         {isServer ? "Vérifie ta connexion internet, puis réessaie." : message}
@@ -435,12 +435,12 @@ export default function CompteurPage() {
               {fmtElapsed(elapsed)}
             </div>
             {trsData && trsData.session.lotCount > 0 && (
-              <div className="mt-2 inline-flex items-center gap-1.5">
+              <div className="mt-2 inline-flex items-center gap-1.5" aria-live="polite" aria-atomic="true">
                 <span className="text-sm font-bold px-3 py-1 rounded-full"
                   style={{ backgroundColor: trsColor(trsData.session.TRS) + "22", color: trsColor(trsData.session.TRS) }}>
                   TRS {fmtPct(trsData.session.TRS)}
                 </span>
-                {!trsStale && <span className="h-2 w-2 rounded-full bg-green-400 motion-safe:animate-pulse shrink-0" />}
+                {!trsStale && <span className="h-2 w-2 rounded-full bg-green-400 motion-safe:animate-pulse shrink-0" aria-hidden="true" />}
                 <span className="text-xs text-gray-400">en direct</span>
                 {trsStale && (
                   <span className="inline-flex items-center gap-1 text-xs text-amber-600">
@@ -494,7 +494,7 @@ export default function CompteurPage() {
           </div>
           <div className="lg:col-span-2 bg-white rounded-2xl border shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b flex items-center gap-2">
-              <Package className="h-4 w-4 text-green-600" />
+              <Package className="h-4 w-4 text-green-600" aria-hidden="true" />
               <h3 className="font-semibold text-sm">Commande en cours</h3>
             </div>
             <div className="overflow-x-auto">
@@ -540,7 +540,7 @@ export default function CompteurPage() {
       {!activeSession && (
         <div className="space-y-3">
           <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800 flex items-start gap-2.5">
-            <Timer className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+            <Timer className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" aria-hidden="true" />
             <div>
               <p className="font-semibold">Aucune session active</p>
               <p className="text-blue-700 mt-0.5">Ouvre le compteur pour commencer à enregistrer tes lots et arrêts. La session démarre le chronomètre et calcule le TRS en temps réel.</p>
@@ -553,8 +553,8 @@ export default function CompteurPage() {
             className={`w-full ${equipmentAccent(selectedEquipment?.equipmentType).btnOpen} ${BTN_PRIMARY} text-lg disabled:opacity-60`}
           >
             {openingSession
-              ? <><Loader2 className={`${BTN_ICON} animate-spin`} /> Ouverture…</>
-              : <><Play className={BTN_ICON} /> Ouvrir le compteur</>}
+              ? <><Loader2 className={`${BTN_ICON} animate-spin`} aria-hidden="true" /> Ouverture…</>
+              : <><Play className={BTN_ICON} aria-hidden="true" /> Ouvrir le compteur</>}
           </button>
         </div>
       )}
@@ -664,7 +664,7 @@ export default function CompteurPage() {
                           {product && <span className="text-gray-400 text-xs truncate">{product.name}</span>}
                           {lotDuration && (
                             <span className="text-gray-300 text-xs flex items-center gap-0.5 shrink-0">
-                              <Clock className="h-3 w-3" />{lotDuration}
+                              <Clock className="h-3 w-3" aria-hidden="true" />{lotDuration}
                             </span>
                           )}
                         </div>
@@ -675,11 +675,11 @@ export default function CompteurPage() {
                           <span className="font-medium text-gray-700">{fmtNumber(lot.quantityProduced)}</span> produits
                         </span>
                         <span className="flex items-center gap-1 text-green-700">
-                          <CheckCircle className="h-3 w-3" /> {fmtNumber(lot.quantityConforming)} conformes
+                          <CheckCircle className="h-3 w-3" aria-hidden="true" /> {fmtNumber(lot.quantityConforming)} conformes
                         </span>
                         {rejectQty > 0 && (
                           <span className="flex items-center gap-1 text-red-600">
-                            <XCircle className="h-3 w-3" /> {fmtNumber(rejectQty)} rebuts
+                            <XCircle className="h-3 w-3" aria-hidden="true" /> {fmtNumber(rejectQty)} rebuts
                           </span>
                         )}
                         {lotTrs && (
@@ -895,7 +895,7 @@ function AClasserBanner({ minutes, onDeclare, categories, equipmentId, sessionId
           urgent ? "hover:bg-red-100" : "hover:bg-amber-100"
         }`}>
         <span className={`flex items-center gap-2 ${urgent ? "text-red-800" : "text-amber-800"}`}>
-          <AlertTriangle className={`h-5 w-5 shrink-0 ${urgent ? "text-red-600" : ""}`} />
+          <AlertTriangle className={`h-5 w-5 shrink-0 ${urgent ? "text-red-600" : ""}`} aria-hidden="true" />
           <span className={`text-sm ${urgent ? "font-bold" : "font-medium"}`}>
             {fmtDuration(minutes)} de temps non classé
             {urgent && " — à déclarer avant fermeture"}
@@ -1025,7 +1025,7 @@ function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs:
   return (
     <div className="bg-white rounded-xl border shadow-sm mb-4 p-4">
       <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-        <Gauge className="h-4 w-4" /> TRS consolidé — Session
+        <Gauge className="h-4 w-4" aria-hidden="true" /> TRS consolidé — Session
       </h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
         {[
@@ -1062,8 +1062,8 @@ function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs:
         {avg30 != null && (
           <span className="flex items-center gap-1 text-gray-500">
             Moy. 30j: <span className="font-medium">{fmtPct(avg30)}</span>
-            {trend != null && trend > 0 && <TrendingUp className="h-3.5 w-3.5 text-green-600" />}
-            {trend != null && trend < 0 && <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
+            {trend != null && trend > 0 && <TrendingUp className="h-3.5 w-3.5 text-green-600" aria-label="En hausse vs. 30j" />}
+            {trend != null && trend < 0 && <TrendingDown className="h-3.5 w-3.5 text-red-500" aria-label="En baisse vs. 30j" />}
           </span>
         )}
       </div>
@@ -1154,7 +1154,7 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
     <div className="bg-green-50 rounded-xl border-2 border-green-300 shadow-sm mb-4 p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-bold text-green-800 flex items-center gap-2">
-          <Play className="h-5 w-5" /> Lot actif: {lot.batchNumber}
+          <Play className="h-5 w-5" aria-hidden="true" /> Lot actif: {lot.batchNumber}
         </h3>
         <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full">En cours</span>
       </div>
@@ -1164,7 +1164,7 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
         {!editingCadence && (
           <button onClick={() => { setEditingCadence(true); setNewCadence(String(lot.cadenceUsed)); }}
             className="inline-flex items-center gap-1 text-xs text-blue-600 border border-blue-200 rounded-full px-2 py-0.5 hover:bg-blue-50">
-            <Gauge className="h-3.5 w-3.5" /> Modifier
+            <Gauge className="h-3.5 w-3.5" aria-hidden="true" /> Modifier
           </button>
         )}
       </div>
@@ -1369,7 +1369,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
     return (
       <div className="max-w-lg mx-auto">
         <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <Package className="h-5 w-5" /> Confirmer le démarrage
+          <Package className="h-5 w-5" aria-hidden="true" /> Confirmer le démarrage
         </h2>
         <div className="bg-white rounded-xl border p-4 mb-4 space-y-3">
           <div className="flex justify-between text-sm">
@@ -1411,7 +1411,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
     <div className="max-w-lg mx-auto">
       <BackButton onClick={onBack} />
       <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-        <Package className="h-5 w-5" /> Nouveau lot
+        <Package className="h-5 w-5" aria-hidden="true" /> Nouveau lot
       </h2>
 
       {error && <div role="alert" className="bg-red-50 text-red-600 rounded-lg p-3 mb-4 text-sm">{error}</div>}
@@ -1516,7 +1516,7 @@ function DeclaredDowntimesList({ title, downtimes, onDelete }: {
                 <span className="text-sm tabular-nums text-gray-500 shrink-0">{fmtDuration(dt.durationMinutes)}</span>
                 <button onClick={() => setConfirmId(dt.id)} aria-label="Supprimer"
                   className="p-1 rounded text-gray-400 hover:text-red-500 transition shrink-0">
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>
               </>
             )}
@@ -1659,7 +1659,7 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
     <div className="max-w-lg mx-auto">
       <BackButton onClick={onBack} />
       <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
-        <AlertTriangle className="h-5 w-5 text-orange-500" /> Déclarer un arrêt
+        <AlertTriangle className="h-5 w-5 text-orange-500" aria-hidden="true" /> Déclarer un arrêt
       </h2>
       <p className="text-sm text-gray-500 mb-4">
         {lotId
@@ -1808,12 +1808,12 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
             {!timerRunning ? (
               <button type="button" onClick={startTimer}
                 className={`bg-orange-500 text-white ${BTN_PRIMARY} w-full hover:bg-orange-600`}>
-                <Play className={BTN_ICON} /> Démarrer le chrono
+                <Play className={BTN_ICON} aria-hidden="true" /> Démarrer le chrono
               </button>
             ) : (
               <button type="button" onClick={stopTimer}
                 className={`bg-red-600 text-white ${BTN_PRIMARY} w-full hover:bg-red-700`}>
-                <StopCircle className={BTN_ICON} /> Arrêter ({fmtTimerElapsed(timerElapsed)})
+                <StopCircle className={BTN_ICON} aria-hidden="true" /> Arrêter ({fmtTimerElapsed(timerElapsed)})
               </button>
             )}
             {duration && !timerRunning && (
