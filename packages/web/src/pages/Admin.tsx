@@ -938,8 +938,8 @@ function DowntimeTree({ categories }: { categories: AdminDowntimeCategory[] }) {
                     >
                       <span className="text-gray-300 mr-0.5">├─</span>
                       {isCollapsed
-                        ? <ChevronRight className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                        : <ChevronDown className="h-3.5 w-3.5 text-gray-400 shrink-0" />}
+                        ? <ChevronRight className="h-3.5 w-3.5 text-gray-400 shrink-0" aria-hidden="true" />
+                        : <ChevronDown className="h-3.5 w-3.5 text-gray-400 shrink-0" aria-hidden="true" />}
                       <span className="text-xs font-medium text-gray-700">{famille}</span>
                       <span className="text-xs text-gray-400">({activeCount}/{cats.length})</span>
                     </button>
@@ -1179,7 +1179,7 @@ function AuditLogPanel() {
                         </td>
                         <td className="px-4 py-2.5 text-xs text-gray-400 font-mono">{e.ipAddress ?? "—"}</td>
                         <td className="px-4 py-2.5">
-                          {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
+                          {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />}
                         </td>
                       </tr>
                       {isExpanded && e.payload && (

@@ -28,7 +28,7 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
         <div className="flex items-center justify-center gap-2 mb-2">
           <div className="p-2 bg-blue-600 rounded-xl">
-            <Timer className="h-7 w-7 text-white" />
+            <Timer className="h-7 w-7 text-white" aria-hidden="true" />
           </div>
         </div>
         <h1 className="text-2xl font-bold text-gray-800 text-center mt-3">TRS Compteur</h1>
@@ -72,7 +72,7 @@ export default function LoginPage() {
               aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus-visible:ring-2 focus-visible:ring-blue-400 rounded p-0.5 transition"
             >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
             </button>
           </div>
         </div>
@@ -82,7 +82,7 @@ export default function LoginPage() {
           disabled={loading || !email || !password}
           className="w-full bg-blue-600 text-white rounded-lg py-2.5 font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
         >
-          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
           {loading ? "Connexion…" : "Se connecter"}
         </button>
       </form>
