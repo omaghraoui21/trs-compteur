@@ -196,6 +196,18 @@ export const api = {
       request<AdminUser>(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     resetUserPassword: (id: string, password: string) =>
       request<AdminUser>(`/admin/users/${id}/password`, { method: "POST", body: JSON.stringify({ password }) }),
+
+    auditLog: (params?: { entityType?: string; entityId?: string; action?: string; from?: string; to?: string; limit?: number; offset?: number }) => {
+      const q = new URLSearchParams();
+      if (params?.entityType) q.set("entityType", params.entityType);
+      if (params?.entityId) q.set("entityId", params.entityId);
+      if (params?.action) q.set("action", params.action);
+      if (params?.from) q.set("from", params.from);
+      if (params?.to) q.set("to", params.to);
+      if (params?.limit != null) q.set("limit", String(params.limit));
+      if (params?.offset != null) q.set("offset", String(params.offset));
+      return request<AuditLogEntry[]>(`/admin/audit-log?${q}`);
+    },
   },
 };
 
@@ -248,6 +260,7 @@ export interface CorrectLotInput {
 
 // Admin types (include all fields, not just active)
 export interface ElectronicSignature { id: string; userId: string | null; userEmail: string; userName: string; entityType: string; entityId: string; meaning: string; action: string; comment: string | null; ipAddress: string | null; signedAt: string }
+export interface AuditLogEntry { id: string; actorId: string | null; actorEmail: string; action: string; entityType: string; entityId: string | null; payload: string | null; ipAddress: string | null; createdAt: string }
 export interface AdminUser { id: string; email: string; displayName: string; role: string; isActive: boolean; createdAt: string }
 export interface AdminRoom { id: string; code: string; name: string; description: string | null; isActive: boolean; createdAt: string }
 export interface AdminEquipment { id: string; roomId: string; code: string; name: string; equipmentType: string | null; trsObjective: string; defaultCadenceUnit: string; microStopThresholdMin: number; isActive: boolean; createdAt: string }

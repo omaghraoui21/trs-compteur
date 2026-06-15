@@ -47514,6 +47514,19 @@ adminRouter.post("/users/:id/password", adminOnly, validate(resetPasswordSchema)
   await audit(req.db, req, "RESET_PASSWORD", "user", id, {});
   res.json(row);
 }));
+adminRouter.get("/audit-log", asyncHandler(async (req, res) => {
+  const { entityType, entityId, action, from, to } = req.query;
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const offset = Number(req.query.offset) || 0;
+  const filters = [];
+  if (entityType) filters.push(eq(auditLog.entityType, entityType));
+  if (entityId) filters.push(eq(auditLog.entityId, entityId));
+  if (action) filters.push(eq(auditLog.action, action));
+  if (from) filters.push(gte(auditLog.createdAt, new Date(from)));
+  if (to) filters.push(lte(auditLog.createdAt, /* @__PURE__ */ new Date(to + "T23:59:59Z")));
+  const rows = await req.db.select().from(auditLog).where(filters.length ? and(...filters) : void 0).orderBy(desc(auditLog.createdAt)).limit(limit).offset(offset);
+  res.json(rows);
+}));
 
 // packages/api/src/routes/maintenance.ts
 var import_express7 = __toESM(require_express2(), 1);

@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, gte, lte } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { rooms, equipments, products, downtimeCategories, productEquipmentCadences, users } from "@trs/db";
+import { rooms, equipments, products, downtimeCategories, productEquipmentCadences, users, auditLog } from "@trs/db";
 import { authenticate, requireRole } from "../middleware";
 import { asyncHandler, validate, HttpError } from "../lib/http";
 import { audit } from "../lib/audit";
@@ -244,4 +244,28 @@ adminRouter.post("/users/:id/password", adminOnly, validate(resetPasswordSchema)
   if (!row) throw new HttpError(404, "Utilisateur introuvable");
   await audit(req.db, req, "RESET_PASSWORD", "user", id, {});
   res.json(row);
+}));
+
+// ─── Audit log viewer (admin + supervisor read-only, GMP traceability) ──────
+adminRouter.get("/audit-log", asyncHandler(async (req, res) => {
+  const { entityType, entityId, action, from, to } = req.query as Record<string, string | undefined>;
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const offset = Number(req.query.offset) || 0;
+
+  const filters: ReturnType<typeof and>[] = [];
+  if (entityType) filters.push(eq(auditLog.entityType, entityType));
+  if (entityId) filters.push(eq(auditLog.entityId, entityId));
+  if (action) filters.push(eq(auditLog.action, action));
+  if (from) filters.push(gte(auditLog.createdAt, new Date(from)));
+  if (to) filters.push(lte(auditLog.createdAt, new Date(to + "T23:59:59Z")));
+
+  const rows = await req.db
+    .select()
+    .from(auditLog)
+    .where(filters.length ? and(...filters) : undefined)
+    .orderBy(desc(auditLog.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  res.json(rows);
 }));
