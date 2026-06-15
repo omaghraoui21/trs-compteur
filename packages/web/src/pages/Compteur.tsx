@@ -515,16 +515,25 @@ export default function CompteurPage() {
       {error && <div className="bg-red-50 text-red-600 rounded-lg p-3 mb-4 text-sm">{error}</div>}
 
       {!activeSession && (
-        <button
-          onClick={handleOpenSession}
-          disabled={openingSession}
-          aria-busy={openingSession}
-          className={`w-full ${equipmentAccent(selectedEquipment?.equipmentType).btnOpen} ${BTN_PRIMARY} text-lg disabled:opacity-60`}
-        >
-          {openingSession
-            ? <><Loader2 className={`${BTN_ICON} animate-spin`} /> Ouverture…</>
-            : <><Play className={BTN_ICON} /> Ouvrir le compteur</>}
-        </button>
+        <div className="space-y-3">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800 flex items-start gap-2.5">
+            <Timer className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">Aucune session active</p>
+              <p className="text-blue-700 mt-0.5">Ouvre le compteur pour commencer à enregistrer tes lots et arrêts. La session démarre le chronomètre et calcule le TRS en temps réel.</p>
+            </div>
+          </div>
+          <button
+            onClick={handleOpenSession}
+            disabled={openingSession}
+            aria-busy={openingSession}
+            className={`w-full ${equipmentAccent(selectedEquipment?.equipmentType).btnOpen} ${BTN_PRIMARY} text-lg disabled:opacity-60`}
+          >
+            {openingSession
+              ? <><Loader2 className={`${BTN_ICON} animate-spin`} /> Ouverture…</>
+              : <><Play className={BTN_ICON} /> Ouvrir le compteur</>}
+          </button>
+        </div>
       )}
 
       {activeSession && !detail && detailLoading && <ListSkeleton rows={4} />}
@@ -1357,9 +1366,15 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
 
         <div>
           <label className="block text-sm font-medium mb-1">N° de lot</label>
-          <input value={batch} onChange={e => setBatch(e.target.value)}
-            className="w-full border rounded-lg px-3 py-3 text-base" placeholder={suggestedBatch || "26019"} required />
-          {suggestedBatch && batch === suggestedBatch && (
+          <input value={batch} onChange={e => setBatch(e.target.value.toUpperCase())}
+            maxLength={30}
+            aria-invalid={!!(batch && !/^[A-Z0-9-_./]{1,30}$/.test(batch))}
+            className={`w-full border rounded-lg px-3 py-3 text-base ${batch && !/^[A-Z0-9-_./]{1,30}$/.test(batch) ? "border-red-400" : ""}`}
+            placeholder={suggestedBatch || "26019"} required />
+          {batch && !/^[A-Z0-9-_./]{1,30}$/.test(batch) && (
+            <p className="text-xs text-red-600 mt-1">Format invalide — lettres majuscules, chiffres, tirets, points et "/" uniquement (30 car. max.)</p>
+          )}
+          {suggestedBatch && batch === suggestedBatch && /^[A-Z0-9-_./]{1,30}$/.test(batch) && (
             <p className="text-xs text-blue-600 mt-1">Auto-suggéré : {suggestedBatch}</p>
           )}
         </div>
@@ -1391,7 +1406,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
           </div>
         )}
 
-        <button type="submit" disabled={loading}
+        <button type="submit" disabled={loading || !!(batch && !/^[A-Z0-9-_./]{1,30}$/.test(batch))}
           className={`w-full bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700 disabled:opacity-50 disabled:pointer-events-none ${flashStart ? "btn-flash" : ""}`}>
           {loading ? "Démarrage…" : "Démarrer le lot"}
         </button>
@@ -1596,12 +1611,12 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
                 const sel = catId === c.id;
                 return (
                   <button key={c.id} type="button" onClick={() => setCatId(c.id)}
-                    className={`border rounded-lg px-2 py-3 text-sm text-center min-h-[60px] transition font-medium ${
+                    className={`border rounded-lg px-2 py-3 text-sm text-center min-h-[64px] transition font-medium ${
                       sel
                         ? "border-blue-500 bg-blue-50 text-blue-800"
                         : "border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700"
                     }`}>
-                    {c.label}
+                    <span className="line-clamp-2 leading-snug">{c.label}</span>
                   </button>
                 );
               })}
@@ -1644,8 +1659,8 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
                       : "border-red-500 bg-red-100 text-red-800 font-medium";
                     return (
                       <button key={c.id} type="button" onClick={() => { setCatId(c.id); section.setFilter(null); }}
-                        className={`border rounded-lg px-2.5 py-3 text-sm text-left transition min-h-[60px] bg-white ${sel ? selCls : "hover:bg-gray-50"}`}>
-                        {c.label}
+                        className={`border rounded-lg px-2.5 py-3 text-sm text-left transition min-h-[64px] bg-white ${sel ? selCls : "hover:bg-gray-50"}`}>
+                        <span className="line-clamp-2 leading-snug">{c.label}</span>
                       </button>
                     );
                   })}

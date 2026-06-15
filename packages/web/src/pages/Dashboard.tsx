@@ -754,6 +754,25 @@ function KpiCard({ metrics, title, objective, prevMetrics }: { metrics: TrsMetri
         ))}
       </div>
 
+      {/* Production summary strip */}
+      <div className="grid grid-cols-3 gap-3 text-center text-sm mb-3">
+        <div className="bg-green-50 rounded-xl p-3">
+          <div className="text-xs text-green-700 mb-1">Fonctionnement (tF)</div>
+          <div className="text-lg font-bold text-green-800">{fmtDuration(Math.round(metrics.tF))}</div>
+        </div>
+        <div className="bg-blue-50 rounded-xl p-3">
+          <div className="text-xs text-blue-700 mb-1">Prod. totale (NPR)</div>
+          <div className="text-lg font-bold text-blue-800">{metrics.totalProduced.toLocaleString("fr-FR")}</div>
+        </div>
+        <div className={`rounded-xl p-3 ${metrics.totalProduced > 0 && metrics.totalRebut / metrics.totalProduced > 0.05 ? "bg-red-50" : "bg-gray-50"}`}>
+          <div className="text-xs text-gray-500 mb-1">Taux de rebut</div>
+          <div className={`text-lg font-bold ${metrics.totalProduced > 0 && metrics.totalRebut / metrics.totalProduced > 0.05 ? "text-red-600" : ""}`}>
+            {metrics.totalProduced > 0 ? `${((metrics.totalRebut / metrics.totalProduced) * 100).toFixed(1)} %` : "—"}
+          </div>
+          {metrics.totalRebut > 0 && <div className="text-[10px] text-gray-400 mt-0.5">{metrics.totalRebut.toLocaleString("fr-FR")} unités</div>}
+        </div>
+      </div>
+
       {/* TEEP + Reliability row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-sm mb-3">
         <div className="bg-blue-50 rounded-xl p-3">

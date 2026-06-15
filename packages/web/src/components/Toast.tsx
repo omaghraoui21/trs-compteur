@@ -23,6 +23,21 @@ function normalizeError(msg: string): string {
   if (/erreur serveur/i.test(msg) || /^HTTP 5/.test(msg)) {
     return "Connexion serveur impossible. Vérifie internet ou réessaie.";
   }
+  if (/fetch failed|network error|failed to fetch/i.test(msg)) {
+    return "Pas de connexion réseau. Vérifie ta connexion et réessaie.";
+  }
+  if (/zod|validation error|invalid input/i.test(msg)) {
+    return "Données invalides. Vérifie les champs et réessaie.";
+  }
+  if (/unauthorized|401/i.test(msg)) {
+    return "Session expirée. Reconnecte-toi.";
+  }
+  if (/not found|404/i.test(msg)) {
+    return "Élément introuvable. Recharge la page.";
+  }
+  if (/conflict|409/i.test(msg)) {
+    return "Action impossible : conflit de données. Recharge la page.";
+  }
   return msg;
 }
 
