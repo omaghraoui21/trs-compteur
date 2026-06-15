@@ -236,6 +236,7 @@ function RoomsPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ code: "", name: "", description: "" });
   const [error, setError] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -264,15 +265,18 @@ function RoomsPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const remove = async (id: string, name: string) => {
-    if (!confirm(`Désactiver le local "${name}" ?`)) return;
-    try { await api.admin.deleteRoom(id); toast.success(`Local "${name}" désactivé`); load(); } catch (e: any) { setError(e.message); }
+  const remove = (id: string, name: string) => { setPendingDelete({ id, name }); };
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    try { await api.admin.deleteRoom(pendingDelete.id); toast.success(`Local "${pendingDelete.name}" désactivé`); load(); } catch (e: any) { setError(e.message); }
+    setPendingDelete(null);
   };
 
   if (loading) return <Spinner />;
 
   return (
     <div>
+      {pendingDelete && <ConfirmDeleteModal label="Désactiver le local ?" name={pendingDelete.name} onConfirm={confirmDelete} onCancel={() => setPendingDelete(null)} />}
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm text-gray-500">{rooms.length} locaux</p>
         <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" aria-hidden="true" /> Ajouter</button>
@@ -329,6 +333,7 @@ function EquipmentsPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ code: "", name: "", roomId: "", equipmentType: "blistereuse", trsObjective: "75", defaultCadenceUnit: "u/min", microStopThresholdMin: "5" });
   const [error, setError] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -361,9 +366,11 @@ function EquipmentsPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const remove = async (id: string, name: string) => {
-    if (!confirm(`Désactiver l'équipement "${name}" ?`)) return;
-    try { await api.admin.deleteEquipment(id); toast.success(`Équipement "${name}" désactivé`); load(); } catch (e: any) { setError(e.message); }
+  const remove = (id: string, name: string) => { setPendingDelete({ id, name }); };
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    try { await api.admin.deleteEquipment(pendingDelete.id); toast.success(`Équipement "${pendingDelete.name}" désactivé`); load(); } catch (e: any) { setError(e.message); }
+    setPendingDelete(null);
   };
 
   const roomName = (roomId: string) => rooms.find(r => r.id === roomId)?.name || roomId;
@@ -372,6 +379,7 @@ function EquipmentsPanel() {
 
   return (
     <div>
+      {pendingDelete && <ConfirmDeleteModal label="Désactiver l'équipement ?" name={pendingDelete.name} onConfirm={confirmDelete} onCancel={() => setPendingDelete(null)} />}
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm text-gray-500">{items.length} équipements</p>
         <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" aria-hidden="true" /> Ajouter</button>
@@ -452,6 +460,7 @@ function ProductsPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ code: "", name: "", defaultCadence: "", cadenceUnit: "u/min", unit: "blisters" });
   const [error, setError] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -480,15 +489,18 @@ function ProductsPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const remove = async (id: string, name: string) => {
-    if (!confirm(`Désactiver le produit "${name}" ?`)) return;
-    try { await api.admin.deleteProduct(id); toast.success(`Produit "${name}" désactivé`); load(); } catch (e: any) { setError(e.message); }
+  const remove = (id: string, name: string) => { setPendingDelete({ id, name }); };
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    try { await api.admin.deleteProduct(pendingDelete.id); toast.success(`Produit "${pendingDelete.name}" désactivé`); load(); } catch (e: any) { setError(e.message); }
+    setPendingDelete(null);
   };
 
   if (loading) return <Spinner />;
 
   return (
     <div>
+      {pendingDelete && <ConfirmDeleteModal label="Désactiver le produit ?" name={pendingDelete.name} onConfirm={confirmDelete} onCancel={() => setPendingDelete(null)} />}
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm text-gray-500">{items.length} produits</p>
         <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" aria-hidden="true" /> Ajouter</button>
@@ -555,6 +567,7 @@ function CadencesPanel() {
   const [form, setForm] = useState({ productId: "", equipmentId: "", cadenceValue: "", cadenceUnit: "u/min", trsObjective: "" });
   const [error, setError] = useState("");
   const [cadenceSearch, setCadenceSearch] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -578,9 +591,11 @@ function CadencesPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const remove = async (id: string, name: string) => {
-    if (!confirm(`Supprimer la cadence "${name}" ?`)) return;
-    try { await api.admin.deleteCadence(id); toast.success(`Cadence "${name}" supprimée`); load(); } catch (e: any) { setError(e.message); }
+  const remove = (id: string, name: string) => { setPendingDelete({ id, name }); };
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    try { await api.admin.deleteCadence(pendingDelete.id); toast.success(`Cadence "${pendingDelete.name}" supprimée`); load(); } catch (e: any) { setError(e.message); }
+    setPendingDelete(null);
   };
 
   // O(1) name lookups — avoids a .find() over the full list per cadence per render
@@ -611,6 +626,7 @@ function CadencesPanel() {
 
   return (
     <div>
+      {pendingDelete && <ConfirmDeleteModal label="Supprimer cette cadence ?" name={pendingDelete.name} onConfirm={confirmDelete} onCancel={() => setPendingDelete(null)} />}
       <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
         <div>
           <p className="text-sm text-gray-500">{cadences.length} cadences configurées</p>
@@ -709,6 +725,7 @@ function DowntimesPanel() {
   const [form, setForm] = useState({ code: "", label: "", famille: FAMILLES[0], isPlanned: false, appliesToEquipmentType: "" });
   const [error, setError] = useState("");
   const [treeView, setTreeView] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -737,9 +754,11 @@ function DowntimesPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const remove = async (id: string, name: string) => {
-    if (!confirm(`Désactiver la catégorie "${name}" ?`)) return;
-    try { await api.admin.deleteDowntimeCategory(id); toast.success(`Catégorie "${name}" désactivée`); load(); } catch (e: any) { setError(e.message); }
+  const remove = (id: string, name: string) => { setPendingDelete({ id, name }); };
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    try { await api.admin.deleteDowntimeCategory(pendingDelete.id); toast.success(`Catégorie "${pendingDelete.name}" désactivée`); load(); } catch (e: any) { setError(e.message); }
+    setPendingDelete(null);
   };
 
   const togglePlanned = async (cat: AdminDowntimeCategory) => {
@@ -759,6 +778,7 @@ function DowntimesPanel() {
 
   return (
     <div>
+      {pendingDelete && <ConfirmDeleteModal label="Désactiver la catégorie ?" name={pendingDelete.name} onConfirm={confirmDelete} onCancel={() => setPendingDelete(null)} />}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
         <div>
           <p className="text-sm text-gray-500">{items.length} catégories d'arrêts</p>
@@ -1005,6 +1025,24 @@ function ErrorBanner({ msg, onClose }: { msg: string; onClose: () => void }) {
 
 function IconBtn({ icon: Icon, onClick, title, className = "text-gray-500 hover:bg-gray-100" }: { icon: typeof Pencil; onClick: () => void; title: string; className?: string }) {
   return <button onClick={onClick} title={title} aria-label={title} className={`p-1.5 rounded transition ${className}`}><Icon className="h-3.5 w-3.5" aria-hidden="true" /></button>;
+}
+
+function ConfirmDeleteModal({ label, name, onConfirm, onCancel }: { label: string; name: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4"
+         role="presentation" onClick={onCancel} onKeyDown={e => { if (e.key === "Escape") onCancel(); }}>
+      <div className="bg-white rounded-xl p-5 w-full max-w-sm shadow-xl"
+           role="dialog" aria-modal="true" aria-labelledby="confirm-del-title"
+           onClick={e => e.stopPropagation()}>
+        <h3 id="confirm-del-title" className="font-semibold mb-1">{label}</h3>
+        <p className="text-sm text-gray-500 mb-4">« {name} »</p>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onCancel} className="px-3 py-1.5 text-sm text-gray-600 border rounded hover:bg-gray-50">Annuler</button>
+          <button onClick={onConfirm} className="px-3 py-1.5 text-sm text-white bg-red-600 rounded hover:bg-red-700">Confirmer</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function FormCard({ title, children, onCancel, onSave }: { title: string; children: React.ReactNode; onCancel: () => void; onSave: () => void | Promise<void> }) {
