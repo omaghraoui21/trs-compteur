@@ -1872,11 +1872,14 @@ function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, isC
                 { label: "TQ", value: s.TQ, colored: false },
                 { label: "Lots", raw: String(s.lotCount) },
                 { label: "Durée", raw: fmtDuration(s.tO) },
+                { label: "Produits", raw: s.totalProduced.toLocaleString("fr-FR") },
+                { label: "Conformes", raw: s.totalConforming.toLocaleString("fr-FR") },
+                { label: "Rebuts", raw: s.totalRebut > 0 ? s.totalRebut.toLocaleString("fr-FR") : "0", colored: s.totalRebut > 0 },
               ] as { label: string; value?: number; raw?: string; colored?: boolean }[]).map(item => (
                 <div key={item.label} className="bg-gray-50 rounded-lg p-2">
                   <div className="text-xs text-gray-500">{item.label}</div>
                   <div className="text-base font-bold"
-                    style={{ color: item.colored ? trsColor(item.value!) : undefined }}>
+                    style={{ color: item.colored && item.value != null ? trsColor(item.value) : item.colored && item.raw != null && item.label === "Rebuts" ? "#dc2626" : undefined }}>
                     {item.value != null ? fmtPct(item.value) : item.raw}
                   </div>
                 </div>
@@ -1923,10 +1926,11 @@ function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, isC
         )}
 
         <div className="mb-4">
-          <label className="block text-xs font-medium text-gray-600 mb-1">
+          <label htmlFor="eos-notes" className="block text-xs font-medium text-gray-600 mb-1">
             Remarques de fin de poste <span className="font-normal text-gray-400">(facultatif — tracé dans l'audit GMP)</span>
           </label>
           <textarea
+            id="eos-notes"
             value={notes}
             onChange={e => onNotesChange(e.target.value)}
             rows={2}

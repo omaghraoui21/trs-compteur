@@ -509,7 +509,7 @@ function ClassificationQualityCard({ total }: { total: TrsMetrics & { aClasserMi
   const { color, bgCls, label: statusLabel } = CLASS_THRESHOLDS.find(t => pct >= t.min) ?? CLASS_THRESHOLDS[2];
 
   return (
-    <div className={`rounded-xl border p-4 mb-4 ${bgCls}`}>
+    <div className={`rounded-xl border p-4 mb-4 ${bgCls}`} role="region" aria-label="Qualité de classement GMP">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex-1 min-w-0">
           <div className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-0.5">Qualité de classement</div>
