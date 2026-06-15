@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { api, type PendingLot, type Product, type LotDowntime, type CadenceChange, type CorrectLotInput, type ElectronicSignature } from "@/lib/api";
-import { fmtPct, trsColor, diffMinutes, fmtDuration as fmtMinutes } from "@trs/engine";
+import { fmtPct, trsColor, diffMinutes, fmtNumber, fmtDuration as fmtMinutes } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton, Skeleton } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
@@ -336,7 +336,7 @@ export default function SupervisorPage() {
                     ].map(({ label, value }) => (
                       <div key={label} className="bg-gray-50 rounded-lg p-2">
                         <div className="text-xs text-gray-500">{label}</div>
-                        <div className="font-semibold text-base">{value.toLocaleString("fr-FR")}</div>
+                        <div className="font-semibold text-base">{fmtNumber(value)}</div>
                       </div>
                     ))}
                   </div>

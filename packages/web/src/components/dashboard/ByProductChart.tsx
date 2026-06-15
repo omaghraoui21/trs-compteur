@@ -1,5 +1,5 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from "recharts";
-import { fmtPct, fmtDuration } from "@trs/engine";
+import { fmtPct, fmtDuration, fmtNumber } from "@trs/engine";
 import type { ProductTrs } from "@/lib/api";
 import { Package } from "lucide-react";
 
@@ -85,8 +85,8 @@ export default function ByProductChart({ byProduct }: Props) {
                   {p.productName}
                 </td>
                 <td className="py-1 px-2 text-right">{p.lotCount}</td>
-                <td className="py-1 px-2 text-right">{p.totalProduced.toLocaleString("fr-FR")}</td>
-                <td className="py-1 px-2 text-right text-red-600">{p.totalRebut.toLocaleString("fr-FR")}</td>
+                <td className="py-1 px-2 text-right">{fmtNumber(p.totalProduced)}</td>
+                <td className="py-1 px-2 text-right text-red-600">{fmtNumber(p.totalRebut)}</td>
                 <td className="py-1 px-2 text-right">{Math.round(p.avgCadencePerMin)} u/min</td>
                 <td className="py-1 px-2 text-right">{fmtPct(p.DO)}</td>
                 <td className="py-1 px-2 text-right">{fmtPct(p.TP)}</td>

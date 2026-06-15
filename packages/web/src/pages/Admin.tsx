@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type ProductEquipmentCadence, type AdminUser, type AuditLogEntry } from "@/lib/api";
 import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, List, Network, ChevronDown, ChevronRight, Users, KeyRound, ScrollText, ChevronLeft } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
@@ -583,25 +583,31 @@ function CadencesPanel() {
     try { await api.admin.deleteCadence(id); toast.success(`Cadence "${name}" supprimée`); load(); } catch (e: any) { setError(e.message); }
   };
 
-  const productName = (id: string) => productsList.find(p => p.id === id)?.name || id;
-  const equipmentName = (id: string) => equipmentsList.find(e => e.id === id)?.name || id;
+  // O(1) name lookups — avoids a .find() over the full list per cadence per render
+  const productNameMap = useMemo(() => new Map(productsList.map(p => [p.id, p.name] as const)), [productsList]);
+  const equipmentNameMap = useMemo(() => new Map(equipmentsList.map(e => [e.id, e.name] as const)), [equipmentsList]);
+  const productName = (id: string) => productNameMap.get(id) ?? id;
+  const equipmentName = (id: string) => equipmentNameMap.get(id) ?? id;
+
+  const filteredCadences = useMemo(() => {
+    const q = cadenceSearch.toLowerCase();
+    if (!q) return cadences;
+    return cadences.filter(c =>
+      (productNameMap.get(c.productId) ?? c.productId).toLowerCase().includes(q) ||
+      (equipmentNameMap.get(c.equipmentId) ?? c.equipmentId).toLowerCase().includes(q));
+  }, [cadences, cadenceSearch, productNameMap, equipmentNameMap]);
+
+  // Group filtered cadences by equipment
+  const grouped = useMemo(() => {
+    const g: Record<string, ProductEquipmentCadence[]> = {};
+    for (const c of filteredCadences) {
+      const name = equipmentNameMap.get(c.equipmentId) ?? c.equipmentId;
+      (g[name] ||= []).push(c);
+    }
+    return g;
+  }, [filteredCadences, equipmentNameMap]);
 
   if (loading) return <Spinner />;
-
-  const searchLower = cadenceSearch.toLowerCase();
-  const filteredCadences = searchLower
-    ? cadences.filter(c =>
-        productName(c.productId).toLowerCase().includes(searchLower) ||
-        equipmentName(c.equipmentId).toLowerCase().includes(searchLower)
-      )
-    : cadences;
-
-  // Group by equipment
-  const grouped = filteredCadences.reduce<Record<string, ProductEquipmentCadence[]>>((acc, c) => {
-    const name = equipmentName(c.equipmentId);
-    (acc[name] ||= []).push(c);
-    return acc;
-  }, {});
 
   return (
     <div>

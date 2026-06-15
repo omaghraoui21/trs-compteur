@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type ProductEquipmentCadence, type SessionTrsResponse, type TrsMetrics, type LotEntry, type LotDowntime } from "@/lib/api";
-import { fmtDuration, fmtPct, trsColor, diffMinutes } from "@trs/engine";
+import { fmtDuration, fmtPct, fmtNumber, trsColor, diffMinutes } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { useActiveSession } from "@/lib/sessionContext";
 import { Onboarding } from "@/components/Onboarding";
@@ -525,8 +525,8 @@ export default function CompteurPage() {
                     <td className="px-4 py-2.5 text-right tabular-nums">
                       {setpointCadence != null ? `${setpointCadence} ${activeLot.cadenceUnit}` : "—"}
                     </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{activeLot.quantityProduced.toLocaleString("fr-FR")}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-green-700">{activeLot.quantityConforming.toLocaleString("fr-FR")}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{fmtNumber(activeLot.quantityProduced)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-green-700">{fmtNumber(activeLot.quantityConforming)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -641,7 +641,7 @@ export default function CompteurPage() {
                 <h3 className="font-semibold text-sm">Lots clôturés</h3>
                 <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
                   <span className="font-medium text-gray-700">{closedLotsAll.length} lot{closedLotsAll.length > 1 ? "s" : ""}</span>
-                  <span className="text-green-700 font-medium">{totalProd.toLocaleString("fr-FR")} produits</span>
+                  <span className="text-green-700 font-medium">{fmtNumber(totalProd)} produits</span>
                   {tqSession !== null && (
                     <span className="font-semibold px-2 py-0.5 rounded-full text-[10px]"
                       style={{ backgroundColor: trsColor(tqSession) + "22", color: trsColor(tqSession) }}>
@@ -672,14 +672,14 @@ export default function CompteurPage() {
                       </div>
                       <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
                         <span className="flex items-center gap-1">
-                          <span className="font-medium text-gray-700">{lot.quantityProduced.toLocaleString("fr-FR")}</span> produits
+                          <span className="font-medium text-gray-700">{fmtNumber(lot.quantityProduced)}</span> produits
                         </span>
                         <span className="flex items-center gap-1 text-green-700">
-                          <CheckCircle className="h-3 w-3" /> {lot.quantityConforming.toLocaleString("fr-FR")} conformes
+                          <CheckCircle className="h-3 w-3" /> {fmtNumber(lot.quantityConforming)} conformes
                         </span>
                         {rejectQty > 0 && (
                           <span className="flex items-center gap-1 text-red-600">
-                            <XCircle className="h-3 w-3" /> {rejectQty.toLocaleString("fr-FR")} rebuts
+                            <XCircle className="h-3 w-3" /> {fmtNumber(rejectQty)} rebuts
                           </span>
                         )}
                         {lotTrs && (
@@ -1906,9 +1906,9 @@ function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, isC
                 { label: "TQ", value: s.TQ, colored: false },
                 { label: "Lots", raw: String(s.lotCount) },
                 { label: "Durée", raw: fmtDuration(s.tO) },
-                { label: "Produits", raw: s.totalProduced.toLocaleString("fr-FR") },
-                { label: "Conformes", raw: s.totalConforming.toLocaleString("fr-FR") },
-                { label: "Rebuts", raw: s.totalRebut > 0 ? s.totalRebut.toLocaleString("fr-FR") : "0", colored: s.totalRebut > 0 },
+                { label: "Produits", raw: fmtNumber(s.totalProduced) },
+                { label: "Conformes", raw: fmtNumber(s.totalConforming) },
+                { label: "Rebuts", raw: s.totalRebut > 0 ? fmtNumber(s.totalRebut) : "0", colored: s.totalRebut > 0 },
               ] as { label: string; value?: number; raw?: string; colored?: boolean }[]).map(item => (
                 <div key={item.label} className="bg-gray-50 rounded-lg p-2">
                   <div className="text-xs text-gray-500">{item.label}</div>

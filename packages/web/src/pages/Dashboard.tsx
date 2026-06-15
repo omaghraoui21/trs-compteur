@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
 import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ParetoItem, type ComparisonResponse, type TrsMetrics, type DailyTrs, type ByProductResponse, type SixLossesResponse, type HeatmapResponse, type DowntimeLogEntry, type DowntimeLogResponse } from "@/lib/api";
-import { fmtPct, fmtDuration, trsColor, familleToNorme, computeOeeBenchmark } from "@trs/engine";
+import { fmtPct, fmtDuration, fmtNumber, trsColor, familleToNorme, computeOeeBenchmark } from "@trs/engine";
 import type { BenchmarkRating } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { DashboardSkeleton } from "@/components/Skeleton";
@@ -260,22 +260,25 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {zoom === "custom" && (
-          <div className="flex flex-wrap items-center gap-2">
-            <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-              aria-label="Date de début" className="border rounded-lg px-2 py-2 text-sm" />
-            <span className="text-gray-400" aria-hidden="true">→</span>
-            <input type="date" value={customTo}
-              onChange={e => setCustomTo(e.target.value)}
-              min={customFrom || undefined}
-              aria-label="Date de fin"
-              aria-invalid={!!customFrom && !!customTo && customTo < customFrom}
-              className={`border rounded-lg px-2 py-2 text-sm ${customFrom && customTo && customTo < customFrom ? "border-red-400" : ""}`} />
-            {customFrom && customTo && customTo < customFrom && (
-              <p role="alert" className="text-xs text-red-600 w-full">La date de fin doit être égale ou postérieure à la date de début.</p>
-            )}
-          </div>
-        )}
+        {zoom === "custom" && (() => {
+          const dateRangeInvalid = !!customFrom && !!customTo && customTo < customFrom;
+          return (
+            <div className="flex flex-wrap items-center gap-2">
+              <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                aria-label="Date de début" className="border rounded-lg px-2 py-2 text-sm" />
+              <span className="text-gray-400" aria-hidden="true">→</span>
+              <input type="date" value={customTo}
+                onChange={e => setCustomTo(e.target.value)}
+                min={customFrom || undefined}
+                aria-label="Date de fin"
+                aria-invalid={dateRangeInvalid}
+                className={`border rounded-lg px-2 py-2 text-sm ${dateRangeInvalid ? "border-red-400" : ""}`} />
+              {dateRangeInvalid && (
+                <p role="alert" className="text-xs text-red-600 w-full">La date de fin doit être égale ou postérieure à la date de début.</p>
+              )}
+            </div>
+          );
+        })()}
 
         <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
           <button onClick={() => setShowComparison(!showComparison)}
@@ -693,8 +696,8 @@ function StatStrip({ metrics }: { metrics: TrsMetrics }) {
   const heldMin = metrics.tAP + metrics.totalUnplannedMin;
   const downtimeHeavy = metrics.tR > 0 && heldMin / metrics.tR > 0.3;
   const cards: { label: string; value: string; sub?: string; color?: string }[] = [
-    { label: "Production", value: metrics.totalProduced.toLocaleString("fr-FR"), sub: "pièces produites" },
-    { label: "Conformes", value: metrics.totalConforming.toLocaleString("fr-FR"), sub: `${metrics.totalRebut.toLocaleString("fr-FR")} rebuts` },
+    { label: "Production", value: fmtNumber(metrics.totalProduced), sub: "pièces produites" },
+    { label: "Conformes", value: fmtNumber(metrics.totalConforming), sub: `${fmtNumber(metrics.totalRebut)} rebuts` },
     { label: "Temps d'arrêt", value: fmtDuration(heldMin), sub: "planifiés + non planifiés", color: downtimeHeavy ? "#dc2626" : undefined },
     { label: "Temps de marche", value: fmtDuration(Math.round(metrics.tF)), sub: "tF" },
     { label: "Disponibilité", value: fmtPct(metrics.DO), sub: "DO", color: trsColor(metrics.DO) },
@@ -784,14 +787,14 @@ function KpiCard({ metrics, title, objective, prevMetrics }: { metrics: TrsMetri
         </div>
         <div className="bg-blue-50 rounded-xl p-3">
           <div className="text-xs text-blue-700 mb-1">Prod. totale (NPR)</div>
-          <div className="text-lg font-bold text-blue-800">{metrics.totalProduced.toLocaleString("fr-FR")}</div>
+          <div className="text-lg font-bold text-blue-800">{fmtNumber(metrics.totalProduced)}</div>
         </div>
         <div className={`rounded-xl p-3 ${metrics.totalProduced > 0 && metrics.totalRebut / metrics.totalProduced > 0.05 ? "bg-red-50" : "bg-gray-50"}`}>
           <div className="text-xs text-gray-500 mb-1">Taux de rebut</div>
           <div className={`text-lg font-bold ${metrics.totalProduced > 0 && metrics.totalRebut / metrics.totalProduced > 0.05 ? "text-red-600" : ""}`}>
             {metrics.totalProduced > 0 ? `${((metrics.totalRebut / metrics.totalProduced) * 100).toFixed(1)} %` : "—"}
           </div>
-          {metrics.totalRebut > 0 && <div className="text-[10px] text-gray-400 mt-0.5">{metrics.totalRebut.toLocaleString("fr-FR")} unités</div>}
+          {metrics.totalRebut > 0 && <div className="text-[10px] text-gray-400 mt-0.5">{fmtNumber(metrics.totalRebut)} unités</div>}
         </div>
       </div>
 
@@ -894,9 +897,9 @@ function TimeBuckets({ metrics }: { metrics: TrsMetrics }) {
     { label: "tN", value: fmtDuration(Math.round(metrics.tN)), color: "text-green-700" },
     { label: "tU", value: fmtDuration(Math.round(metrics.tU)), color: "text-green-800" },
     { label: "Lots", value: String(metrics.lotCount) },
-    { label: "NPR", value: metrics.totalProduced.toLocaleString("fr-FR") },
-    { label: "NPB", value: metrics.totalConforming.toLocaleString("fr-FR") },
-    { label: "NPC", value: metrics.totalRebut.toLocaleString("fr-FR"), color: "text-red-600" },
+    { label: "NPR", value: fmtNumber(metrics.totalProduced) },
+    { label: "NPB", value: fmtNumber(metrics.totalConforming) },
+    { label: "NPC", value: fmtNumber(metrics.totalRebut), color: "text-red-600" },
   ];
 
   return (
@@ -1015,8 +1018,8 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                   <td className="px-3 py-2 text-right text-gray-500">{fmtDuration(d.tR)}</td>
                   <td className="px-3 py-2 text-right text-gray-500">{fmtDuration(Math.round(d.tF))}</td>
                   <td className="px-3 py-2 text-right">{d.lotCount}</td>
-                  <td className="px-3 py-2 text-right">{d.totalProduced.toLocaleString("fr-FR")}</td>
-                  <td className="px-3 py-2 text-right text-red-600">{d.totalRebut.toLocaleString("fr-FR")}</td>
+                  <td className="px-3 py-2 text-right">{fmtNumber(d.totalProduced)}</td>
+                  <td className="px-3 py-2 text-right text-red-600">{fmtNumber(d.totalRebut)}</td>
                   <td className="px-3 py-2 text-right">{fmtPct(d.DO)}</td>
                   <td className="px-3 py-2 text-right">{fmtPct(d.TP)}</td>
                   <td className="px-3 py-2 text-right">{fmtPct(d.TQ)}</td>
@@ -1047,7 +1050,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                     <td className="px-3 py-1.5 text-right text-gray-400">{fmtDuration(Math.round(lot.tF))}</td>
                     <td className="px-3 py-1.5 text-right">1</td>
                     <td className="px-3 py-1.5 text-right">{lot.quantityProduced?.toLocaleString("fr-FR")}</td>
-                    <td className="px-3 py-1.5 text-right text-red-500">{lot.rebut?.toLocaleString("fr-FR") ?? 0}</td>
+                    <td className="px-3 py-1.5 text-right text-red-500">{fmtNumber(lot.rebut ?? 0)}</td>
                     <td className="px-3 py-1.5 text-right">—</td>
                     <td className="px-3 py-1.5 text-right" style={{ color: lot.TP > 1 ? "#d97706" : undefined }}>{fmtPct(lot.TP)}</td>
                     <td className="px-3 py-1.5 text-right" style={{ color: lot.TQ > 1 ? "#dc2626" : undefined }}>{fmtPct(lot.TQ)}</td>
@@ -1066,8 +1069,8 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
               <td className="px-3 py-2 text-right">{fmtDuration(total.tR)}</td>
               <td className="px-3 py-2 text-right">{fmtDuration(Math.round(total.tF))}</td>
               <td className="px-3 py-2 text-right">{total.lotCount}</td>
-              <td className="px-3 py-2 text-right">{total.totalProduced.toLocaleString("fr-FR")}</td>
-              <td className="px-3 py-2 text-right text-red-600">{total.totalRebut.toLocaleString("fr-FR")}</td>
+              <td className="px-3 py-2 text-right">{fmtNumber(total.totalProduced)}</td>
+              <td className="px-3 py-2 text-right text-red-600">{fmtNumber(total.totalRebut)}</td>
               <td className="px-3 py-2 text-right">{fmtPct(total.DO)}</td>
               <td className="px-3 py-2 text-right">{fmtPct(total.TP)}</td>
               <td className="px-3 py-2 text-right">{fmtPct(total.TQ)}</td>

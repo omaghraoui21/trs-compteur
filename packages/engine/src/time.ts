@@ -24,6 +24,11 @@ export function fmtPct(ratio: number): string {
   return `${(ratio * 100).toFixed(1)}%`;
 }
 
+/** Format an integer with French thousands separators (e.g. 12345 → "12 345") */
+export function fmtNumber(n: number): string {
+  return n.toLocaleString("fr-FR");
+}
+
 /** TRS color: green >= 75%, orange >= 55%, red < 55% */
 export function trsColor(ratio: number): string {
   if (ratio >= 0.75) return "#22c55e";
