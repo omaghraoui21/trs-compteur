@@ -31,18 +31,20 @@ interface Props {
   total: TrsMetrics;
   daily: DailyTrs[];
   equipmentName: string;
+  equipmentCode?: string;
   from: string;
   to: string;
   byProduct?: ProductTrs[];
   sixLosses?: SixBigLoss[];
 }
 
-export default function PdfReport({ total, daily, equipmentName, from, to, byProduct, sixLosses }: Props) {
+export default function PdfReport({ total, daily, equipmentName, equipmentCode, from, to, byProduct, sixLosses }: Props) {
+  const equip = equipmentCode ? `${equipmentName} (${equipmentCode})` : equipmentName;
   return (
     <Document>
       <Page size="A4" style={s.page}>
         {/* Header */}
-        <Text style={s.header}>Rapport TRS — {equipmentName}</Text>
+        <Text style={s.header}>Rapport TRS — {equip}</Text>
         <Text style={s.subheader}>Période : {from} → {to} | Généré le {new Date().toLocaleDateString("fr-FR")}</Text>
 
         {/* KPI Cards */}

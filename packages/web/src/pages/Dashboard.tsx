@@ -209,6 +209,7 @@ export default function DashboardPage() {
           total={data.total}
           daily={data.daily}
           equipmentName={eq?.name || ""}
+          equipmentCode={eq?.code}
           from={from}
           to={to}
           byProduct={byProductData?.byProduct}
@@ -315,11 +316,14 @@ export default function DashboardPage() {
         <>
           {/* ─── Comparison mode ─────────────────────────────── */}
           {showComparison && comparisonData && (
-            <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {comparisonData.equipments.map(ceq => (
-                <KpiCard key={ceq.equipmentId} metrics={ceq.total} title={ceq.equipmentName} objective={ceq.trsObjective} />
-              ))}
-            </div>
+            <>
+              <p className="text-xs text-gray-400 mb-2 text-right">Période comparée : {from} → {to}</p>
+              <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {comparisonData.equipments.map(ceq => (
+                  <KpiCard key={ceq.equipmentId} metrics={ceq.total} title={ceq.equipmentName} objective={ceq.trsObjective} />
+                ))}
+              </div>
+            </>
           )}
 
           {/* ─── Headline stat strip ─────────────────────────── */}

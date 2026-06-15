@@ -603,10 +603,25 @@ export default function CompteurPage() {
           )}
 
           {/* Closed lots summary */}
-          {detail.lots.filter(l => l.status !== "active").length > 0 && (
+          {detail.lots.filter(l => l.status !== "active").length > 0 && (() => {
+            const closedLotsAll = detail.lots.filter(l => l.status !== "active");
+            const totalProd = closedLotsAll.reduce((s, l) => s + l.quantityProduced, 0);
+            const totalConf = closedLotsAll.reduce((s, l) => s + l.quantityConforming, 0);
+            const tqSession = totalProd > 0 ? (totalConf / totalProd) : null;
+            return (
             <div className="bg-white rounded-xl border shadow-sm mb-4">
-              <div className="px-4 py-3 border-b">
+              <div className="px-4 py-3 border-b flex items-center justify-between flex-wrap gap-2">
                 <h3 className="font-semibold text-sm">Lots clôturés</h3>
+                <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+                  <span className="font-medium text-gray-700">{closedLotsAll.length} lot{closedLotsAll.length > 1 ? "s" : ""}</span>
+                  <span className="text-green-700 font-medium">{totalProd.toLocaleString("fr-FR")} produits</span>
+                  {tqSession !== null && (
+                    <span className="font-semibold px-2 py-0.5 rounded-full text-[10px]"
+                      style={{ backgroundColor: trsColor(tqSession) + "22", color: trsColor(tqSession) }}>
+                      TQ {fmtPct(tqSession)}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="divide-y">
                 {detail.lots.filter(l => l.status !== "active").map(lot => {
@@ -655,7 +670,8 @@ export default function CompteurPage() {
                 })}
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* « À classer » — temps non couvert par un lot ou un arrêt déclaré.
               ≥ 10 min → bannière rouge urgente en tête ; 1-9 min → rappel amber. */}
