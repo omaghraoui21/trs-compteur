@@ -308,7 +308,7 @@ export default function SupervisorPage() {
                         <User className="h-3 w-3" />{lot.operatorName}
                       </span>
                       <span className="inline-flex items-center gap-0.5">
-                        <CalendarDays className="h-3 w-3" />{lot.sessionDate}
+                        <CalendarDays className="h-3 w-3" />{new Date(lot.sessionDate).toLocaleDateString("fr-FR")}
                       </span>
                     </div>
                     <QualityBar tq={tq} />
