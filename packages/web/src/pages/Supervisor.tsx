@@ -239,8 +239,12 @@ export default function SupervisorPage() {
             }`}
           >
             {tab.label}
-            {tab.key === "closed" && pendingCount > 0 && statusFilter === "closed" && (
-              <span className="ml-1.5 text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded-full">{pendingCount}</span>
+            {tab.key === statusFilter && !loading && lots.length > 0 && (
+              <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                tab.key === "closed" ? "bg-blue-600 text-white" :
+                tab.key === "validated" ? "bg-green-100 text-green-700" :
+                "bg-red-100 text-red-700"
+              }`}>{lots.length}</span>
             )}
           </button>
         ))}
