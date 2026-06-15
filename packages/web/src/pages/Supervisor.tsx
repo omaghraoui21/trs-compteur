@@ -214,6 +214,7 @@ export default function SupervisorPage() {
       {(pullDistance > 0 || refreshing) && (
         <div className="flex items-center justify-center overflow-hidden transition-all" style={{ height: refreshing ? 40 : pullDistance }}>
           <RefreshCw
+            aria-hidden="true"
             className={`h-5 w-5 transition-colors ${pullDistance >= PULL_THRESHOLD || refreshing ? "text-blue-600" : "text-blue-300"} ${refreshing ? "animate-spin" : ""}`}
             style={{ transform: `rotate(${(pullDistance / PULL_THRESHOLD) * 180}deg)` }}
           />
