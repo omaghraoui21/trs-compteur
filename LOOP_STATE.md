@@ -1,6 +1,6 @@
 # LOOP_STATE.md — TRS Compteur
 
-**Date:** 2026-06-15 (~07:15 UTC)
+**Date:** 2026-06-15 (~07:40 UTC)
 **Local branch:** `devin/1779664896-initial-app` (production / Vercel)
 **Status:** ✅ Auto-push to prod enabled (standing user instruction)
 
@@ -10,19 +10,20 @@
 
 | Commit | Change |
 |--------|--------|
-| `ee3ced7` | fix(a11y): aria-hidden sweep Supervisor + Admin; test(engine): isShortStop override (95 tests) |
-| `63094cf` | fix(a11y): aria-hidden sweep on Dashboard icons; test(engine): computeProductTrs edge cases (92 tests) |
+| `b7ead2b` | test(engine): STOPS_GT_DURATION + no-famille fallback branch (97 tests) |
+| `c6c57ea` | fix(a11y): vague a11y finale — Login, ByProductChart, Layout, Supervisor, Admin, Compteur |
+| `ee3ced7` | fix(a11y): aria-hidden sweep Supervisor + Admin; test(engine): isShortStop (95 tests) |
+| `63094cf` | fix(a11y): aria-hidden sweep Dashboard; test(engine): computeProductTrs edge cases (92 tests) |
 | `572826a` | feat: MTBF/MTTR reliability row in live session TRS summary |
 | `c1c8aa2` | fix(ux): silence non-critical 30-day average fetch in TrsSummaryCard |
-| `4df1297` | fix(a11y): aria-hidden/label sweep on BackButton, Layout, ByProductChart, TrsVerificationPanel |
-| `d679a64` | fix(a11y): aria-live on live TRS badge; aria-label on trend icons; aria-hidden sweep |
-| `807d59f` | fix(a11y): scope=col on Compteur table; aria-hidden on action-bar icons |
+| `eae9ca5` | test(engine): cover computeMtbfMttr, computeAClasserMin, computeOeeBenchmark (87 tests) |
 
 ---
 
 ## What Is Working (verified)
 
-- ✅ 95 engine tests passing (5 test files)
+- ✅ 97 engine tests passing (5 test files)
+- ✅ Vague a11y complète — tous les composants web ont aria-hidden/aria-label sur chaque icône Lucide
 - ✅ Full `pnpm typecheck` clean (4 packages)
 - ✅ `api/handler.mjs` rebuilt and committed (`572826a`) — includes reliability computation
 
@@ -39,12 +40,13 @@ only when `breakdownCount > 0`; clean sessions stay clean.
 
 ## Next Goal
 
-La vague a11y est presque complète (Compteur, Dashboard, Supervisor, Admin, Layout, BackButton). Cibles restantes :
-1. **SixLossesChart / HeatmapChart / WaterfallChart / TrsChart** — vérifier les icônes Lucide dans les composants graphiques.
-2. **Login.tsx** — vérifier aria sur le formulaire.
-3. **`computeSixBigLosses`** — les tests couvrent maintenant tous les cas (heuristic + explicit isShortStop). ✅
-4. **Skeleton.tsx / Toast.tsx** — vérifier les rôles aria.
-5. Si aucune amélioration réelle trouvée, signaler plutôt qu'inventer du churn.
+La vague a11y est **terminée**. Tous les composants (Login, Compteur, Dashboard, Supervisor, Admin, Layout, BackButton, charts) sont propres.
+
+Axes d'amélioration potentiels restants :
+1. **Tests moteur** : `computeSessionTrs` — vérifier si la branche "session sans aucun lot" est testée.
+2. **UX Supervisor** : afficher le nombre de lots dans chaque onglet de statut (badge sur "En attente / Validés / Rejetés").
+3. **Dashboard** : vérifier si l'export CSV inclut les colonnes MTBF/MTTR.
+4. Si aucune amélioration réelle trouvée, signaler plutôt qu'inventer du churn.
 
 > Note: the app is heavily polished; cycles are incremental. If a cycle can't find
 > a genuinely useful change, flag it rather than inventing churn.
