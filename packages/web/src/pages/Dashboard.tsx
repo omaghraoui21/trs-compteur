@@ -689,7 +689,7 @@ function StatStrip({ metrics }: { metrics: TrsMetrics }) {
     { label: "Performance", value: fmtPct(metrics.TP), sub: "TP", color: trsColor(metrics.TP) },
   ];
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4" role="region" aria-label="Résumé de production">
       {cards.map(c => (
         <div key={c.label} className="bg-white rounded-xl border shadow-sm p-4 text-center">
           <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">{c.label}</div>
