@@ -459,6 +459,22 @@ describe("computeSessionTrs", () => {
     expect(result.warnings.some(w => w.code === "TAP_GT_TO")).toBe(true);
   });
 
+  it("warns UNPLANNED_GT_TR when unplanned stops exceed required time", () => {
+    // Session: 08:00→10:00 = 120min, plannedStopsMin=0 → tR=120
+    // unplannedStopsMin=150 > tR(120) → warning + tF=0
+    const result = computeSessionTrs({
+      openedAt: new Date("2026-05-04T08:00:00Z"),
+      closedAt: new Date("2026-05-04T10:00:00Z"),
+      plannedStopsMin: 0,
+      unplannedStopsMin: 150,
+      lots: [],
+    });
+    expect(result.tR).toBe(120);
+    expect(result.tF).toBe(0);
+    expect(result.DO).toBe(0);
+    expect(result.warnings.some(w => w.code === "UNPLANNED_GT_TR")).toBe(true);
+  });
+
   it("DO = 1 when no unplanned stops (tF = tR)", () => {
     // No lots, no unplanned stops → tF = tR → DO = 1
     const result = computeSessionTrs({
