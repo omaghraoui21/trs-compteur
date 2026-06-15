@@ -1002,7 +1002,6 @@ function SessionTimelineBar({ detail, session }: { detail: SessionDetail; sessio
 
 function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs: TrsMetrics | undefined; equipmentId: string; trsObjective: number }) {
   const [avg30, setAvg30] = useState<number | null>(null);
-  const toast = useToast();
 
   useEffect(() => {
     if (!equipmentId) return;
@@ -1011,11 +1010,13 @@ function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs:
     from.setDate(from.getDate() - 30);
     const fromStr = from.toISOString().slice(0, 10);
     const toStr = now.toISOString().slice(0, 10);
+    // Non-critical: if the 30-day fetch fails (no history yet, minor network
+    // hiccup), the trend arrow simply won't show — no toast noise for operators.
     api.dashboardTrs(equipmentId, fromStr, toStr)
       .then(data => {
         if (data.total && data.total.TRS > 0) setAvg30(data.total.TRS);
       })
-      .catch((err) => toast.error(err.message || "Chargement de la moyenne 30j échoué"));
+      .catch(() => {});
   }, [equipmentId]);
 
   if (!sessionTrs) return null;
