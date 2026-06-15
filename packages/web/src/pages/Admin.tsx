@@ -263,8 +263,8 @@ function RoomsPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const remove = async (id: string) => {
-    if (!confirm("Désactiver ce local ?")) return;
+  const remove = async (id: string, name: string) => {
+    if (!confirm(`Désactiver le local "${name}" ?`)) return;
     try { await api.admin.deleteRoom(id); load(); } catch (e: any) { setError(e.message); }
   };
 
@@ -303,7 +303,7 @@ function RoomsPanel() {
                   <td data-label="Actions" className="py-2 px-3">
                     <div className="flex gap-1">
                       <IconBtn icon={Pencil} onClick={() => startEdit(r)} title="Modifier" />
-                      {r.isActive && <IconBtn icon={Trash2} onClick={() => remove(r.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
+                      {r.isActive && <IconBtn icon={Trash2} onClick={() => remove(r.id, r.name)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
                       {!r.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateRoom(r.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
                     </div>
                   </td>
@@ -359,8 +359,8 @@ function EquipmentsPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const remove = async (id: string) => {
-    if (!confirm("Désactiver cet équipement ?")) return;
+  const remove = async (id: string, name: string) => {
+    if (!confirm(`Désactiver l'équipement "${name}" ?`)) return;
     try { await api.admin.deleteEquipment(id); load(); } catch (e: any) { setError(e.message); }
   };
 
@@ -426,7 +426,7 @@ function EquipmentsPanel() {
                   <td data-label="Actions" className="py-2 px-3">
                     <div className="flex gap-1">
                       <IconBtn icon={Pencil} onClick={() => startEdit(e)} title="Modifier" />
-                      {e.isActive && <IconBtn icon={Trash2} onClick={() => remove(e.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
+                      {e.isActive && <IconBtn icon={Trash2} onClick={() => remove(e.id, e.name)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
                       {!e.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateEquipment(e.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
                     </div>
                   </td>
@@ -477,8 +477,8 @@ function ProductsPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const remove = async (id: string) => {
-    if (!confirm("Désactiver ce produit ?")) return;
+  const remove = async (id: string, name: string) => {
+    if (!confirm(`Désactiver le produit "${name}" ?`)) return;
     try { await api.admin.deleteProduct(id); load(); } catch (e: any) { setError(e.message); }
   };
 
@@ -526,7 +526,7 @@ function ProductsPanel() {
                   <td data-label="Actions" className="py-2 px-3">
                     <div className="flex gap-1">
                       <IconBtn icon={Pencil} onClick={() => startEdit(p)} title="Modifier" />
-                      {p.isActive && <IconBtn icon={Trash2} onClick={() => remove(p.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
+                      {p.isActive && <IconBtn icon={Trash2} onClick={() => remove(p.id, p.name)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
                       {!p.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateProduct(p.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
                     </div>
                   </td>
@@ -573,8 +573,8 @@ function CadencesPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const remove = async (id: string) => {
-    if (!confirm("Supprimer cette cadence ?")) return;
+  const remove = async (id: string, name: string) => {
+    if (!confirm(`Supprimer la cadence "${name}" ?`)) return;
     try { await api.admin.deleteCadence(id); load(); } catch (e: any) { setError(e.message); }
   };
 
@@ -647,7 +647,7 @@ function CadencesPanel() {
                     <td data-label="Unité" className="py-2 px-3">{c.cadenceUnit}</td>
                     <td data-label="Obj. TRS" className="py-2 px-3">{c.trsObjective ? `${c.trsObjective}%` : "—"}</td>
                     <td data-label="Action" className="py-2 px-3">
-                      <IconBtn icon={Trash2} onClick={() => remove(c.id)} title="Supprimer" className="text-red-500 hover:bg-red-50" />
+                      <IconBtn icon={Trash2} onClick={() => remove(c.id, `${productName(c.productId)} (${eqName})`)} title="Supprimer" className="text-red-500 hover:bg-red-50" />
                     </td>
                   </tr>
                 ))}
@@ -704,8 +704,8 @@ function DowntimesPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const remove = async (id: string) => {
-    if (!confirm("Désactiver cette catégorie ?")) return;
+  const remove = async (id: string, name: string) => {
+    if (!confirm(`Désactiver la catégorie "${name}" ?`)) return;
     try { await api.admin.deleteDowntimeCategory(id); load(); } catch (e: any) { setError(e.message); }
   };
 
@@ -821,7 +821,7 @@ function DowntimesPanel() {
                     <td data-label="Actions" className="py-2 px-3">
                       <div className="flex gap-1">
                         <IconBtn icon={Pencil} onClick={() => startEdit(c)} title="Modifier" />
-                        {c.isActive && <IconBtn icon={Trash2} onClick={() => remove(c.id)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
+                        {c.isActive && <IconBtn icon={Trash2} onClick={() => remove(c.id, c.label)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
                         {!c.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateDowntimeCategory(c.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
                       </div>
                     </td>
