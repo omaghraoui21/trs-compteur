@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, and, or, gte, lte, desc, sql, inArray, isNull, getTableColumns } from "drizzle-orm";
+import { eq, and, or, gte, lte, desc, sql, inArray, isNull, getTableColumns, count } from "drizzle-orm";
 import { sessions, lotEntries, sessionEvents, downtimeEvents, downtimeCategories, equipments, products, lotCadenceChanges, users } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, computeMtbfMttr, computeAClasserMin } from "@trs/engine";
 import type { ProductLotInput } from "@trs/engine";
@@ -533,4 +533,11 @@ dashboardRouter.get("/pending-lots", validateQuery(pendingLotsQuerySchema), asyn
     .orderBy(desc(lotEntries.endedAt));
 
   res.json(lots);
+}));
+
+// Lightweight count of closed lots awaiting supervisor validation.
+dashboardRouter.get("/pending-lots/count", asyncHandler(async (req, res) => {
+  const { db } = req;
+  const [row] = await db.select({ count: count() }).from(lotEntries).where(eq(lotEntries.status, "closed"));
+  res.json({ count: row?.count ?? 0 });
 }));

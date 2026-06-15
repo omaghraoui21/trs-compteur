@@ -141,6 +141,7 @@ export const api = {
     request<DowntimeLogResponse>(`/dashboard/downtime-log?equipmentId=${equipmentId}&from=${from}&to=${to}`),
   pendingLots: (status?: "closed" | "validated" | "rejected" | "all") =>
     request<PendingLot[]>(`/dashboard/pending-lots${status ? `?status=${status}` : ""}`),
+  pendingLotsCount: () => request<{ count: number }>("/dashboard/pending-lots/count"),
 
   // Admin CRUD
   admin: {
