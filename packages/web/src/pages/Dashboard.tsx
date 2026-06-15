@@ -343,7 +343,7 @@ export default function DashboardPage() {
             <TrsChart daily={data.daily} objective={objective} />
             {paretoData
               ? <ParetoChart pareto={paretoData.pareto} totalMin={paretoData.totalMin} onSelectCode={setDrillCode} />
-              : <ChartUnavailable label="Pareto des arrêts" />}
+              : <ChartUnavailable label="Pareto des arrêts" onRetry={() => api.dashboardPareto(selectedEquipment, from, to).then(setParetoData).catch(() => {})} />}
           </div>
 
           {/* ─── Pareto drill-down modal ─────────────────────── */}
@@ -358,8 +358,12 @@ export default function DashboardPage() {
 
           {/* ─── By-Product + Six Losses row ───────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            {byProductData ? <ByProductChart byProduct={byProductData.byProduct} /> : <ChartUnavailable label="TRS par produit" />}
-            {sixLossesData ? <SixLossesChart data={sixLossesData.total} /> : <ChartUnavailable label="Six grandes pertes" />}
+            {byProductData
+              ? <ByProductChart byProduct={byProductData.byProduct} />
+              : <ChartUnavailable label="TRS par produit" onRetry={() => api.dashboardByProduct(selectedEquipment, from, to).then(setByProductData).catch(() => {})} />}
+            {sixLossesData
+              ? <SixLossesChart data={sixLossesData.total} />
+              : <ChartUnavailable label="Six grandes pertes" onRetry={() => api.dashboardSixLosses(selectedEquipment, from, to).then(setSixLossesData).catch(() => {})} />}
           </div>
 
           {/* ─── Cascade + Verification row ──────────────────── */}
@@ -372,7 +376,9 @@ export default function DashboardPage() {
 
           {/* ─── Heatmap row ─────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            {heatmapData ? <HeatmapChart heatmap={heatmapData.heatmap} /> : <ChartUnavailable label="Heatmap horaire" />}
+            {heatmapData
+              ? <HeatmapChart heatmap={heatmapData.heatmap} />
+              : <ChartUnavailable label="Heatmap horaire" onRetry={() => api.dashboardHeatmap(selectedEquipment, from, to).then(setHeatmapData).catch(() => {})} />}
           </div>
 
           {/* ─── Daily breakdown table ───────────────────────── */}
@@ -631,12 +637,20 @@ function DowntimeLog({ log }: { log: DowntimeLogEntry[] }) {
 // fetched — no extra request.
 // Placeholder for an optional chart whose data failed to load (the fetch uses
 // .catch(() => null) so one failing chart never blanks the whole dashboard).
-function ChartUnavailable({ label }: { label: string }) {
+function ChartUnavailable({ label, onRetry }: { label: string; onRetry?: () => void }) {
   return (
     <div className="bg-white rounded-xl border p-6 flex flex-col items-center justify-center text-center text-gray-400 min-h-[200px]">
       <BarChart3 className="h-7 w-7 mb-2 text-gray-300" />
       <p className="text-sm font-medium text-gray-500">{label}</p>
       <p className="text-xs mt-1">Données indisponibles pour cette période.</p>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="mt-3 text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded px-2 py-1"
+        >
+          <RefreshCw className="h-3.5 w-3.5" /> Réessayer
+        </button>
+      )}
     </div>
   );
 }

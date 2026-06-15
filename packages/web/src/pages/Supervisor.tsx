@@ -4,7 +4,7 @@ import { fmtPct, trsColor, diffMinutes, fmtDuration as fmtMinutes } from "@trs/e
 import { useToast } from "@/components/Toast";
 import { ListSkeleton, Skeleton } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
-import { ClipboardCheck, Check, X, ChevronDown, ChevronUp, RefreshCw, Clock, AlertOctagon, ShieldCheck, User, CalendarDays, Cpu, Pencil } from "lucide-react";
+import { ClipboardCheck, Check, X, ChevronDown, ChevronUp, RefreshCw, Clock, AlertOctagon, ShieldCheck, User, CalendarDays, Cpu, Pencil, Loader2 } from "lucide-react";
 
 const PULL_THRESHOLD = 60;
 
@@ -533,16 +533,24 @@ export default function SupervisorPage() {
                         <button
                           onClick={() => openSign(lot.id, "validate")}
                           disabled={submitting || errors.length > 0}
+                          aria-busy={submitting}
                           className="flex-1 bg-green-600 text-white rounded-lg py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-green-700 transition disabled:opacity-40 disabled:pointer-events-none"
                         >
-                          <Check className="h-4 w-4" /> Valider
+                          {submitting && pendingSign?.lotId === lot.id && pendingSign.action === "validate"
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <Check className="h-4 w-4" />}
+                          Valider
                         </button>
                         <button
                           onClick={() => openSign(lot.id, "reject")}
                           disabled={submitting}
+                          aria-busy={submitting}
                           className="flex-1 bg-red-100 text-red-700 rounded-lg py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-red-200 transition disabled:opacity-40 disabled:pointer-events-none"
                         >
-                          <X className="h-4 w-4" /> Rejeter
+                          {submitting && pendingSign?.lotId === lot.id && pendingSign.action === "reject"
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <X className="h-4 w-4" />}
+                          Rejeter
                         </button>
                       </div>
                       {errors.length > 0 && (
@@ -566,11 +574,22 @@ export default function SupervisorPage() {
 
       {/* 21 CFR Part 11 — electronic signature dialog */}
       {pendingSign && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setPendingSign(null)}>
-          <div className="bg-white rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={() => { if (!submitting) setPendingSign(null); }}
+          onKeyDown={(e) => { if (e.key === "Escape" && !submitting) setPendingSign(null); }}
+          role="presentation"
+        >
+          <div
+            className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sign-dialog-title"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center gap-2 mb-1">
-              <ShieldCheck className="h-5 w-5 text-blue-600" />
-              <h3 className="font-semibold">Signature électronique</h3>
+              <ShieldCheck className="h-5 w-5 text-blue-600" aria-hidden="true" />
+              <h3 id="sign-dialog-title" className="font-semibold">Signature électronique</h3>
             </div>
             <p className="text-sm text-gray-600 mb-1">
               {pendingSign.action === "validate" ? "Validation du lot"
@@ -583,25 +602,28 @@ export default function SupervisorPage() {
             <input
               type="password"
               autoFocus
+              aria-label="Mot de passe de signature"
               value={signPassword}
               onChange={(e) => setSignPassword(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && signPassword) handleAction(pendingSign.lotId, pendingSign.action, signPassword); }}
+              onKeyDown={(e) => { if (e.key === "Enter" && signPassword && !submitting) handleAction(pendingSign.lotId, pendingSign.action, signPassword); }}
               placeholder="Mot de passe"
-              className="w-full border rounded-lg px-3 py-2 text-sm mb-4"
+              className="w-full border rounded-lg px-3 py-2 text-sm mb-1"
             />
+            <p className="text-[10px] text-gray-400 mb-3">Appuyez sur Entrée pour signer</p>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setPendingSign(null)} disabled={submitting}
-                className="px-3 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50">Annuler</button>
+                className="px-3 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50 disabled:opacity-50">Annuler</button>
               <button
                 onClick={() => handleAction(pendingSign.lotId, pendingSign.action, signPassword)}
                 disabled={submitting || !signPassword}
-                className={`px-4 py-2 text-sm text-white rounded-lg disabled:opacity-50 ${
+                aria-busy={submitting}
+                className={`px-4 py-2 text-sm text-white rounded-lg disabled:opacity-50 flex items-center gap-1.5 ${
                   pendingSign.action === "validate" ? "bg-green-600 hover:bg-green-700"
                   : pendingSign.action === "reject" ? "bg-red-600 hover:bg-red-700"
                   : "bg-amber-600 hover:bg-amber-700"
                 }`}
               >
-                {submitting ? "Signature…" : "Signer"}
+                {submitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Signature…</> : "Signer"}
               </button>
             </div>
           </div>
