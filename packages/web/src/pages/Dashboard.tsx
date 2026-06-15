@@ -593,9 +593,9 @@ function ParetoDrillModal({ code, pareto, log, onClose }: {
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-gray-500 border-b">
-                  <th className="text-left py-1 px-2">Date / Heure</th>
-                  <th className="text-right py-1 px-2">Durée</th>
-                  <th className="text-left py-1 px-2">Lot</th>
+                  <th scope="col" className="text-left py-1 px-2">Date / Heure</th>
+                  <th scope="col" className="text-right py-1 px-2">Durée</th>
+                  <th scope="col" className="text-left py-1 px-2">Lot</th>
                 </tr>
               </thead>
               <tbody>
@@ -621,7 +621,7 @@ function DowntimeLog({ log }: { log: DowntimeLogEntry[] }) {
   return (
     <div className="bg-white rounded-xl border shadow-sm mt-4 overflow-hidden" role="region" aria-label="Journal des arrêts">
       <div className="flex items-center gap-2 px-4 py-3 border-b">
-        <AlertTriangle className="h-5 w-5 text-red-500" />
+        <AlertTriangle className="h-5 w-5 text-red-500" aria-hidden="true" />
         <h3 className="font-semibold">Journal des arrêts</h3>
         <span className="ml-auto text-xs text-gray-400">{log.length} arrêt{log.length > 1 ? "s" : ""}</span>
       </div>
