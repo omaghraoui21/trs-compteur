@@ -229,6 +229,7 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
 // ─── Rooms Panel ──────────────────────────────────────────
 
 function RoomsPanel() {
+  const toast = useToast();
   const [rooms, setRooms] = useState<AdminRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -265,7 +266,7 @@ function RoomsPanel() {
 
   const remove = async (id: string, name: string) => {
     if (!confirm(`Désactiver le local "${name}" ?`)) return;
-    try { await api.admin.deleteRoom(id); load(); } catch (e: any) { setError(e.message); }
+    try { await api.admin.deleteRoom(id); toast.success(`Local "${name}" désactivé`); load(); } catch (e: any) { setError(e.message); }
   };
 
   if (loading) return <Spinner />;
@@ -304,7 +305,7 @@ function RoomsPanel() {
                     <div className="flex gap-1">
                       <IconBtn icon={Pencil} onClick={() => startEdit(r)} title="Modifier" />
                       {r.isActive && <IconBtn icon={Trash2} onClick={() => remove(r.id, r.name)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                      {!r.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateRoom(r.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
+                      {!r.isActive && <IconBtn icon={Check} onClick={async () => { try { await api.admin.updateRoom(r.id, { isActive: true }); toast.success(`Local "${r.name}" réactivé`); load(); } catch (e: any) { setError(e.message); } }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
                     </div>
                   </td>
                 </tr>
@@ -320,6 +321,7 @@ function RoomsPanel() {
 // ─── Equipments Panel ──────────────────────────────────────
 
 function EquipmentsPanel() {
+  const toast = useToast();
   const [items, setItems] = useState<AdminEquipment[]>([]);
   const [rooms, setRooms] = useState<AdminRoom[]>([]);
   const [loading, setLoading] = useState(true);
@@ -361,7 +363,7 @@ function EquipmentsPanel() {
 
   const remove = async (id: string, name: string) => {
     if (!confirm(`Désactiver l'équipement "${name}" ?`)) return;
-    try { await api.admin.deleteEquipment(id); load(); } catch (e: any) { setError(e.message); }
+    try { await api.admin.deleteEquipment(id); toast.success(`Équipement "${name}" désactivé`); load(); } catch (e: any) { setError(e.message); }
   };
 
   const roomName = (roomId: string) => rooms.find(r => r.id === roomId)?.name || roomId;
@@ -427,7 +429,7 @@ function EquipmentsPanel() {
                     <div className="flex gap-1">
                       <IconBtn icon={Pencil} onClick={() => startEdit(e)} title="Modifier" />
                       {e.isActive && <IconBtn icon={Trash2} onClick={() => remove(e.id, e.name)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                      {!e.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateEquipment(e.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
+                      {!e.isActive && <IconBtn icon={Check} onClick={async () => { try { await api.admin.updateEquipment(e.id, { isActive: true }); toast.success(`Équipement "${e.name}" réactivé`); load(); } catch (err: any) { setError(err.message); } }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
                     </div>
                   </td>
                 </tr>
@@ -443,6 +445,7 @@ function EquipmentsPanel() {
 // ─── Products Panel ──────────────────────────────────────
 
 function ProductsPanel() {
+  const toast = useToast();
   const [items, setItems] = useState<AdminProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -479,7 +482,7 @@ function ProductsPanel() {
 
   const remove = async (id: string, name: string) => {
     if (!confirm(`Désactiver le produit "${name}" ?`)) return;
-    try { await api.admin.deleteProduct(id); load(); } catch (e: any) { setError(e.message); }
+    try { await api.admin.deleteProduct(id); toast.success(`Produit "${name}" désactivé`); load(); } catch (e: any) { setError(e.message); }
   };
 
   if (loading) return <Spinner />;
@@ -527,7 +530,7 @@ function ProductsPanel() {
                     <div className="flex gap-1">
                       <IconBtn icon={Pencil} onClick={() => startEdit(p)} title="Modifier" />
                       {p.isActive && <IconBtn icon={Trash2} onClick={() => remove(p.id, p.name)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                      {!p.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateProduct(p.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
+                      {!p.isActive && <IconBtn icon={Check} onClick={async () => { try { await api.admin.updateProduct(p.id, { isActive: true }); toast.success(`Produit "${p.name}" réactivé`); load(); } catch (err: any) { setError(err.message); } }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
                     </div>
                   </td>
                 </tr>
@@ -543,6 +546,7 @@ function ProductsPanel() {
 // ─── Cadences Panel (Product × Equipment) ────────────────
 
 function CadencesPanel() {
+  const toast = useToast();
   const [cadences, setCadences] = useState<ProductEquipmentCadence[]>([]);
   const [productsList, setProductsList] = useState<AdminProduct[]>([]);
   const [equipmentsList, setEquipmentsList] = useState<AdminEquipment[]>([]);
@@ -550,6 +554,7 @@ function CadencesPanel() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ productId: "", equipmentId: "", cadenceValue: "", cadenceUnit: "u/min", trsObjective: "" });
   const [error, setError] = useState("");
+  const [cadenceSearch, setCadenceSearch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -575,7 +580,7 @@ function CadencesPanel() {
 
   const remove = async (id: string, name: string) => {
     if (!confirm(`Supprimer la cadence "${name}" ?`)) return;
-    try { await api.admin.deleteCadence(id); load(); } catch (e: any) { setError(e.message); }
+    try { await api.admin.deleteCadence(id); toast.success(`Cadence "${name}" supprimée`); load(); } catch (e: any) { setError(e.message); }
   };
 
   const productName = (id: string) => productsList.find(p => p.id === id)?.name || id;
@@ -583,8 +588,16 @@ function CadencesPanel() {
 
   if (loading) return <Spinner />;
 
+  const searchLower = cadenceSearch.toLowerCase();
+  const filteredCadences = searchLower
+    ? cadences.filter(c =>
+        productName(c.productId).toLowerCase().includes(searchLower) ||
+        equipmentName(c.equipmentId).toLowerCase().includes(searchLower)
+      )
+    : cadences;
+
   // Group by equipment
-  const grouped = cadences.reduce<Record<string, ProductEquipmentCadence[]>>((acc, c) => {
+  const grouped = filteredCadences.reduce<Record<string, ProductEquipmentCadence[]>>((acc, c) => {
     const name = equipmentName(c.equipmentId);
     (acc[name] ||= []).push(c);
     return acc;
@@ -592,13 +605,26 @@ function CadencesPanel() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
         <div>
           <p className="text-sm text-gray-500">{cadences.length} cadences configurées</p>
           <p className="text-xs text-gray-400 mt-1">Cadence théorique par couple produit × équipement. Pré-remplit automatiquement le formulaire opérateur.</p>
         </div>
-        <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Ajouter</button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            type="search"
+            value={cadenceSearch}
+            onChange={e => setCadenceSearch(e.target.value)}
+            placeholder="Chercher produit ou équipement…"
+            aria-label="Filtrer les cadences"
+            className="border rounded-lg px-3 py-1.5 text-sm w-56"
+          />
+          <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Ajouter</button>
+        </div>
       </div>
+      {cadenceSearch && filteredCadences.length === 0 && (
+        <p className="text-sm text-gray-400 py-4 text-center">Aucune cadence correspond à « {cadenceSearch} ».</p>
+      )}
 
       {error && <ErrorBanner msg={error} onClose={() => setError("")} />}
 
@@ -669,6 +695,7 @@ function CadencesPanel() {
 // ─── Downtimes Panel (with planned/unplanned toggle) ─────
 
 function DowntimesPanel() {
+  const toast = useToast();
   const [items, setItems] = useState<AdminDowntimeCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -706,7 +733,7 @@ function DowntimesPanel() {
 
   const remove = async (id: string, name: string) => {
     if (!confirm(`Désactiver la catégorie "${name}" ?`)) return;
-    try { await api.admin.deleteDowntimeCategory(id); load(); } catch (e: any) { setError(e.message); }
+    try { await api.admin.deleteDowntimeCategory(id); toast.success(`Catégorie "${name}" désactivée`); load(); } catch (e: any) { setError(e.message); }
   };
 
   const togglePlanned = async (cat: AdminDowntimeCategory) => {
@@ -822,7 +849,7 @@ function DowntimesPanel() {
                       <div className="flex gap-1">
                         <IconBtn icon={Pencil} onClick={() => startEdit(c)} title="Modifier" />
                         {c.isActive && <IconBtn icon={Trash2} onClick={() => remove(c.id, c.label)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                        {!c.isActive && <IconBtn icon={Check} onClick={async () => { await api.admin.updateDowntimeCategory(c.id, { isActive: true }); load(); }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
+                        {!c.isActive && <IconBtn icon={Check} onClick={async () => { try { await api.admin.updateDowntimeCategory(c.id, { isActive: true }); toast.success(`Catégorie "${c.label}" réactivée`); load(); } catch (err: any) { setError(err.message); } }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
                       </div>
                     </td>
                   </tr>
