@@ -332,8 +332,8 @@ export default function DashboardPage() {
                   (NaN/0 TRS) from destabilizing the comparator. */}
               {[...comparisonData.equipments]
                 .sort((a, b) => (b.total.TRS || 0) - (a.total.TRS || 0))
-                .map(ceq => (
-                  <KpiCard key={ceq.equipmentId} metrics={ceq.total} title={ceq.equipmentName} subtitle={`${from} → ${to}`} objective={ceq.trsObjective} />
+                .map((ceq, i) => (
+                  <KpiCard key={ceq.equipmentId} metrics={ceq.total} title={ceq.equipmentName} subtitle={`${from} → ${to}`} rank={i + 1} objective={ceq.trsObjective} />
                 ))}
             </div>
           )}
@@ -729,11 +729,23 @@ function Delta({ curr, prev }: { curr: number; prev: number }) {
   );
 }
 
-function KpiCard({ metrics, title, subtitle, objective, prevMetrics }: { metrics: TrsMetrics; title: string; subtitle?: string; objective?: number; prevMetrics?: TrsMetrics }) {
+function RankBadge({ rank }: { rank: number }) {
+  return (
+    <span
+      className="inline-flex items-center justify-center h-5 min-w-[20px] px-1 rounded-full bg-gray-100 text-gray-500 text-[11px] font-bold shrink-0"
+      aria-label={`Rang ${rank} par TRS`}
+    >
+      #{rank}
+    </span>
+  );
+}
+
+function KpiCard({ metrics, title, subtitle, rank, objective, prevMetrics }: { metrics: TrsMetrics; title: string; subtitle?: string; rank?: number; objective?: number; prevMetrics?: TrsMetrics }) {
   if (metrics.lotCount === 0) {
     return (
       <div className="bg-white rounded-xl border shadow-sm p-6 mb-4" role="region" aria-label={`TRS Consolidé — ${title}`}>
         <div className="flex items-center gap-2 mb-4">
+          {rank != null && <RankBadge rank={rank} />}
           <Gauge className="h-5 w-5 text-blue-600" aria-hidden="true" />
           <div>
             <h3 className="font-semibold leading-tight">TRS Consolidé — {title}</h3>
@@ -756,6 +768,7 @@ function KpiCard({ metrics, title, subtitle, objective, prevMetrics }: { metrics
     <div className="bg-white rounded-xl border shadow-sm p-6 mb-4" role="region" aria-label={`TRS Consolidé — ${title}`}>
       <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
         <div className="flex items-center gap-2">
+          {rank != null && <RankBadge rank={rank} />}
           <Gauge className="h-5 w-5 text-blue-600" aria-hidden="true" />
           <div>
             <h3 className="font-semibold leading-tight">TRS Consolidé — {title}</h3>
