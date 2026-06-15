@@ -462,8 +462,9 @@ export default function SupervisorPage() {
                               { key: "qRej"  as const, label: "Rebut",         placeholder: String(lot.quantityRejected),    hasErr: rejErr },
                             ].map(f => (
                               <div key={f.key}>
-                                <label className="block text-[10px] text-amber-700 mb-0.5">{f.label}</label>
+                                <label htmlFor={`corr-${f.key}-${lot.id}`} className="block text-[10px] text-amber-700 mb-0.5">{f.label}</label>
                                 <input
+                                  id={`corr-${f.key}-${lot.id}`}
                                   type="number" inputMode="numeric" min="0"
                                   value={correctionData[f.key]}
                                   placeholder={f.placeholder}
@@ -483,8 +484,9 @@ export default function SupervisorPage() {
                           )}
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <label className="block text-[10px] text-amber-700 mb-0.5">Cadence</label>
+                              <label htmlFor={`corr-cadence-${lot.id}`} className="block text-[10px] text-amber-700 mb-0.5">Cadence</label>
                               <input
+                                id={`corr-cadence-${lot.id}`}
                                 type="number" inputMode="numeric" min="0"
                                 value={correctionData.cadence}
                                 placeholder={String(lot.cadenceUsed)}
@@ -493,8 +495,9 @@ export default function SupervisorPage() {
                               />
                             </div>
                             <div>
-                              <label className="block text-[10px] text-amber-700 mb-0.5">Unité</label>
+                              <label htmlFor={`corr-unit-${lot.id}`} className="block text-[10px] text-amber-700 mb-0.5">Unité</label>
                               <select
+                                id={`corr-unit-${lot.id}`}
                                 value={correctionData.cadenceUnit || lot.cadenceUnit}
                                 onChange={e => setCorrectionData(prev => ({ ...prev, cadenceUnit: e.target.value }))}
                                 className="w-full border border-amber-300 rounded-lg px-2 py-1.5 text-sm bg-white"
@@ -505,8 +508,9 @@ export default function SupervisorPage() {
                             </div>
                           </div>
                           <div>
-                            <label className="block text-[10px] text-amber-700 mb-0.5">Raison de la correction <span className="text-red-500">*</span></label>
+                            <label htmlFor={`corr-reason-${lot.id}`} className="block text-[10px] text-amber-700 mb-0.5">Raison de la correction <span className="text-red-500">*</span></label>
                             <input
+                              id={`corr-reason-${lot.id}`}
                               value={correctionData.reason}
                               aria-required="true"
                               onChange={e => setCorrectionData(prev => ({ ...prev, reason: e.target.value }))}

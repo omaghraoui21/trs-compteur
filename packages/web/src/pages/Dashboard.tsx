@@ -1045,7 +1045,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
             {/* TOTAL row */}
             <tr className="bg-gray-100 font-bold border-t-2">
               <td className="px-3 py-2"></td>
-              <td className="px-3 py-2">TOTAL</td>
+              <th className="px-3 py-2 text-left" scope="row">TOTAL</th>
               <td className="px-3 py-2 text-right">{fmtDuration(total.tO)}</td>
               <td className="px-3 py-2 text-right">{fmtDuration(total.tAP)}</td>
               <td className="px-3 py-2 text-right">{fmtDuration(total.tR)}</td>
