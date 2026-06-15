@@ -108,6 +108,7 @@ export default function CompteurPage() {
   const [cadences, setCadences] = useState<ProductEquipmentCadence[]>([]);
   const [trsData, setTrsData] = useState<SessionTrsResponse | null>(null);
   const [trsStale, setTrsStale] = useState(false);
+  const [trsRefreshing, setTrsRefreshing] = useState(false);
   const [sessionDts, setSessionDts] = useState<LotDowntime[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [openingSession, setOpeningSession] = useState(false);
@@ -159,6 +160,19 @@ export default function CompteurPage() {
     const iv = setInterval(poll, 30_000);
     return () => clearInterval(iv);
   }, [activeSession, detail]);
+
+  const refreshTrs = useCallback(async () => {
+    if (!activeSession || trsRefreshing) return;
+    setTrsRefreshing(true);
+    try {
+      setTrsData(await api.sessionTrs(activeSession.id));
+      setTrsStale(false);
+    } catch {
+      setTrsStale(true);
+    } finally {
+      setTrsRefreshing(false);
+    }
+  }, [activeSession, trsRefreshing]);
 
   const loadDetail = useCallback(async (sessionId: string) => {
     setDetailLoading(true);
@@ -429,8 +443,17 @@ export default function CompteurPage() {
                 {!trsStale && <span className="h-2 w-2 rounded-full bg-green-400 motion-safe:animate-pulse shrink-0" />}
                 <span className="text-xs text-gray-400">en direct</span>
                 {trsStale && (
-                  <span className="inline-flex items-center gap-1 text-xs text-amber-600" title="La mise à jour automatique a échoué — valeur possiblement périmée">
-                    <AlertTriangle className="h-3.5 w-3.5" /> hors ligne
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                    <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> hors ligne
+                    <button
+                      onClick={refreshTrs}
+                      disabled={trsRefreshing}
+                      aria-label="Actualiser le TRS"
+                      title="Actualiser le TRS"
+                      className="ml-0.5 p-0.5 rounded hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400 disabled:opacity-50"
+                    >
+                      <RotateCcw className={`h-3 w-3 ${trsRefreshing ? "animate-spin" : ""}`} aria-hidden="true" />
+                    </button>
                   </span>
                 )}
               </div>
