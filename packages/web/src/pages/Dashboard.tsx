@@ -972,7 +972,15 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                 <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => onToggleDay(d.date)}>
                   <td className="px-3 py-2">
                     {d.lots && d.lots.length > 0 && (
-                      expandedDay === d.date ? <ChevronUp className="h-3 w-3 text-gray-400" /> : <ChevronDown className="h-3 w-3 text-gray-400" />
+                      <button
+                        type="button"
+                        aria-expanded={expandedDay === d.date}
+                        aria-label={expandedDay === d.date ? "Réduire les lots" : "Afficher les lots"}
+                        onClick={e => { e.stopPropagation(); onToggleDay(d.date); }}
+                        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded"
+                      >
+                        {expandedDay === d.date ? <ChevronUp className="h-3 w-3 text-gray-400" /> : <ChevronDown className="h-3 w-3 text-gray-400" />}
+                      </button>
                     )}
                   </td>
                   <td className="px-3 py-2 font-medium">
