@@ -66,15 +66,15 @@ export default function ByProductChart({ byProduct }: Props) {
         <table className="w-full text-xs">
           <thead>
             <tr className="text-gray-500 border-b">
-              <th className="text-left py-1 px-2">Produit</th>
-              <th className="text-right py-1 px-2">Lots</th>
-              <th className="text-right py-1 px-2">NPR</th>
-              <th className="text-right py-1 px-2">NPC</th>
-              <th className="text-right py-1 px-2">Cad.</th>
-              <th className="text-right py-1 px-2">{byProduct[0]?.trAllocated ? "DO*" : "DO"}</th>
-              <th className="text-right py-1 px-2">TP</th>
-              <th className="text-right py-1 px-2">TQ</th>
-              <th className="text-right py-1 px-2 font-bold">TRS</th>
+              <th scope="col" className="text-left py-1 px-2">Produit</th>
+              <th scope="col" className="text-right py-1 px-2">Lots</th>
+              <th scope="col" className="text-right py-1 px-2">NPR</th>
+              <th scope="col" className="text-right py-1 px-2">NPC</th>
+              <th scope="col" className="text-right py-1 px-2">Cad.</th>
+              <th scope="col" className="text-right py-1 px-2">{byProduct[0]?.trAllocated ? "DO*" : "DO"}</th>
+              <th scope="col" className="text-right py-1 px-2">TP</th>
+              <th scope="col" className="text-right py-1 px-2">TQ</th>
+              <th scope="col" className="text-right py-1 px-2 font-bold">TRS</th>
             </tr>
           </thead>
           <tbody>
@@ -85,8 +85,8 @@ export default function ByProductChart({ byProduct }: Props) {
                   {p.productName}
                 </td>
                 <td className="py-1 px-2 text-right">{p.lotCount}</td>
-                <td className="py-1 px-2 text-right">{p.totalProduced.toLocaleString()}</td>
-                <td className="py-1 px-2 text-right text-red-600">{p.totalRebut.toLocaleString()}</td>
+                <td className="py-1 px-2 text-right">{p.totalProduced.toLocaleString("fr-FR")}</td>
+                <td className="py-1 px-2 text-right text-red-600">{p.totalRebut.toLocaleString("fr-FR")}</td>
                 <td className="py-1 px-2 text-right">{Math.round(p.avgCadencePerMin)} u/min</td>
                 <td className="py-1 px-2 text-right">{fmtPct(p.DO)}</td>
                 <td className="py-1 px-2 text-right">{fmtPct(p.TP)}</td>
