@@ -1125,7 +1125,7 @@ function AuditLogPanel() {
                         <tr key={`${e.id}-payload`}>
                           <td colSpan={6} className="px-4 py-2 bg-gray-50 border-b">
                             <pre className="text-[11px] text-gray-600 whitespace-pre-wrap break-all font-mono max-h-40 overflow-auto">
-                              {JSON.stringify(JSON.parse(e.payload), null, 2)}
+                              {(() => { try { return JSON.stringify(JSON.parse(e.payload), null, 2); } catch { return e.payload; } })()}
                             </pre>
                           </td>
                         </tr>

@@ -930,9 +930,9 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                         </span>
                       )}
                     </div>
-                    {(d as any).notes && (
-                      <div className="text-[10px] text-gray-400 mt-0.5 truncate max-w-[14rem]" title={(d as any).notes}>
-                        📝 {(d as any).notes}
+                    {d.notes && (
+                      <div className="text-[10px] text-gray-400 mt-0.5 truncate max-w-[14rem]" title={d.notes}>
+                        📝 {d.notes}
                       </div>
                     )}
                   </td>
