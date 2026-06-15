@@ -221,7 +221,7 @@ export default function SupervisorPage() {
       )}
 
       <h2 className="text-xl font-bold mb-3 flex items-center gap-2">
-        <ClipboardCheck className="h-5 w-5" /> Validation des lots
+        <ClipboardCheck className="h-5 w-5" aria-hidden="true" /> Validation des lots
       </h2>
 
       {/* Status filter tabs */}
@@ -280,17 +280,17 @@ export default function SupervisorPage() {
                       <span className="font-medium">Lot {lot.batchNumber}</span>
                       {errors.length > 0 && (
                         <span className="inline-flex items-center gap-0.5 bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full">
-                          <AlertOctagon className="h-3 w-3" />{errors.length}
+                          <AlertOctagon className="h-3 w-3" aria-hidden="true" />{errors.length}
                         </span>
                       )}
                       {warnings.length > 0 && (
                         <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full">{warnings.length} alerte{warnings.length > 1 ? "s" : ""}</span>
                       )}
                       {lot.status === "validated" && (
-                        <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full flex items-center gap-0.5"><Check className="h-3 w-3" />Validé</span>
+                        <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full flex items-center gap-0.5"><Check className="h-3 w-3" aria-hidden="true" />Validé</span>
                       )}
                       {lot.status === "rejected" && (
-                        <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full flex items-center gap-0.5"><X className="h-3 w-3" />Rejeté</span>
+                        <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full flex items-center gap-0.5"><X className="h-3 w-3" aria-hidden="true" />Rejeté</span>
                       )}
                     </div>
                     {/* Context: product · equipment · operator · date */}
@@ -298,22 +298,22 @@ export default function SupervisorPage() {
                       <span>{product?.name ?? "—"} · Lot #{lot.lotOrder}</span>
                       {lot.endedAt && (
                         <span className="inline-flex items-center gap-0.5">
-                          <Clock className="h-3 w-3" />{fmtLotDuration(lot.startedAt, lot.endedAt)}
+                          <Clock className="h-3 w-3" aria-hidden="true" />{fmtLotDuration(lot.startedAt, lot.endedAt)}
                         </span>
                       )}
                       <span className="inline-flex items-center gap-0.5">
-                        <Cpu className="h-3 w-3" />{lot.equipmentCode}
+                        <Cpu className="h-3 w-3" aria-hidden="true" />{lot.equipmentCode}
                       </span>
                       <span className="inline-flex items-center gap-0.5">
-                        <User className="h-3 w-3" />{lot.operatorName}
+                        <User className="h-3 w-3" aria-hidden="true" />{lot.operatorName}
                       </span>
                       <span className="inline-flex items-center gap-0.5">
-                        <CalendarDays className="h-3 w-3" />{new Date(lot.sessionDate).toLocaleDateString("fr-FR")}
+                        <CalendarDays className="h-3 w-3" aria-hidden="true" />{new Date(lot.sessionDate).toLocaleDateString("fr-FR")}
                       </span>
                     </div>
                     <QualityBar tq={tq} />
                   </div>
-                  {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400 shrink-0 mt-1" /> : <ChevronDown className="h-4 w-4 text-gray-400 shrink-0 mt-1" />}
+                  {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400 shrink-0 mt-1" aria-hidden="true" /> : <ChevronDown className="h-4 w-4 text-gray-400 shrink-0 mt-1" aria-hidden="true" />}
                 </div>
               </button>
 
@@ -425,7 +425,7 @@ export default function SupervisorPage() {
                   {(lotSignatures[lot.id] ?? []).filter(s => s.action === "correct").map(sig => (
                     <div key={sig.id} className="bg-amber-50 border border-amber-100 rounded-lg p-2">
                       <div className="text-xs font-semibold text-amber-800 mb-0.5 flex items-center gap-1">
-                        <Pencil className="h-3 w-3" /> Correction signée — {sig.userName}
+                        <Pencil className="h-3 w-3" aria-hidden="true" /> Correction signée — {sig.userName}
                       </div>
                       {sig.comment && <div className="text-xs text-amber-700">{sig.comment}</div>}
                       <div className="text-[10px] text-amber-400 mt-0.5">
@@ -576,8 +576,8 @@ export default function SupervisorPage() {
                           className="flex-1 bg-green-600 text-white rounded-lg py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-green-700 transition disabled:opacity-40 disabled:pointer-events-none"
                         >
                           {submitting && pendingSign?.lotId === lot.id && pendingSign.action === "validate"
-                            ? <Loader2 className="h-4 w-4 animate-spin" />
-                            : <Check className="h-4 w-4" />}
+                            ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                            : <Check className="h-4 w-4" aria-hidden="true" />}
                           Valider
                         </button>
                         <button
@@ -587,8 +587,8 @@ export default function SupervisorPage() {
                           className="flex-1 bg-red-100 text-red-700 rounded-lg py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-red-200 transition disabled:opacity-40 disabled:pointer-events-none"
                         >
                           {submitting && pendingSign?.lotId === lot.id && pendingSign.action === "reject"
-                            ? <Loader2 className="h-4 w-4 animate-spin" />
-                            : <X className="h-4 w-4" />}
+                            ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                            : <X className="h-4 w-4" aria-hidden="true" />}
                           Rejeter
                         </button>
                       </div>
@@ -602,7 +602,7 @@ export default function SupervisorPage() {
                     onClick={() => setExpanded(null)}
                     className="w-full flex items-center justify-center gap-1 text-xs text-gray-400 hover:text-gray-600 py-1 border-t mt-1"
                   >
-                    <ChevronUp className="h-3.5 w-3.5" /> Réduire
+                    <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" /> Réduire
                   </button>
                 </div>
               )}
@@ -662,7 +662,7 @@ export default function SupervisorPage() {
                   : "bg-amber-600 hover:bg-amber-700"
                 }`}
               >
-                {submitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Signature…</> : "Signer"}
+                {submitting ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Signature…</> : "Signer"}
               </button>
             </div>
           </div>

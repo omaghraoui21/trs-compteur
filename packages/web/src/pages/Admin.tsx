@@ -34,7 +34,7 @@ export default function AdminPage() {
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
-        <Settings className="h-6 w-6 text-blue-700" />
+        <Settings className="h-6 w-6 text-blue-700" aria-hidden="true" />
         <h1 className="text-2xl font-bold text-gray-800">Configuration</h1>
       </div>
 
@@ -51,7 +51,7 @@ export default function AdminPage() {
                 : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
             }`}
           >
-            <tab.icon className="h-4 w-4" />
+            <tab.icon className="h-4 w-4" aria-hidden="true" />
             {tab.label}
           </button>
         ))}
@@ -128,7 +128,7 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
       <div className="flex justify-end mb-3">
         {!creating && (
           <button onClick={() => setCreating(true)} className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700">
-            <Plus className="h-4 w-4" /> Ajouter
+            <Plus className="h-4 w-4" aria-hidden="true" /> Ajouter
           </button>
         )}
       </div>
@@ -182,13 +182,13 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
                   <td data-label="Statut" className="px-4 py-2">
                     <button onClick={() => toggleActive(u)} disabled={isSelf} className="inline-flex items-center gap-1 disabled:opacity-40">
                       {u.isActive
-                        ? <><ToggleRight className="h-4 w-4 text-green-600" /> <span className="text-green-700 text-xs">Actif</span></>
-                        : <><ToggleLeft className="h-4 w-4 text-gray-400" /> <span className="text-gray-400 text-xs">Inactif</span></>}
+                        ? <><ToggleRight className="h-4 w-4 text-green-600" aria-hidden="true" /> <span className="text-green-700 text-xs">Actif</span></>
+                        : <><ToggleLeft className="h-4 w-4 text-gray-400" aria-hidden="true" /> <span className="text-gray-400 text-xs">Inactif</span></>}
                     </button>
                   </td>
                   <td data-label="Actions" className="px-4 py-2 text-right">
-                    <button onClick={() => { setPwFor(u); setNewPw(""); }} title="Réinitialiser le mot de passe" className="p-1.5 rounded text-gray-500 hover:bg-gray-100">
-                      <KeyRound className="h-4 w-4" />
+                    <button onClick={() => { setPwFor(u); setNewPw(""); }} title="Réinitialiser le mot de passe" aria-label="Réinitialiser le mot de passe" className="p-1.5 rounded text-gray-500 hover:bg-gray-100">
+                      <KeyRound className="h-4 w-4" aria-hidden="true" />
                     </button>
                   </td>
                 </tr>
@@ -275,7 +275,7 @@ function RoomsPanel() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm text-gray-500">{rooms.length} locaux</p>
-        <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Ajouter</button>
+        <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" aria-hidden="true" /> Ajouter</button>
       </div>
 
       {error && <ErrorBanner msg={error} onClose={() => setError("")} />}
@@ -374,7 +374,7 @@ function EquipmentsPanel() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm text-gray-500">{items.length} équipements</p>
-        <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Ajouter</button>
+        <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" aria-hidden="true" /> Ajouter</button>
       </div>
 
       {error && <ErrorBanner msg={error} onClose={() => setError("")} />}
@@ -491,7 +491,7 @@ function ProductsPanel() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm text-gray-500">{items.length} produits</p>
-        <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Ajouter</button>
+        <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" aria-hidden="true" /> Ajouter</button>
       </div>
 
       {error && <ErrorBanner msg={error} onClose={() => setError("")} />}
@@ -625,7 +625,7 @@ function CadencesPanel() {
             aria-label="Filtrer les cadences"
             className="border rounded-lg px-3 py-1.5 text-sm w-56"
           />
-          <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Ajouter</button>
+          <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" aria-hidden="true" /> Ajouter</button>
         </div>
       </div>
       {cadenceSearch && filteredCadences.length === 0 && (
@@ -665,7 +665,7 @@ function CadencesPanel() {
       {Object.entries(grouped).map(([eqName, items]) => (
         <div key={eqName} className="mb-6">
           <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-            <Cpu className="h-4 w-4" /> {eqName}
+            <Cpu className="h-4 w-4" aria-hidden="true" /> {eqName}
             <span className="text-xs font-normal text-gray-400">({items.length} produits)</span>
           </h3>
           <div className="overflow-x-auto">
@@ -777,16 +777,16 @@ function DowntimesPanel() {
               onClick={() => setTreeView(false)}
               className={`px-2.5 py-1.5 flex items-center gap-1 transition ${!treeView ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
             >
-              <List className="h-3 w-3" /> Liste
+              <List className="h-3 w-3" aria-hidden="true" /> Liste
             </button>
             <button
               onClick={() => setTreeView(true)}
               className={`px-2.5 py-1.5 flex items-center gap-1 border-l transition ${treeView ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
             >
-              <Network className="h-3 w-3" /> Arbre
+              <Network className="h-3 w-3" aria-hidden="true" /> Arbre
             </button>
           </div>
-          <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary shrink-0"><Plus className="h-4 w-4" /> Ajouter</button>
+          <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary shrink-0"><Plus className="h-4 w-4" aria-hidden="true" /> Ajouter</button>
         </div>
       </div>
 
@@ -812,7 +812,7 @@ function DowntimesPanel() {
           </div>
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => setForm({ ...form, isPlanned: !form.isPlanned })} aria-pressed={form.isPlanned} className="flex items-center gap-2">
-              {form.isPlanned ? <ToggleRight className="h-6 w-6 text-amber-600" /> : <ToggleLeft className="h-6 w-6 text-gray-400" />}
+              {form.isPlanned ? <ToggleRight className="h-6 w-6 text-amber-600" aria-hidden="true" /> : <ToggleLeft className="h-6 w-6 text-gray-400" aria-hidden="true" />}
               <span className="text-sm">{form.isPlanned ? "Arrêt planifié" : "Arrêt non planifié"}</span>
             </button>
           </div>
@@ -841,11 +841,11 @@ function DowntimesPanel() {
                       <button onClick={() => togglePlanned(c)} aria-pressed={c.isPlanned} className="inline-flex items-center gap-1" title={c.isPlanned ? "Planifié → cliquez pour changer" : "Non planifié → cliquez pour changer"}>
                         {c.isPlanned ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
-                            <ToggleRight className="h-3.5 w-3.5" /> Planifié
+                            <ToggleRight className="h-3.5 w-3.5" aria-hidden="true" /> Planifié
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
-                            <ToggleLeft className="h-3.5 w-3.5" /> Non planifié
+                            <ToggleLeft className="h-3.5 w-3.5" aria-hidden="true" /> Non planifié
                           </span>
                         )}
                       </button>
@@ -998,13 +998,13 @@ function ErrorBanner({ msg, onClose }: { msg: string; onClose: () => void }) {
   return (
     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
       <span className="text-sm text-red-700">{msg}</span>
-      <button onClick={onClose}><X className="h-4 w-4 text-red-400" /></button>
+      <button onClick={onClose} aria-label="Fermer"><X className="h-4 w-4 text-red-400" aria-hidden="true" /></button>
     </div>
   );
 }
 
 function IconBtn({ icon: Icon, onClick, title, className = "text-gray-500 hover:bg-gray-100" }: { icon: typeof Pencil; onClick: () => void; title: string; className?: string }) {
-  return <button onClick={onClick} title={title} className={`p-1.5 rounded transition ${className}`}><Icon className="h-3.5 w-3.5" /></button>;
+  return <button onClick={onClick} title={title} aria-label={title} className={`p-1.5 rounded transition ${className}`}><Icon className="h-3.5 w-3.5" aria-hidden="true" /></button>;
 }
 
 function FormCard({ title, children, onCancel, onSave }: { title: string; children: React.ReactNode; onCancel: () => void; onSave: () => void | Promise<void> }) {
@@ -1101,7 +1101,7 @@ function AuditLogPanel() {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <ScrollText className="h-5 w-5 text-blue-700" />
+        <ScrollText className="h-5 w-5 text-blue-700" aria-hidden="true" />
         <h2 className="font-semibold text-gray-800">Journal d'audit — traçabilité GMP (21 CFR Part 11)</h2>
       </div>
 
@@ -1204,11 +1204,11 @@ function AuditLogPanel() {
             <div className="flex gap-2">
               <button disabled={offset === 0} onClick={() => load(Math.max(0, offset - PAGE_SIZE))}
                 className="flex items-center gap-1 px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50">
-                <ChevronLeft className="h-4 w-4" /> Préc.
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Préc.
               </button>
               <button disabled={entries.length < PAGE_SIZE} onClick={() => load(offset + PAGE_SIZE)}
                 className="flex items-center gap-1 px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50">
-                Suiv. <ChevronRight className="h-4 w-4" />
+                Suiv. <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
           </div>

@@ -742,6 +742,49 @@ describe("computeSixBigLosses (X)", () => {
   });
 });
 
+describe("computeSixBigLosses — isShortStop explicit override", () => {
+  const baseTrs = {
+    tT: 1440, tO: 540, fermeture: 900, tAP: 0, tR: 480, tF: 450,
+    tN: 440, tU: 435, nonQualiteMin: 0, ecartCadenceMin: 0, totalUnplannedMin: 30,
+    DO: 450 / 480, TP: 440 / 450, TQ: 1, TRS: 435 / 480, TRG: 435 / 540,
+    lotCount: 1, totalProduced: 10000, totalConforming: 10000, totalRebut: 0,
+    downtimeByFamille: {}, downtimeByNorme: {}, warnings: [],
+    audit: { tF_norme: 450, tF_lots: 450, tF_delta: 0, formula: "" },
+  };
+
+  it("isShortStop=true forces a long stop (>threshold) into micro_stop", () => {
+    // 20-min stop would normally be a breakdown; operator flagged it as short stop.
+    const result = computeSixBigLosses(baseTrs, [
+      { durationMinutes: 20, isPlanned: false, famille: "Panne équipement", isShortStop: true },
+    ], 5);
+    const breakdown = result.losses.find(l => l.category === "breakdown")!;
+    const microStop = result.losses.find(l => l.category === "micro_stop")!;
+    expect(breakdown.minutes).toBe(0);
+    expect(microStop.minutes).toBe(20);
+  });
+
+  it("isShortStop=false forces a short stop (<threshold) into breakdown", () => {
+    // 2-min stop would normally be a micro-stop; operator flagged it as significant.
+    const result = computeSixBigLosses(baseTrs, [
+      { durationMinutes: 2, isPlanned: false, famille: "Panne équipement", isShortStop: false },
+    ], 5);
+    const breakdown = result.losses.find(l => l.category === "breakdown")!;
+    const microStop = result.losses.find(l => l.category === "micro_stop")!;
+    expect(breakdown.minutes).toBe(2);
+    expect(microStop.minutes).toBe(0);
+  });
+
+  it("isShortStop=null falls back to duration heuristic", () => {
+    const result = computeSixBigLosses(baseTrs, [
+      { durationMinutes: 3, isPlanned: false, famille: "Panne équipement", isShortStop: null },
+    ], 5);
+    const breakdown = result.losses.find(l => l.category === "breakdown")!;
+    const microStop = result.losses.find(l => l.category === "micro_stop")!;
+    expect(breakdown.minutes).toBe(0);
+    expect(microStop.minutes).toBe(3);
+  });
+});
+
 describe("Excel regression — Géluleuse Mai 2026", () => {
   it("Row 7: Aeronide 400µg, lot 26016, cadence 1020 gél/min", () => {
     // Excel: tO=540, tAP=90 (Pause=0, CHSG=0, APR=90, MQCH=0), tR=450
