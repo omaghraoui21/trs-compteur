@@ -326,14 +326,11 @@ export default function DashboardPage() {
         <>
           {/* ─── Comparison mode ─────────────────────────────── */}
           {showComparison && comparisonData && (
-            <>
-              <p className="text-xs text-gray-400 mb-2 text-right">Période comparée : {from} → {to}</p>
-              <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {comparisonData.equipments.map(ceq => (
-                  <KpiCard key={ceq.equipmentId} metrics={ceq.total} title={ceq.equipmentName} objective={ceq.trsObjective} />
-                ))}
-              </div>
-            </>
+            <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {comparisonData.equipments.map(ceq => (
+                <KpiCard key={ceq.equipmentId} metrics={ceq.total} title={ceq.equipmentName} subtitle={`${from} → ${to}`} objective={ceq.trsObjective} />
+              ))}
+            </div>
           )}
 
           {/* ─── Headline stat strip ─────────────────────────── */}
@@ -350,7 +347,7 @@ export default function DashboardPage() {
                   </p>
                 );
               })()}
-              <KpiCard metrics={data.total} title={eq?.name || ""} objective={objective} prevMetrics={prevData?.total ?? undefined} />
+              <KpiCard metrics={data.total} title={eq?.name || ""} subtitle={`${from} → ${to}`} objective={objective} prevMetrics={prevData?.total ?? undefined} />
             </>
           )}
 
@@ -727,13 +724,16 @@ function Delta({ curr, prev }: { curr: number; prev: number }) {
   );
 }
 
-function KpiCard({ metrics, title, objective, prevMetrics }: { metrics: TrsMetrics; title: string; objective?: number; prevMetrics?: TrsMetrics }) {
+function KpiCard({ metrics, title, subtitle, objective, prevMetrics }: { metrics: TrsMetrics; title: string; subtitle?: string; objective?: number; prevMetrics?: TrsMetrics }) {
   if (metrics.lotCount === 0) {
     return (
       <div className="bg-white rounded-xl border shadow-sm p-6 mb-4" role="region" aria-label={`TRS Consolidé — ${title}`}>
         <div className="flex items-center gap-2 mb-4">
-          <Gauge className="h-5 w-5 text-blue-600" />
-          <h3 className="font-semibold">TRS Consolidé — {title}</h3>
+          <Gauge className="h-5 w-5 text-blue-600" aria-hidden="true" />
+          <div>
+            <h3 className="font-semibold leading-tight">TRS Consolidé — {title}</h3>
+            {subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}
+          </div>
         </div>
         <div className="text-center text-gray-400 py-8">
           <BarChart3 className="h-10 w-10 mx-auto mb-3 text-gray-300" />
@@ -751,8 +751,11 @@ function KpiCard({ metrics, title, objective, prevMetrics }: { metrics: TrsMetri
     <div className="bg-white rounded-xl border shadow-sm p-6 mb-4" role="region" aria-label={`TRS Consolidé — ${title}`}>
       <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
         <div className="flex items-center gap-2">
-          <Gauge className="h-5 w-5 text-blue-600" />
-          <h3 className="font-semibold">TRS Consolidé — {title}</h3>
+          <Gauge className="h-5 w-5 text-blue-600" aria-hidden="true" />
+          <div>
+            <h3 className="font-semibold leading-tight">TRS Consolidé — {title}</h3>
+            {subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}
+          </div>
         </div>
         <BenchmarkBadge rating={bench.ratings.TRS} />
       </div>
