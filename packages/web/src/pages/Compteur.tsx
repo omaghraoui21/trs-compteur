@@ -501,13 +501,13 @@ export default function CompteurPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wide text-gray-400 text-left">
-                    <th className="px-4 py-2 font-medium">Lot</th>
-                    <th className="px-4 py-2 font-medium">Produit</th>
-                    <th className="px-4 py-2 font-medium">État</th>
-                    <th className="px-4 py-2 font-medium">Début</th>
-                    <th className="px-4 py-2 font-medium text-right">Consigne</th>
-                    <th className="px-4 py-2 font-medium text-right">Produits</th>
-                    <th className="px-4 py-2 font-medium text-right">Conformes</th>
+                    <th scope="col" className="px-4 py-2 font-medium">Lot</th>
+                    <th scope="col" className="px-4 py-2 font-medium">Produit</th>
+                    <th scope="col" className="px-4 py-2 font-medium">État</th>
+                    <th scope="col" className="px-4 py-2 font-medium">Début</th>
+                    <th scope="col" className="px-4 py-2 font-medium text-right">Consigne</th>
+                    <th scope="col" className="px-4 py-2 font-medium text-right">Produits</th>
+                    <th scope="col" className="px-4 py-2 font-medium text-right">Conformes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -744,24 +744,24 @@ export default function CompteurPage() {
                 {urgentUnclassified ? (
                   <button onClick={() => setView("add-downtime")}
                     className={`flex-1 bg-red-600 text-white ${BTN_PRIMARY} hover:bg-red-700`}>
-                    <AlertTriangle className={BTN_ICON} /> Classez le temps non couvert
+                    <AlertTriangle className={BTN_ICON} aria-hidden="true" /> Classez le temps non couvert
                   </button>
                 ) : (
                   <>
                     <button onClick={() => setView("add-downtime")}
                       className={`flex-1 bg-orange-50 text-orange-700 ${BTN_PRIMARY} hover:bg-orange-100`}>
-                      <AlertTriangle className={BTN_ICON} /> Déclarer un arrêt
+                      <AlertTriangle className={BTN_ICON} aria-hidden="true" /> Déclarer un arrêt
                     </button>
                     {!activeLot && (lastClosedLot ? (
                       <button
                         onClick={() => { setPrefillProductId(lastClosedLot.productId); setView("new-lot"); }}
                         className={`flex-1 bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700`}>
-                        <Zap className={BTN_ICON} /> Lot suivant
+                        <Zap className={BTN_ICON} aria-hidden="true" /> Lot suivant
                       </button>
                     ) : (
                       <button onClick={() => setView("new-lot")}
                         className={`flex-1 bg-green-50 text-green-700 ${BTN_PRIMARY} hover:bg-green-100`}>
-                        <Package className={BTN_ICON} /> Nouveau lot
+                        <Package className={BTN_ICON} aria-hidden="true" /> Nouveau lot
                       </button>
                     ))}
                   </>
@@ -769,7 +769,7 @@ export default function CompteurPage() {
                 <button onClick={handleCloseSession}
                   aria-label="Fermer la session"
                   className={`flex-1 bg-red-50 text-red-700 ${BTN_PRIMARY} hover:bg-red-100`}>
-                  <Square className={BTN_ICON} /> Fermer
+                  <Square className={BTN_ICON} aria-hidden="true" /> Fermer
                 </button>
               </div>
             );
@@ -1251,12 +1251,12 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
       <div className="flex gap-2">
         <button onClick={onAddDowntime}
           className={`flex-1 bg-orange-100 text-orange-700 ${BTN_PRIMARY} hover:bg-orange-200`}>
-          <AlertTriangle className={BTN_ICON} /> Arrêt
+          <AlertTriangle className={BTN_ICON} aria-hidden="true" /> Arrêt
         </button>
         {!showConfirm && (
           <button onClick={handleClose} disabled={closing}
             className={`flex-1 bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700 disabled:opacity-50 ${flashClose ? "btn-flash" : ""}`}>
-            <Square className={BTN_ICON} /> Clôturer lot
+            <Square className={BTN_ICON} aria-hidden="true" /> Clôturer lot
           </button>
         )}
       </div>
@@ -1386,7 +1386,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
           </div>
           {cadenceWarning && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" aria-hidden="true" />
               <p className="text-xs text-amber-700">{cadenceWarning}</p>
             </div>
           )}
@@ -1396,7 +1396,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
           <button onClick={() => setStep("form")}
             aria-label="Retour au formulaire"
             className={`flex-1 border border-gray-300 text-gray-700 ${BTN_PRIMARY} hover:bg-gray-50`}>
-            <ChevronLeft className="h-4 w-4" /> Modifier
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Modifier
           </button>
           <button onClick={submitLot} disabled={loading}
             className={`flex-1 bg-green-600 text-white ${BTN_PRIMARY} hover:bg-green-700 disabled:opacity-50 ${flashStart ? "btn-flash" : ""}`}>
@@ -1856,7 +1856,7 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
 function CheckItem({ ok, warn, label }: { ok: boolean; warn?: boolean; label: string }) {
   return (
     <div className={`flex items-center gap-2 text-sm py-1.5 px-3 rounded-lg ${ok ? "text-green-700 bg-green-50" : warn ? "text-amber-700 bg-amber-50" : "text-red-700 bg-red-50"}`}>
-      {ok ? <CheckCircle className="h-4 w-4 shrink-0" /> : warn ? <AlertTriangle className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
+      {ok ? <CheckCircle className="h-4 w-4 shrink-0" aria-hidden="true" /> : warn ? <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" /> : <XCircle className="h-4 w-4 shrink-0" aria-hidden="true" />}
       <span>{label}</span>
     </div>
   );
@@ -1980,7 +1980,7 @@ function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, isC
           </button>
           <button onClick={onConfirm} disabled={classifiedBlocking || isClosing}
             className={`flex-1 bg-red-600 text-white ${BTN_PRIMARY} hover:bg-red-700 disabled:opacity-40 disabled:pointer-events-none`}>
-            {isClosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
+            {isClosing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Square className="h-4 w-4" aria-hidden="true" />}
             {isClosing ? "Fermeture…" : "Fermer"}
           </button>
         </div>
