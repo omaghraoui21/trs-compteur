@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, groupSessionsByPeriod, isoWeekKey, periodKey, familleToNorme, timeWeightedCadence } from "./trs";
+import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, groupSessionsByPeriod, isoWeekKey, periodKey, familleToNorme, timeWeightedCadence, computeMtbfMttr, computeAClasserMin, computeOeeBenchmark } from "./trs";
 
 describe("timeWeightedCadence", () => {
   const start = new Date("2026-06-01T08:00:00Z");
@@ -1012,5 +1012,106 @@ describe("computeProductTrs reconciliation", () => {
     const results = computeProductTrs(lots);
     expect(results[0].trAllocated).toBe(false);
     expect(results[0].tR).toBe(300);
+  });
+});
+
+describe("computeMtbfMttr", () => {
+  it("returns null metrics when there are no breakdowns above the threshold", () => {
+    // Two micro-stops below the 5-min default threshold — should not count as breakdowns.
+    const r = computeMtbfMttr([
+      { durationMinutes: 2, isPlanned: false },
+      { durationMinutes: 4, isPlanned: false },
+    ], 480);
+    expect(r).toEqual({ breakdownCount: 0, totalBreakdownMin: 0, mtbf: null, mttr: null, availability: null });
+  });
+
+  it("ignores planned stops when computing MTBF/MTTR", () => {
+    const r = computeMtbfMttr([
+      { durationMinutes: 60, isPlanned: true },   // planned — excluded
+      { durationMinutes: 30, isPlanned: false },  // unplanned breakdown
+    ], 480);
+    expect(r.breakdownCount).toBe(1);
+    expect(r.mtbf).toBe(480); // 480 / 1
+    expect(r.mttr).toBe(30);  // 30 / 1
+    expect(r.availability).toBeCloseTo(480 / (480 + 30), 6);
+  });
+
+  it("accumulates multiple breakdowns correctly", () => {
+    const r = computeMtbfMttr([
+      { durationMinutes: 20, isPlanned: false },
+      { durationMinutes: 40, isPlanned: false },
+    ], 480);
+    expect(r.breakdownCount).toBe(2);
+    expect(r.totalBreakdownMin).toBe(60);
+    expect(r.mtbf).toBe(240);          // 480 / 2
+    expect(r.mttr).toBe(30);           // 60 / 2
+    expect(r.availability).toBeCloseTo(240 / (240 + 30), 6);
+  });
+
+  it("respects a custom microStopThresholdMin", () => {
+    // With threshold = 15, a 10-min stop is a micro-stop (excluded).
+    const r = computeMtbfMttr([{ durationMinutes: 10, isPlanned: false }], 480, 15);
+    expect(r.breakdownCount).toBe(0);
+    // With threshold = 10, the same stop qualifies.
+    const r2 = computeMtbfMttr([{ durationMinutes: 10, isPlanned: false }], 480, 10);
+    expect(r2.breakdownCount).toBe(1);
+  });
+});
+
+describe("computeAClasserMin", () => {
+  it("returns the unaccounted wall-clock time", () => {
+    // 480 min total, 420 min in lots, 30 planned, 20 unplanned → 10 min à classer
+    expect(computeAClasserMin(480, 420, 30, 20)).toBe(10);
+  });
+
+  it("clamps to 0 when stops + lots exceed tO (over-allocation)", () => {
+    expect(computeAClasserMin(480, 450, 30, 20)).toBe(0);
+  });
+
+  it("rounds sub-minute remainders", () => {
+    // 480 - 419.4 - 30 - 20 = 10.6 → rounds to 11
+    expect(computeAClasserMin(480, 419.4, 30, 20)).toBe(11);
+  });
+});
+
+describe("computeOeeBenchmark", () => {
+  it("rates world-class pharma metrics as world_class", () => {
+    const r = computeOeeBenchmark({ DO: 0.90, TP: 0.90, TQ: 0.995, TRS: 0.70 }, "pharmaceutical");
+    expect(r.industry).toBe("pharmaceutical");
+    expect(r.ratings.TRS).toBe("world_class");
+    expect(r.ratings.DO).toBe("world_class");
+    expect(r.ratings.TP).toBe("world_class");
+    expect(r.ratings.TQ).toBe("world_class");
+  });
+
+  it("rates below-threshold pharma metrics as below", () => {
+    const r = computeOeeBenchmark({ DO: 0.60, TP: 0.70, TQ: 0.960, TRS: 0.40 }, "pharmaceutical");
+    expect(r.ratings.TRS).toBe("below");
+    expect(r.ratings.DO).toBe("below");
+    expect(r.ratings.TP).toBe("below");
+    expect(r.ratings.TQ).toBe("below");
+  });
+
+  it("correctly classifies the acceptable band", () => {
+    // pharmaceutical: TRS acceptable ≥ 0.50, world_class ≥ 0.65
+    const r = computeOeeBenchmark({ DO: 0.75, TP: 0.78, TQ: 0.975, TRS: 0.55 }, "pharmaceutical");
+    expect(r.ratings.TRS).toBe("acceptable");
+    expect(r.ratings.DO).toBe("acceptable");
+    expect(r.ratings.TP).toBe("acceptable");
+    expect(r.ratings.TQ).toBe("acceptable");
+  });
+
+  it("defaults to pharmaceutical industry when no industry is specified", () => {
+    const r = computeOeeBenchmark({ DO: 0.90, TP: 0.90, TQ: 0.995, TRS: 0.70 });
+    expect(r.industry).toBe("pharmaceutical");
+    expect(r.thresholds.trs.worldClass).toBe(0.65);
+  });
+
+  it("applies the general (Nakajima) 85% world-class threshold", () => {
+    const r = computeOeeBenchmark({ DO: 0.90, TP: 0.90, TQ: 0.995, TRS: 0.80 }, "general");
+    // 0.80 < 0.85 world-class but ≥ 0.65 acceptable
+    expect(r.ratings.TRS).toBe("acceptable");
+    const r2 = computeOeeBenchmark({ DO: 0.92, TP: 0.96, TQ: 0.999, TRS: 0.86 }, "general");
+    expect(r2.ratings.TRS).toBe("world_class");
   });
 });
