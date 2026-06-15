@@ -1115,3 +1115,55 @@ describe("computeOeeBenchmark", () => {
     expect(r2.ratings.TRS).toBe("world_class");
   });
 });
+
+describe("computeProductTrs edge cases", () => {
+  it("converts u/h cadence to per-minute for avgCadencePerMin", () => {
+    const lots = [
+      { productId: "p1", productName: "X", cadence: 6000, cadenceUnit: "u/h" as const,
+        produced: 10000, conforming: 10000, lotDurationMin: 100, unplannedMin: 0, tF: 100, tN: 100, tU: 100 },
+    ];
+    const results = computeProductTrs(lots);
+    // 6000 u/h = 100 u/min
+    expect(results[0].avgCadencePerMin).toBeCloseTo(100, 6);
+  });
+
+  it("defaults TQ to 1 when no units were produced", () => {
+    const lots = [
+      { productId: "p1", productName: "X", cadence: 120, cadenceUnit: "u/min" as const,
+        produced: 0, conforming: 0, lotDurationMin: 60, unplannedMin: 0, tF: 0, tN: 0, tU: 0 },
+    ];
+    const results = computeProductTrs(lots);
+    expect(results[0].TQ).toBe(1);
+  });
+
+  it("returns TP = 0 when tF is zero", () => {
+    const lots = [
+      { productId: "p1", productName: "X", cadence: 120, cadenceUnit: "u/min" as const,
+        produced: 0, conforming: 0, lotDurationMin: 60, unplannedMin: 60, tF: 0, tN: 0, tU: 0 },
+    ];
+    const results = computeProductTrs(lots);
+    expect(results[0].TP).toBe(0);
+  });
+
+  it("sorts results by TRS descending", () => {
+    const lots = [
+      { productId: "low",  productName: "Low",  cadence: 100, cadenceUnit: "u/min" as const,
+        produced: 5000, conforming: 4800, lotDurationMin: 120, unplannedMin: 30, tF: 90, tN: 80, tU: 72 },
+      { productId: "high", productName: "High", cadence: 120, cadenceUnit: "u/min" as const,
+        produced: 28800, conforming: 28800, lotDurationMin: 240, unplannedMin: 0, tF: 240, tN: 240, tU: 240 },
+    ];
+    const results = computeProductTrs(lots);
+    expect(results[0].productId).toBe("high");
+    expect(results[1].productId).toBe("low");
+    expect(results[0].TRS).toBeGreaterThan(results[1].TRS);
+  });
+
+  it("returns avgCadencePerMin = 0 when totalDurationMin is zero", () => {
+    const lots = [
+      { productId: "p1", productName: "X", cadence: 120, cadenceUnit: "u/min" as const,
+        produced: 0, conforming: 0, lotDurationMin: 0, unplannedMin: 0, tF: 0, tN: 0, tU: 0 },
+    ];
+    const results = computeProductTrs(lots);
+    expect(results[0].avgCadencePerMin).toBe(0);
+  });
+});

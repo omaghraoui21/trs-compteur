@@ -234,7 +234,7 @@ export default function DashboardPage() {
   return (
     <div className="max-w-6xl mx-auto">
       <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-        <BarChart3 className="h-5 w-5" /> Tableau de bord TRS
+        <BarChart3 className="h-5 w-5" aria-hidden="true" /> Tableau de bord TRS
       </h2>
 
       {/* ─── Filters ────────────────────────────────────────── */}
@@ -284,15 +284,15 @@ export default function DashboardPage() {
           <button onClick={() => setShowComparison(!showComparison)}
             aria-pressed={showComparison}
             className={`flex items-center gap-1 px-3 py-2 text-sm rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${showComparison ? "bg-blue-50 border-blue-300 text-blue-700" : "text-gray-600 hover:bg-gray-50"}`}>
-            <ArrowLeftRight className="h-4 w-4" /> Comparer
+            <ArrowLeftRight className="h-4 w-4" aria-hidden="true" /> Comparer
           </button>
           <button onClick={exportCsv}
             className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border text-gray-600 hover:bg-gray-50">
-            <Download className="h-4 w-4" /> CSV
+            <Download className="h-4 w-4" aria-hidden="true" /> CSV
           </button>
           <button onClick={exportPdf} disabled={pdfLoading}
             className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
-            {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+            {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <FileText className="h-4 w-4" aria-hidden="true" />}
             {pdfLoading ? "PDF…" : "PDF"}
           </button>
         </div>
@@ -304,7 +304,7 @@ export default function DashboardPage() {
           <p className="text-sm mt-1 mb-4">Vérifiez votre connexion, puis réessayez.</p>
           <button onClick={loadEquipments}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition">
-            <RefreshCw className="h-4 w-4" /> Réessayer
+            <RefreshCw className="h-4 w-4" aria-hidden="true" /> Réessayer
           </button>
         </div>
       )}
@@ -317,7 +317,7 @@ export default function DashboardPage() {
           <p className="text-sm mt-1 mb-4">Vérifiez votre connexion, puis réessayez.</p>
           <button onClick={fetchData}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition">
-            <RefreshCw className="h-4 w-4" /> Réessayer
+            <RefreshCw className="h-4 w-4" aria-hidden="true" /> Réessayer
           </button>
         </div>
       )}
@@ -454,7 +454,7 @@ function LinePerformanceBand({ daily }: { daily: DailyTrs[] }) {
   return (
     <div className="bg-white rounded-xl border shadow-sm p-4 mb-4" role="region" aria-label="Line Performance">
       <div className="flex items-center gap-2 mb-3">
-        <BarChart3 className="h-5 w-5 text-blue-600" />
+        <BarChart3 className="h-5 w-5 text-blue-600" aria-hidden="true" />
         <h3 className="font-semibold">Line Performance</h3>
       </div>
       <div className="flex items-end gap-0.5 h-36">
@@ -678,7 +678,7 @@ function DowntimeLog({ log }: { log: DowntimeLogEntry[] }) {
 function ChartUnavailable({ label, onRetry }: { label: string; onRetry?: () => void }) {
   return (
     <div className="bg-white rounded-xl border p-6 flex flex-col items-center justify-center text-center text-gray-400 min-h-[200px]">
-      <BarChart3 className="h-7 w-7 mb-2 text-gray-300" />
+      <BarChart3 className="h-7 w-7 mb-2 text-gray-300" aria-hidden="true" />
       <p className="text-sm font-medium text-gray-500">{label}</p>
       <p className="text-xs mt-1">Données indisponibles pour cette période.</p>
       {onRetry && (
@@ -686,7 +686,7 @@ function ChartUnavailable({ label, onRetry }: { label: string; onRetry?: () => v
           onClick={onRetry}
           className="mt-3 text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded px-2 py-1"
         >
-          <RefreshCw className="h-3.5 w-3.5" /> Réessayer
+          <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /> Réessayer
         </button>
       )}
     </div>
@@ -753,7 +753,7 @@ function KpiCard({ metrics, title, subtitle, rank, objective, prevMetrics }: { m
           </div>
         </div>
         <div className="text-center text-gray-400 py-8">
-          <BarChart3 className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+          <BarChart3 className="h-10 w-10 mx-auto mb-3 text-gray-300" aria-hidden="true" />
           <p className="font-medium text-gray-500">Aucune donnée pour cette période</p>
           <p className="text-sm mt-1">Ajustez les filtres ou sélectionnez une autre plage.</p>
         </div>
@@ -880,7 +880,7 @@ function WarningsBanner({ warnings, audit }: { warnings?: TrsMetrics["warnings"]
     <div className="mt-3 space-y-1">
       {errors.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+          <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" aria-hidden="true" />
           <div className="text-xs text-red-700 space-y-0.5">
             {errors.map((w, i) => <div key={i}>{w.message}</div>)}
           </div>
@@ -888,7 +888,7 @@ function WarningsBanner({ warnings, audit }: { warnings?: TrsMetrics["warnings"]
       )}
       {warns.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+          <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" aria-hidden="true" />
           <div className="text-xs text-amber-700 space-y-0.5">
             {warns.map((w, i) => <div key={i}>{w.message}</div>)}
           </div>
@@ -896,7 +896,7 @@ function WarningsBanner({ warnings, audit }: { warnings?: TrsMetrics["warnings"]
       )}
       {audit && Math.abs(audit.tF_delta) > 5 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-start gap-2">
-          <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" aria-hidden="true" />
           <div className="text-xs text-blue-700">
             Audit: {audit.formula} (écart lots: {audit.tF_delta.toFixed(0)}min)
           </div>
@@ -969,12 +969,12 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
     <div className="bg-white rounded-xl border shadow-sm" role="region" aria-label="Détail par jour">
       <div className="px-4 py-3 border-b flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-gray-400" />
+          <Calendar className="h-4 w-4 text-gray-400" aria-hidden="true" />
           <h3 className="font-semibold text-sm">Détail par jour</h3>
         </div>
         <button onClick={exportCsv}
           className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700">
-          <Download className="h-3 w-3" /> Export CSV
+          <Download className="h-3 w-3" aria-hidden="true" /> Export CSV
         </button>
       </div>
       <div className="relative overflow-auto max-h-[480px]">
@@ -1010,7 +1010,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                         onClick={e => { e.stopPropagation(); onToggleDay(d.date); }}
                         className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded"
                       >
-                        {expandedDay === d.date ? <ChevronUp className="h-3 w-3 text-gray-400" /> : <ChevronDown className="h-3 w-3 text-gray-400" />}
+                        {expandedDay === d.date ? <ChevronUp className="h-3 w-3 text-gray-400" aria-hidden="true" /> : <ChevronDown className="h-3 w-3 text-gray-400" aria-hidden="true" />}
                       </button>
                     )}
                   </td>
