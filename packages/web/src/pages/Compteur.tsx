@@ -110,6 +110,7 @@ export default function CompteurPage() {
   const [trsStale, setTrsStale] = useState(false);
   const [sessionDts, setSessionDts] = useState<LotDowntime[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [openingSession, setOpeningSession] = useState(false);
   const [error, setError] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [prefillProductId, setPrefillProductId] = useState("");
@@ -210,7 +211,9 @@ export default function CompteurPage() {
   };
 
   const handleOpenSession = async () => {
-    if (!selectedEquipment || !selectedRoom) return;
+    if (!selectedEquipment || !selectedRoom || openingSession) return;
+    setOpeningSession(true);
+    setError("");
     try {
       const session = await api.openSession(selectedEquipment.id, selectedRoom.id);
       setActiveSession(session);
@@ -218,6 +221,8 @@ export default function CompteurPage() {
       await loadDetail(session.id);
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setOpeningSession(false);
     }
   };
 
@@ -510,9 +515,15 @@ export default function CompteurPage() {
       {error && <div className="bg-red-50 text-red-600 rounded-lg p-3 mb-4 text-sm">{error}</div>}
 
       {!activeSession && (
-        <button onClick={handleOpenSession}
-          className={`w-full ${equipmentAccent(selectedEquipment?.equipmentType).btnOpen} ${BTN_PRIMARY} text-lg`}>
-          <Play className={BTN_ICON} /> Ouvrir le compteur
+        <button
+          onClick={handleOpenSession}
+          disabled={openingSession}
+          aria-busy={openingSession}
+          className={`w-full ${equipmentAccent(selectedEquipment?.equipmentType).btnOpen} ${BTN_PRIMARY} text-lg disabled:opacity-60`}
+        >
+          {openingSession
+            ? <><Loader2 className={`${BTN_ICON} animate-spin`} /> Ouverture…</>
+            : <><Play className={BTN_ICON} /> Ouvrir le compteur</>}
         </button>
       )}
 

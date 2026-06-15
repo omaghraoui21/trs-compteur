@@ -541,14 +541,25 @@ function ParetoDrillModal({ code, pareto, log, onClose }: {
   );
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+      onKeyDown={e => { if (e.key === "Escape") onClose(); }}
+      role="presentation"
+    >
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pareto-drill-title"
+        onClick={e => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between p-4 border-b">
           <div>
-            <h3 className="font-semibold">{cause?.label ?? code}</h3>
+            <h3 id="pareto-drill-title" className="font-semibold">{cause?.label ?? code}</h3>
             {cause && <p className="text-xs text-gray-400 mt-0.5">{cause.famille} · {fmtDuration(cause.totalMin)} · {cause.count} occurrence{cause.count > 1 ? "s" : ""}</p>}
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+          <button onClick={onClose} aria-label="Fermer" className="text-gray-400 hover:text-gray-600 text-xl leading-none p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400">✕</button>
         </div>
 
         <div className="overflow-y-auto flex-1 p-4">
