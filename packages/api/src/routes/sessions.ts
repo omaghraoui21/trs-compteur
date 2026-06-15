@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { eq, and, desc, inArray, isNull } from "drizzle-orm";
 import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories, lotCadenceChanges } from "@trs/db";
-import { computeLotTrs, computeSessionTrs, computeAClasserMin, diffMinutes } from "@trs/engine";
+import { computeLotTrs, computeSessionTrs, computeAClasserMin, computeMtbfMttr, diffMinutes } from "@trs/engine";
 import { authenticate } from "../middleware";
 import { asyncHandler, validate, validateQuery } from "../lib/http";
 import { audit } from "../lib/audit";
@@ -335,5 +335,13 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
   // unclassified — and so this matches the dashboard's aggregation.
   const aClasserMin = computeAClasserMin(sessionTrs.tO, lotsDurationMin, plannedStopsMin, sessionUnplannedMin);
 
-  res.json({ session: sessionTrs, lots: lotResults, aClasserMin });
+  // MTBF/MTTR — combine session-level and lot-level unplanned stops.
+  // Default micro-stop threshold = 5 min (ignores micro-stops from TP bucket).
+  const allDowntimesForReliability = [
+    ...sessionDts,
+    ...allDts.map(d => ({ durationMinutes: d.durationMinutes, isPlanned: d.isPlanned })),
+  ];
+  const reliability = computeMtbfMttr(allDowntimesForReliability, sessionTrs.tF);
+
+  res.json({ session: { ...sessionTrs, reliability }, lots: lotResults, aClasserMin });
 }));

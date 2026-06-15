@@ -1068,6 +1068,23 @@ function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs:
           </span>
         )}
       </div>
+      {sessionTrs.reliability && sessionTrs.reliability.breakdownCount > 0 && (
+        <div className="flex items-center gap-4 mt-2 text-xs border-t pt-2">
+          <span className="text-gray-500">
+            Pannes: <span className="font-medium text-red-600">{sessionTrs.reliability.breakdownCount}</span>
+          </span>
+          {sessionTrs.reliability.mtbf != null && (
+            <span className="text-gray-500">
+              MTBF: <span className="font-medium">{fmtDuration(Math.round(sessionTrs.reliability.mtbf))}</span>
+            </span>
+          )}
+          {sessionTrs.reliability.mttr != null && (
+            <span className="text-gray-500">
+              MTTR: <span className="font-medium">{fmtDuration(Math.round(sessionTrs.reliability.mttr))}</span>
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

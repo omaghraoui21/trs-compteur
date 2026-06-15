@@ -46553,7 +46553,12 @@ sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
     lots: lotResults
   });
   const aClasserMin = computeAClasserMin(sessionTrs.tO, lotsDurationMin, plannedStopsMin, sessionUnplannedMin);
-  res.json({ session: sessionTrs, lots: lotResults, aClasserMin });
+  const allDowntimesForReliability = [
+    ...sessionDts,
+    ...allDts.map((d) => ({ durationMinutes: d.durationMinutes, isPlanned: d.isPlanned }))
+  ];
+  const reliability = computeMtbfMttr(allDowntimesForReliability, sessionTrs.tF);
+  res.json({ session: { ...sessionTrs, reliability }, lots: lotResults, aClasserMin });
 }));
 
 // packages/api/src/routes/lots.ts
