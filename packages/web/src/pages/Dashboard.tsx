@@ -808,7 +808,7 @@ function KpiCard({ metrics, title, objective, prevMetrics }: { metrics: TrsMetri
             {fmtPct(metrics.utilisation ?? 0)}
           </div>
           {(metrics.utilisation ?? 0) > 1 ? (
-            <div className="text-[10px] text-amber-600 mt-0.5">⚠ &gt;100% — vérifier les données</div>
+            <div className="text-[10px] text-amber-600 mt-0.5 flex items-center gap-0.5"><AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />&gt;100% — vérifier les données</div>
           ) : (
             <div className="text-[10px] text-gray-400 mt-0.5">tO / 24h</div>
           )}
@@ -832,7 +832,7 @@ function KpiCard({ metrics, title, objective, prevMetrics }: { metrics: TrsMetri
       {objective != null && (
         <div className="text-xs text-gray-500 flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${metrics.TRS >= objective / 100 ? "bg-green-500" : "bg-red-500"}`} />
-          Objectif: {objective}% — {metrics.TRS >= objective / 100 ? "Atteint ✓" : "Non atteint"}
+          Objectif: {objective}% — {metrics.TRS >= objective / 100 ? "Atteint" : "Non atteint"}
         </div>
       )}
 
@@ -1079,6 +1079,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
         {/* Fade hint on mobile to indicate horizontal scroll */}
         <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent lg:hidden" />
       </div>
+      <p className="lg:hidden text-[11px] text-gray-400 text-center py-1.5 border-t">← Glissez pour voir les métriques →</p>
     </div>
   );
 }

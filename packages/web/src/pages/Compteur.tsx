@@ -1414,7 +1414,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
             <p className="text-xs text-red-600 mt-1">Format invalide — lettres majuscules, chiffres, tirets, points et "/" uniquement (30 car. max.)</p>
           )}
           {batchDuplicate && /^[A-Z0-9-_./]{1,30}$/.test(batch) && (
-            <p className="text-xs text-amber-600 mt-1">⚠ Ce numéro de lot a déjà été utilisé dans cette session.</p>
+            <p className="text-xs text-amber-600 mt-1 flex items-center gap-1"><AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />Ce numéro de lot a déjà été utilisé dans cette session.</p>
           )}
           {suggestedBatch && batch === suggestedBatch && /^[A-Z0-9-_./]{1,30}$/.test(batch) && !batchDuplicate && (
             <p className="text-xs text-blue-600 mt-1">Auto-suggéré : {suggestedBatch}</p>
