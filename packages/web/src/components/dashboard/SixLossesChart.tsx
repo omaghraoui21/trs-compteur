@@ -30,7 +30,7 @@ export default function SixLossesChart({ data }: Props) {
     return (
       <div className="bg-white rounded-xl border shadow-sm p-4" role="region" aria-label="6 Grandes Pertes">
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-600" /> 6 Grandes Pertes (Nakajima)
+          <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden="true" /> 6 Grandes Pertes (Nakajima)
         </h3>
         <div className="text-center text-gray-400 py-8 text-sm">Aucune perte enregistrée</div>
       </div>
@@ -54,7 +54,7 @@ export default function SixLossesChart({ data }: Props) {
   return (
     <div className="bg-white rounded-xl border shadow-sm p-4" role="region" aria-label="6 Grandes Pertes">
       <h3 className="font-semibold text-sm mb-1 flex items-center gap-2">
-        <AlertTriangle className="h-4 w-4 text-amber-600" /> 6 Grandes Pertes (Nakajima/TPM)
+        <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden="true" /> 6 Grandes Pertes (Nakajima/TPM)
       </h3>
       <p className="text-xs text-gray-500 mb-3">Classification NF E 60-182 — Total pertes : {fmtDuration(totalLossMin)}</p>
 
