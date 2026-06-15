@@ -887,9 +887,9 @@ function TimeBuckets({ metrics }: { metrics: TrsMetrics }) {
     { label: "tN", value: fmtDuration(Math.round(metrics.tN)), color: "text-green-700" },
     { label: "tU", value: fmtDuration(Math.round(metrics.tU)), color: "text-green-800" },
     { label: "Lots", value: String(metrics.lotCount) },
-    { label: "NPR", value: metrics.totalProduced.toLocaleString() },
-    { label: "NPB", value: metrics.totalConforming.toLocaleString() },
-    { label: "NPC", value: metrics.totalRebut.toLocaleString(), color: "text-red-600" },
+    { label: "NPR", value: metrics.totalProduced.toLocaleString("fr-FR") },
+    { label: "NPB", value: metrics.totalConforming.toLocaleString("fr-FR") },
+    { label: "NPC", value: metrics.totalRebut.toLocaleString("fr-FR"), color: "text-red-600" },
   ];
 
   return (
@@ -1008,7 +1008,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                   <td className="px-3 py-2 text-right text-gray-500">{fmtDuration(d.tR)}</td>
                   <td className="px-3 py-2 text-right text-gray-500">{fmtDuration(Math.round(d.tF))}</td>
                   <td className="px-3 py-2 text-right">{d.lotCount}</td>
-                  <td className="px-3 py-2 text-right">{d.totalProduced.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right">{d.totalProduced.toLocaleString("fr-FR")}</td>
                   <td className="px-3 py-2 text-right text-red-600">{d.totalRebut.toLocaleString("fr-FR")}</td>
                   <td className="px-3 py-2 text-right">{fmtPct(d.DO)}</td>
                   <td className="px-3 py-2 text-right">{fmtPct(d.TP)}</td>
@@ -1039,7 +1039,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                     <td className="px-3 py-1.5 text-right text-gray-400">—</td>
                     <td className="px-3 py-1.5 text-right text-gray-400">{fmtDuration(Math.round(lot.tF))}</td>
                     <td className="px-3 py-1.5 text-right">1</td>
-                    <td className="px-3 py-1.5 text-right">{lot.quantityProduced?.toLocaleString()}</td>
+                    <td className="px-3 py-1.5 text-right">{lot.quantityProduced?.toLocaleString("fr-FR")}</td>
                     <td className="px-3 py-1.5 text-right text-red-500">{lot.rebut?.toLocaleString("fr-FR") ?? 0}</td>
                     <td className="px-3 py-1.5 text-right">—</td>
                     <td className="px-3 py-1.5 text-right" style={{ color: lot.TP > 1 ? "#d97706" : undefined }}>{fmtPct(lot.TP)}</td>
@@ -1059,7 +1059,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
               <td className="px-3 py-2 text-right">{fmtDuration(total.tR)}</td>
               <td className="px-3 py-2 text-right">{fmtDuration(Math.round(total.tF))}</td>
               <td className="px-3 py-2 text-right">{total.lotCount}</td>
-              <td className="px-3 py-2 text-right">{total.totalProduced.toLocaleString()}</td>
+              <td className="px-3 py-2 text-right">{total.totalProduced.toLocaleString("fr-FR")}</td>
               <td className="px-3 py-2 text-right text-red-600">{total.totalRebut.toLocaleString("fr-FR")}</td>
               <td className="px-3 py-2 text-right">{fmtPct(total.DO)}</td>
               <td className="px-3 py-2 text-right">{fmtPct(total.TP)}</td>

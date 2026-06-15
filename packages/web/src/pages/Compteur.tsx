@@ -441,8 +441,8 @@ export default function CompteurPage() {
               <div className="text-[11px] text-gray-400 mb-0.5">Lot en cours</div>
               {activeLot ? (
                 <>
-                  <div className="font-bold text-base leading-tight truncate">{activeLot.batchNumber}</div>
-                  <div className="text-xs text-gray-500 truncate">{activeLotProduct?.name ?? ""}</div>
+                  <div className="font-bold text-base leading-tight truncate" title={activeLot.batchNumber}>{activeLot.batchNumber}</div>
+                  <div className="text-xs text-gray-500 truncate" title={activeLotProduct?.name}>{activeLotProduct?.name ?? ""}</div>
                 </>
               ) : (
                 <div className="text-sm text-gray-400 font-medium">Aucun lot actif</div>
@@ -512,7 +512,7 @@ export default function CompteurPage() {
         </div>
       )}
 
-      {error && <div className="bg-red-50 text-red-600 rounded-lg p-3 mb-4 text-sm">{error}</div>}
+      {error && <div role="alert" className="bg-red-50 text-red-600 rounded-lg p-3 mb-4 text-sm">{error}</div>}
 
       {!activeSession && (
         <div className="space-y-3">
@@ -1178,14 +1178,14 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
         <div>
           <label htmlFor={`lot-produced-${lot.id}`} className="block text-xs text-gray-600 mb-1">Qté produite (NPR)</label>
           <input id={`lot-produced-${lot.id}`} type="number" value={produced} onChange={e => setProduced(e.target.value)}
-            className="w-full border rounded-lg px-3 py-3 text-base" inputMode="numeric" />
+            className="w-full border rounded-lg px-3 py-3 text-base" inputMode="numeric" min="0" />
         </div>
         <div>
           <label htmlFor={`lot-conforming-${lot.id}`} className="block text-xs text-gray-600 mb-1">Qté conforme (NPB)</label>
           <input id={`lot-conforming-${lot.id}`} type="number" value={conforming} onChange={e => setConforming(e.target.value)}
             aria-invalid={errors.some(e => e.msg.startsWith("Conforme"))}
             className={`w-full border rounded-lg px-3 py-3 text-base ${errors.some(e => e.msg.startsWith("Conforme")) ? "border-red-400" : ""}`}
-            inputMode="numeric" />
+            inputMode="numeric" min="0" />
         </div>
       </div>
 
@@ -1364,7 +1364,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
             </div>
           )}
         </div>
-        {error && <div className="bg-red-50 text-red-600 rounded-lg p-3 mb-4 text-sm">{error}</div>}
+        {error && <div role="alert" className="bg-red-50 text-red-600 rounded-lg p-3 mb-4 text-sm">{error}</div>}
         <div className="flex gap-3">
           <button onClick={() => setStep("form")}
             aria-label="Retour au formulaire"
@@ -1387,7 +1387,7 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
         <Package className="h-5 w-5" /> Nouveau lot
       </h2>
 
-      {error && <div className="bg-red-50 text-red-600 rounded-lg p-3 mb-4 text-sm">{error}</div>}
+      {error && <div role="alert" className="bg-red-50 text-red-600 rounded-lg p-3 mb-4 text-sm">{error}</div>}
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border p-4 space-y-4">
         <div>
