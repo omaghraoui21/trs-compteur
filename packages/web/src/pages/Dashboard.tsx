@@ -163,26 +163,30 @@ export default function DashboardPage() {
 
   const exportCsv = () => {
     if (!data?.daily?.length) { toast.error("Aucune donnée à exporter pour cette période."); return; }
-    const headers = ["Date", "Produit", "Lot", "tT", "tO", "Fermeture", "tAP", "tR", "tF", "tN", "tU", "Lots", "NPR", "NPB", "NPC", "DO", "TP", "TQ", "TRS", "TRG", "Non classé (min)"];
+    const headers = ["Date", "Produit", "Lot", "tT", "tO", "Fermeture", "tAP", "tR", "tF", "tN", "tU", "Lots", "NPR", "NPB", "NPC", "DO", "TP", "TQ", "TRS", "TRG", "Non classé (min)", "Pannes", "MTBF (min)", "MTTR (min)"];
     const rows = data.daily.map(d => {
       const lots = d.lots || [];
       const produits = lots.map((l: any) => l.productName).join("+");
       const batchNums = lots.map((l: any) => l.batchNumber).join("+");
+      const rel = d.reliability;
       return csvRow([
         d.date, produits, batchNums,
         d.tT, d.tO, d.fermeture, d.tAP, d.tR, Math.round(d.tF), Math.round(d.tN), Math.round(d.tU),
         d.lotCount, d.totalProduced, d.totalConforming, d.totalRebut,
         (d.DO * 100).toFixed(1), (d.TP * 100).toFixed(1), (d.TQ * 100).toFixed(1),
         (d.TRS * 100).toFixed(1), (d.TRG * 100).toFixed(1), d.aClasserMin ?? 0,
+        rel?.breakdownCount ?? "", rel?.mtbf != null ? Math.round(rel.mtbf) : "", rel?.mttr != null ? Math.round(rel.mttr) : "",
       ]);
     });
 
     const t = data.total;
+    const tRel = t.reliability;
     rows.push(csvRow([
       "TOTAL", "", "", t.tT, t.tO, t.fermeture, t.tAP, t.tR, Math.round(t.tF), Math.round(t.tN), Math.round(t.tU),
       t.lotCount, t.totalProduced, t.totalConforming, t.totalRebut,
       (t.DO * 100).toFixed(1), (t.TP * 100).toFixed(1), (t.TQ * 100).toFixed(1),
       (t.TRS * 100).toFixed(1), (t.TRG * 100).toFixed(1), t.aClasserMin ?? 0,
+      tRel?.breakdownCount ?? "", tRel?.mtbf != null ? Math.round(tRel.mtbf) : "", tRel?.mttr != null ? Math.round(tRel.mttr) : "",
     ]));
 
     const csv = [csvRow(headers), ...rows].join("\n");

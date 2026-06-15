@@ -104,6 +104,37 @@ export default function PdfReport({ total, daily, equipmentName, equipmentCode, 
           </View>
         </View>
 
+        {/* Reliability (MTBF / MTTR) — shown only when breakdowns occurred */}
+        {total.reliability && total.reliability.breakdownCount > 0 && (
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Fiabilité (pannes non planifiées &gt; 5 min)</Text>
+            <View style={s.kpiRow}>
+              <View style={s.kpiCard}>
+                <Text style={s.kpiLabel}>Pannes</Text>
+                <Text style={s.kpiValue}>{total.reliability.breakdownCount}</Text>
+              </View>
+              {total.reliability.mtbf != null && (
+                <View style={s.kpiCard}>
+                  <Text style={s.kpiLabel}>MTBF</Text>
+                  <Text style={s.kpiValue}>{dur(Math.round(total.reliability.mtbf))}</Text>
+                </View>
+              )}
+              {total.reliability.mttr != null && (
+                <View style={s.kpiCard}>
+                  <Text style={s.kpiLabel}>MTTR</Text>
+                  <Text style={s.kpiValue}>{dur(Math.round(total.reliability.mttr))}</Text>
+                </View>
+              )}
+              {total.reliability.availability != null && (
+                <View style={s.kpiCard}>
+                  <Text style={s.kpiLabel}>Disponibilité pannes</Text>
+                  <Text style={s.kpiValue}>{pct(total.reliability.availability)}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
         {/* Daily breakdown */}
         <View style={s.section}>
           <Text style={s.sectionTitle}>Détail journalier ({daily.length} jour(s))</Text>
