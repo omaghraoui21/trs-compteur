@@ -190,7 +190,7 @@ export default function SupervisorPage() {
       const lotDurationMin = lot.endedAt ? diffMinutes(lot.startedAt, lot.endedAt) : null;
 
       if (lotDurationMin !== null && totalDowntimeMin !== null && totalDowntimeMin > lotDurationMin) {
-        errors.push(`Arrêts (${totalDowntimeMin} min) > durée du lot (${lotDurationMin} min)`);
+        errors.push(`Arrêts (${fmtMinutes(totalDowntimeMin)}) > durée du lot (${fmtMinutes(lotDurationMin)})`);
       }
       if (cadChanges.length > 0) {
         warnings.push(`Cadence modifiée ${cadChanges.length} fois en cours de lot — à vérifier`);
@@ -371,7 +371,7 @@ export default function SupervisorPage() {
                       Arrêts enregistrés
                       {totalDowntimeMin !== null && totalDowntimeMin > 0 && (
                         <span className="ml-1 font-normal text-gray-400">
-                          — {totalDowntimeMin} min · <span className="text-amber-600">planifié {plannedMin}</span> · <span className="text-red-600">non planifié {unplannedMin}</span>
+                          — {fmtMinutes(totalDowntimeMin)} · <span className="text-amber-600">planifié {fmtMinutes(plannedMin)}</span> · <span className="text-red-600">non planifié {fmtMinutes(unplannedMin)}</span>
                         </span>
                       )}
                     </div>
@@ -394,7 +394,7 @@ export default function SupervisorPage() {
                             <span className="text-gray-400 shrink-0">{dt.famille}</span>
                             <span className="text-gray-300">›</span>
                             <span className="font-medium text-gray-700 flex-1">{dt.reason}</span>
-                            <span className="shrink-0 font-mono text-gray-500">{dt.durationMinutes} min</span>
+                            <span className="shrink-0 font-mono text-gray-500">{fmtMinutes(dt.durationMinutes)}</span>
                           </div>
                         ))}
                       </div>
@@ -542,17 +542,19 @@ export default function SupervisorPage() {
                       )}
 
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">
+                        <label htmlFor={`comment-${lot.id}`} className="block text-xs text-gray-500 mb-1">
                           Commentaire superviseur
                           {" "}<span className="text-red-400 text-[10px]">(obligatoire pour le rejet)</span>
                         </label>
                         <input
+                          id={`comment-${lot.id}`}
                           value={comment}
                           onChange={e => { setComment(e.target.value); if (e.target.value.trim()) setCommentError(""); }}
+                          aria-invalid={!!commentError}
                           className={`w-full border rounded-lg px-3 py-2 text-sm ${commentError ? "border-red-400" : ""}`}
                           placeholder="Observations, motif de rejet…"
                         />
-                        {commentError && <p className="text-xs text-red-500 mt-0.5">{commentError}</p>}
+                        {commentError && <p className="text-xs text-red-500 mt-0.5" role="alert">{commentError}</p>}
                       </div>
 
                       <div className="flex gap-2">
