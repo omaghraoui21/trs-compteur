@@ -28,7 +28,7 @@ export default function SixLossesChart({ data }: Props) {
   const nonZeroLosses = losses.filter(l => l.minutes > 0);
   if (nonZeroLosses.length === 0) {
     return (
-      <div className="bg-white rounded-xl border shadow-sm p-4">
+      <div className="bg-white rounded-xl border shadow-sm p-4" role="region" aria-label="6 Grandes Pertes">
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-amber-600" /> 6 Grandes Pertes (Nakajima)
         </h3>
@@ -52,7 +52,7 @@ export default function SixLossesChart({ data }: Props) {
   }
 
   return (
-    <div className="bg-white rounded-xl border shadow-sm p-4">
+    <div className="bg-white rounded-xl border shadow-sm p-4" role="region" aria-label="6 Grandes Pertes">
       <h3 className="font-semibold text-sm mb-1 flex items-center gap-2">
         <AlertTriangle className="h-4 w-4 text-amber-600" /> 6 Grandes Pertes (Nakajima/TPM)
       </h3>

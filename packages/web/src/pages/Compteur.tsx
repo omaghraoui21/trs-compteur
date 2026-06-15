@@ -1785,10 +1785,23 @@ function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, isC
   const classifiedOk = aClasserMin < 5;
   const classifiedBlocking = aClasserMin >= 10;
 
+  const titleId = "end-of-shift-title";
+
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg p-6 shadow-xl">
-        <h2 className="text-lg font-bold mb-1">Fermer le compteur ?</h2>
+    <div
+      className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center"
+      role="presentation"
+      onKeyDown={e => { if (e.key === "Escape" && !isClosing && !classifiedBlocking) onCancel(); }}
+      onClick={() => { if (!isClosing && !classifiedBlocking) onCancel(); }}
+    >
+      <div
+        className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg p-6 shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 id={titleId} className="text-lg font-bold mb-1">Fermer le compteur ?</h2>
         <p className="text-sm text-gray-500 mb-4">Résumé de la session en cours</p>
 
         {s && s.lotCount > 0 ? (

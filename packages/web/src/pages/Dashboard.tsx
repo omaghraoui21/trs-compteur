@@ -239,8 +239,8 @@ export default function DashboardPage() {
       {/* ─── Filters ────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border p-4 mb-4 flex flex-col sm:flex-row sm:items-end gap-3 flex-wrap">
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Équipement</label>
-          <select value={selectedEquipment} onChange={e => setSelectedEquipment(e.target.value)}
+          <label htmlFor="equipment-select" className="block text-xs text-gray-500 mb-1">Équipement</label>
+          <select id="equipment-select" value={selectedEquipment} onChange={e => setSelectedEquipment(e.target.value)}
             className="w-full sm:w-auto border rounded-lg px-3 py-2 text-sm">
             {equipmentsList.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
@@ -262,10 +262,10 @@ export default function DashboardPage() {
         {zoom === "custom" && (
           <div className="flex flex-wrap items-center gap-2">
             <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-              className="border rounded-lg px-2 py-2 text-sm" />
-            <span className="text-gray-400">→</span>
+              aria-label="Date de début" className="border rounded-lg px-2 py-2 text-sm" />
+            <span className="text-gray-400" aria-hidden="true">→</span>
             <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-              className="border rounded-lg px-2 py-2 text-sm" />
+              aria-label="Date de fin" className="border rounded-lg px-2 py-2 text-sm" />
           </div>
         )}
 
@@ -425,7 +425,7 @@ const BAND_STATES = [
 function LinePerformanceBand({ daily }: { daily: DailyTrs[] }) {
   if (!daily.length) return null;
   return (
-    <div className="bg-white rounded-xl border shadow-sm p-4 mb-4">
+    <div className="bg-white rounded-xl border shadow-sm p-4 mb-4" role="region" aria-label="Line Performance">
       <div className="flex items-center gap-2 mb-3">
         <BarChart3 className="h-5 w-5 text-blue-600" />
         <h3 className="font-semibold">Line Performance</h3>
@@ -597,7 +597,7 @@ function ParetoDrillModal({ code, pareto, log, onClose }: {
 // table sorted newest-first, fed by GET /dashboard/downtime-log.
 function DowntimeLog({ log }: { log: DowntimeLogEntry[] }) {
   return (
-    <div className="bg-white rounded-xl border shadow-sm mt-4 overflow-hidden">
+    <div className="bg-white rounded-xl border shadow-sm mt-4 overflow-hidden" role="region" aria-label="Journal des arrêts">
       <div className="flex items-center gap-2 px-4 py-3 border-b">
         <AlertTriangle className="h-5 w-5 text-red-500" />
         <h3 className="font-semibold">Journal des arrêts</h3>
@@ -705,7 +705,7 @@ function Delta({ curr, prev }: { curr: number; prev: number }) {
 function KpiCard({ metrics, title, objective, prevMetrics }: { metrics: TrsMetrics; title: string; objective?: number; prevMetrics?: TrsMetrics }) {
   if (metrics.lotCount === 0) {
     return (
-      <div className="bg-white rounded-xl border shadow-sm p-6 mb-4">
+      <div className="bg-white rounded-xl border shadow-sm p-6 mb-4" role="region" aria-label={`TRS Consolidé — ${title}`}>
         <div className="flex items-center gap-2 mb-4">
           <Gauge className="h-5 w-5 text-blue-600" />
           <h3 className="font-semibold">TRS Consolidé — {title}</h3>
@@ -723,7 +723,7 @@ function KpiCard({ metrics, title, objective, prevMetrics }: { metrics: TrsMetri
   const rel = metrics.reliability;
 
   return (
-    <div className="bg-white rounded-xl border shadow-sm p-6 mb-4">
+    <div className="bg-white rounded-xl border shadow-sm p-6 mb-4" role="region" aria-label={`TRS Consolidé — ${title}`}>
       <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
         <div className="flex items-center gap-2">
           <Gauge className="h-5 w-5 text-blue-600" />
@@ -859,7 +859,7 @@ function TimeBuckets({ metrics }: { metrics: TrsMetrics }) {
   ];
 
   return (
-    <div className="bg-white rounded-xl border shadow-sm p-4 mb-4">
+    <div className="bg-white rounded-xl border shadow-sm p-4 mb-4" role="region" aria-label="Décomposition temps et quantités">
       <h3 className="font-semibold text-sm mb-3">Décomposition temps & quantités</h3>
       <div className="grid grid-cols-4 sm:grid-cols-7 lg:grid-cols-13 gap-2">
         {buckets.map(b => (
@@ -901,7 +901,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
   if (!daily.length) return null;
 
   return (
-    <div className="bg-white rounded-xl border shadow-sm">
+    <div className="bg-white rounded-xl border shadow-sm" role="region" aria-label="Détail par jour">
       <div className="px-4 py-3 border-b flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-gray-400" />

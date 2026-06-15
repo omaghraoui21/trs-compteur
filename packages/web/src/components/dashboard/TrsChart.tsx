@@ -42,7 +42,7 @@ export default function TrsChart({ daily, objective }: Props) {
   if (daily.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-xl border shadow-sm p-4">
+    <div className="bg-white rounded-xl border shadow-sm p-4" role="region" aria-label="Évolution TRS">
       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
         <h3 className="font-semibold text-sm">Évolution TRS</h3>
         <div className="flex rounded-lg border overflow-hidden text-xs">

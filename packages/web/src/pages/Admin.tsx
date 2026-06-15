@@ -37,10 +37,12 @@ export default function AdminPage() {
         <h1 className="text-2xl font-bold text-gray-800">Configuration</h1>
       </div>
 
-      <div className="flex overflow-x-auto border-b mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
+      <div role="tablist" className="flex overflow-x-auto border-b mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
         {visibleTabs.map((tab) => (
           <button
             key={tab.key}
+            role="tab"
+            aria-selected={activeTab === tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition ${
               activeTab === tab.key
@@ -196,9 +198,20 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
       </div>
 
       {pwFor && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={() => setPwFor(null)}>
-          <div className="bg-white rounded-xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold mb-1">Réinitialiser le mot de passe</h3>
+        <div
+          className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4"
+          role="presentation"
+          onClick={() => setPwFor(null)}
+          onKeyDown={e => { if (e.key === "Escape") setPwFor(null); }}
+        >
+          <div
+            className="bg-white rounded-xl p-5 w-full max-w-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pw-reset-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="pw-reset-title" className="font-semibold mb-1">Réinitialiser le mot de passe</h3>
             <p className="text-sm text-gray-500 mb-3">{pwFor.displayName} · {pwFor.email}</p>
             <Field label="Nouveau mot de passe" type="password" value={newPw} onChange={setNewPw} placeholder="6 caractères min." />
             <div className="flex gap-2 justify-end mt-4">
