@@ -14,7 +14,7 @@ export default function ByProductChart({ byProduct }: Props) {
     return (
       <div className="bg-white rounded-xl border shadow-sm p-4" role="region" aria-label="TRS par produit">
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-          <Package className="h-4 w-4 text-blue-600" /> TRS par produit
+          <Package className="h-4 w-4 text-blue-600" aria-hidden="true" /> TRS par produit
         </h3>
         <div className="text-center text-gray-400 py-8 text-sm">Aucun lot clôturé dans la période</div>
       </div>

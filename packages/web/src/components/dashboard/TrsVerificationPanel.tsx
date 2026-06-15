@@ -90,10 +90,10 @@ export default function TrsVerificationPanel({ metrics }: Props) {
     <div className="bg-white rounded-xl border shadow-sm p-4 mb-4" role="region" aria-label="Vérification TRS NF E 60-182">
       <div className="flex items-center justify-between gap-2 mb-1">
         <h3 className="font-semibold text-sm flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-blue-600" /> Vérification TRS (NF E 60-182)
+          <ShieldCheck className="h-4 w-4 text-blue-600" aria-hidden="true" /> Vérification TRS (NF E 60-182)
         </h3>
         <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${allOk ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
-          {allOk ? <><Check className="h-3.5 w-3.5" /> Cohérent</> : <><AlertTriangle className="h-3.5 w-3.5" /> À vérifier</>}
+          {allOk ? <><Check className="h-3.5 w-3.5" aria-hidden="true" /> Cohérent</> : <><AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> À vérifier</>}
         </span>
       </div>
       <p className="text-xs text-gray-500 mb-3">Contrôle croisé des valeurs calculées et mesurées.</p>
@@ -117,8 +117,8 @@ export default function TrsVerificationPanel({ metrics }: Props) {
         {checks.map(c => (
           <li key={c.label} className="flex items-start gap-2 text-xs">
             {c.ok
-              ? <Check className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
-              : <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />}
+              ? <Check className="h-4 w-4 text-green-600 shrink-0 mt-0.5" aria-label="Vérifié" />
+              : <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" aria-label="À vérifier" />}
             <div className="flex-1 min-w-0">
               <span className="font-medium text-gray-700">{c.label}</span>
               <span className="text-gray-400 ml-1 font-mono">{c.detail}</span>
@@ -139,7 +139,7 @@ export default function TrsVerificationPanel({ metrics }: Props) {
         <div className="mt-3 rounded-lg bg-red-50 border border-red-100 p-2 space-y-1">
           {errorWarnings.map((w, i) => (
             <div key={i} className="text-[11px] text-red-700 flex items-start gap-1.5">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" /> {w.message}
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" /> {w.message}
             </div>
           ))}
         </div>

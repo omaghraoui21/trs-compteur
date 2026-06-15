@@ -83,10 +83,10 @@ export default function Layout({ children }: { children: ReactNode }) {
             <span className="hidden sm:inline text-sm opacity-80">{user?.displayName}</span>
           )}
           <button onClick={() => setPwOpen(true)} className={HEADER_ICON_BTN} aria-label="Changer mon mot de passe">
-            <KeyRound className="h-4 w-4" />
+            <KeyRound className="h-4 w-4" aria-hidden="true" />
           </button>
           <button onClick={logout} className={HEADER_ICON_BTN} aria-label="Déconnexion">
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       </header>
