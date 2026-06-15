@@ -114,6 +114,7 @@ export default function CompteurPage() {
   const [elapsed, setElapsed] = useState(0);
   const [prefillProductId, setPrefillProductId] = useState("");
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [sessionNotes, setSessionNotes] = useState("");
   const [isClosing, setIsClosing] = useState(false);
   const [bootError, setBootError] = useState("");
   const toast = useToast();
@@ -229,12 +230,13 @@ export default function CompteurPage() {
     if (!activeSession) return;
     setIsClosing(true);
     try {
-      await api.closeSession(activeSession.id);
+      await api.closeSession(activeSession.id, sessionNotes || undefined);
       setActiveSession(null);
       setDetail(null);
       setTrsData(null);
       sessionCtx.set(null);
       setShowCloseModal(false);
+      setSessionNotes("");
       setView("pick-room");
     } catch (err: any) {
       toast.error(err.message || "Fermeture du compteur échouée");
@@ -712,6 +714,8 @@ export default function CompteurPage() {
           aClasserMin={trsData?.aClasserMin ?? 0}
           trsObjective={Number(selectedEquipment?.trsObjective || 75)}
           isClosing={isClosing}
+          notes={sessionNotes}
+          onNotesChange={setSessionNotes}
           onConfirm={handleConfirmClose}
           onCancel={() => setShowCloseModal(false)}
         />
@@ -1755,12 +1759,14 @@ function CheckItem({ ok, warn, label }: { ok: boolean; warn?: boolean; label: st
   );
 }
 
-function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, isClosing, onConfirm, onCancel }: {
+function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, isClosing, notes, onNotesChange, onConfirm, onCancel }: {
   trsData: SessionTrsResponse | null;
   hasActiveLot: boolean;
   aClasserMin: number;
   trsObjective: number;
   isClosing?: boolean;
+  notes: string;
+  onNotesChange: (v: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -1833,6 +1839,19 @@ function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, isC
             Fermez ce modal et déclarez les arrêts inter-lots avant de clore la session.
           </p>
         )}
+
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Remarques de fin de poste <span className="font-normal text-gray-400">(facultatif — tracé dans l'audit GMP)</span>
+          </label>
+          <textarea
+            value={notes}
+            onChange={e => onNotesChange(e.target.value)}
+            rows={2}
+            placeholder="Ex : légères vibrations sur tête 3, lot B-228 mis en quarantaine par QC…"
+            className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
+          />
+        </div>
 
         <div className="flex gap-3">
           <button onClick={onCancel} disabled={isClosing}

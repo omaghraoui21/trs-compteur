@@ -133,12 +133,13 @@ sessionsRouter.post("/:id/close", asyncHandler(async (req, res) => {
     }
   }
 
+  const notes = typeof req.body?.notes === "string" ? req.body.notes.trim() || null : null;
   const [session] = await db.update(sessions)
-    .set({ status: "closed", closedAt: now })
+    .set({ status: "closed", closedAt: now, ...(notes !== null ? { notes } : {}) })
     .where(eq(sessions.id, String(req.params.id)))
     .returning();
 
-  if (session) await audit(db, req, "CLOSE_SESSION", "session", session.id, {});
+  if (session) await audit(db, req, "CLOSE_SESSION", "session", session.id, { notes });
   res.json(session);
 }));
 

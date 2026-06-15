@@ -88,8 +88,8 @@ export const api = {
   session: (id: string) => request<SessionDetail>(`/sessions/${id}`),
   openSession: (equipmentId: string, roomId: string) =>
     request<Session>("/sessions/open", { method: "POST", body: JSON.stringify({ equipmentId, roomId }) }),
-  closeSession: (id: string) =>
-    request<Session>(`/sessions/${id}/close`, { method: "POST" }),
+  closeSession: (id: string, notes?: string) =>
+    request<Session>(`/sessions/${id}/close`, { method: "POST", body: JSON.stringify({ notes }) }),
   addEvent: (sessionId: string, data: AddEventInput) =>
     request<SessionEvent>(`/sessions/${sessionId}/events`, { method: "POST", body: JSON.stringify(data) }),
   sessionTrs: (id: string) => request<SessionTrsResponse>(`/sessions/${id}/trs`),

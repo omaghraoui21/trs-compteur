@@ -46402,8 +46402,9 @@ sessionsRouter.post("/:id/close", asyncHandler(async (req, res) => {
       await db2.update(sessionEvents).set({ endedAt: now, durationMinutes: dur }).where(eq(sessionEvents.id, ev.id));
     }
   }
-  const [session] = await db2.update(sessions).set({ status: "closed", closedAt: now }).where(eq(sessions.id, String(req.params.id))).returning();
-  if (session) await audit(db2, req, "CLOSE_SESSION", "session", session.id, {});
+  const notes = typeof req.body?.notes === "string" ? req.body.notes.trim() || null : null;
+  const [session] = await db2.update(sessions).set({ status: "closed", closedAt: now, ...notes !== null ? { notes } : {} }).where(eq(sessions.id, String(req.params.id))).returning();
+  if (session) await audit(db2, req, "CLOSE_SESSION", "session", session.id, { notes });
   res.json(session);
 }));
 sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async (req, res) => {
