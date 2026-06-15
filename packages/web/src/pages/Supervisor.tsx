@@ -56,6 +56,7 @@ export default function SupervisorPage() {
   // Correction form state
   const [correcting, setCorrecting] = useState<string | null>(null);
   const [correctionData, setCorrectionData] = useState({ qProd: "", qConf: "", qRej: "", cadence: "", cadenceUnit: "", reason: "" });
+  const [lotDataFailed, setLotDataFailed] = useState<Record<string, boolean>>({});
 
   const touchStartY = useRef(0);
   const toast = useToast();
@@ -99,6 +100,7 @@ export default function SupervisorPage() {
       setLotDowntimes(prev => ({ ...prev, [lotId]: [] }));
       setLotCadence(prev => ({ ...prev, [lotId]: [] }));
       setLotSignatures(prev => ({ ...prev, [lotId]: [] }));
+      setLotDataFailed(prev => ({ ...prev, [lotId]: true }));
     } finally {
       setLoadingDowntimesId(null);
     }
@@ -381,7 +383,12 @@ export default function SupervisorPage() {
                         <Skeleton className="h-4 w-2/3" />
                       </div>
                     )}
-                    {dts && dts.length === 0 && (
+                    {lotDataFailed[lot.id] && (
+                      <div role="alert" className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">
+                        Données détaillées indisponibles — vérifiez votre connexion et réessayez.
+                      </div>
+                    )}
+                    {dts && dts.length === 0 && !lotDataFailed[lot.id] && (
                       <div className="text-xs text-gray-400 py-1">Aucun arrêt enregistré sur ce lot.</div>
                     )}
                     {dts && dts.length > 0 && (

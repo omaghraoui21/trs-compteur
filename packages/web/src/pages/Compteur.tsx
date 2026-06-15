@@ -585,7 +585,11 @@ export default function CompteurPage() {
                 );
               })}
               {detail.events.length === 0 && (
-                <div className="px-4 py-6 text-center text-gray-400 text-sm">Aucun événement enregistré</div>
+                <div className="px-4 py-6 text-center text-gray-400 text-sm">
+                  {diffMinutes(activeSession?.openedAt ? new Date(activeSession.openedAt) : new Date(), new Date()) < 2
+                    ? "Démarrage en cours — les événements apparaîtront ici."
+                    : "Aucun événement. Les lots et arrêts enregistrés apparaîtront ici."}
+                </div>
               )}
             </div>
           </div>
