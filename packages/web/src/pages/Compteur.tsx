@@ -1168,13 +1168,13 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
 
       {/* U4: Real-time validation banners */}
       {errors.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 mb-3">
-          {errors.map((e, i) => <div key={i} className="text-xs text-red-700 flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> {e.msg}</div>)}
+        <div role="alert" className="bg-red-50 border border-red-200 rounded-lg p-2.5 mb-3">
+          {errors.map((e, i) => <div key={i} className="text-xs text-red-700 flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> {e.msg}</div>)}
         </div>
       )}
       {warns.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3">
-          {warns.map((w, i) => <div key={i} className="text-xs text-amber-700 flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> {w.msg}</div>)}
+        <div role="status" className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3">
+          {warns.map((w, i) => <div key={i} className="text-xs text-amber-700 flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> {w.msg}</div>)}
         </div>
       )}
 

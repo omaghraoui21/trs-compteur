@@ -153,11 +153,11 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
         <table className="rtable w-full text-sm">
           <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
             <tr>
-              <th className="text-left px-4 py-2">Nom</th>
-              <th className="text-left px-4 py-2">Email</th>
-              <th className="text-left px-4 py-2">Rôle</th>
-              <th className="text-left px-4 py-2">Statut</th>
-              <th className="text-right px-4 py-2">Actions</th>
+              <th scope="col" className="text-left px-4 py-2">Nom</th>
+              <th scope="col" className="text-left px-4 py-2">Email</th>
+              <th scope="col" className="text-left px-4 py-2">Rôle</th>
+              <th scope="col" className="text-left px-4 py-2">Statut</th>
+              <th scope="col" className="text-right px-4 py-2">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1141,12 +1141,12 @@ function AuditLogPanel() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b text-xs text-gray-500 uppercase tracking-wide">
-                  <th className="text-left px-4 py-2.5">Date / Heure</th>
-                  <th className="text-left px-4 py-2.5">Action</th>
-                  <th className="text-left px-4 py-2.5">Acteur</th>
-                  <th className="text-left px-4 py-2.5">Entité</th>
-                  <th className="text-left px-4 py-2.5">IP</th>
-                  <th className="px-4 py-2.5" />
+                  <th scope="col" className="text-left px-4 py-2.5">Date / Heure</th>
+                  <th scope="col" className="text-left px-4 py-2.5">Action</th>
+                  <th scope="col" className="text-left px-4 py-2.5">Acteur</th>
+                  <th scope="col" className="text-left px-4 py-2.5">Entité</th>
+                  <th scope="col" className="text-left px-4 py-2.5">IP</th>
+                  <th scope="col" className="px-4 py-2.5" />
                 </tr>
               </thead>
               <tbody className="divide-y">
