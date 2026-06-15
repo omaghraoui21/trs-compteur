@@ -327,9 +327,14 @@ export default function DashboardPage() {
           {/* ─── Comparison mode ─────────────────────────────── */}
           {showComparison && comparisonData && (
             <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {comparisonData.equipments.map(ceq => (
-                <KpiCard key={ceq.equipmentId} metrics={ceq.total} title={ceq.equipmentName} subtitle={`${from} → ${to}`} objective={ceq.trsObjective} />
-              ))}
+              {/* Best→worst TRS so the strongest/weakest lines surface at a glance.
+                  Copy before sort (non-mutating); `|| 0` keeps zero-lot equipments
+                  (NaN/0 TRS) from destabilizing the comparator. */}
+              {[...comparisonData.equipments]
+                .sort((a, b) => (b.total.TRS || 0) - (a.total.TRS || 0))
+                .map(ceq => (
+                  <KpiCard key={ceq.equipmentId} metrics={ceq.total} title={ceq.equipmentName} subtitle={`${from} → ${to}`} objective={ceq.trsObjective} />
+                ))}
             </div>
           )}
 

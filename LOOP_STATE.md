@@ -1,6 +1,6 @@
 # LOOP_STATE.md — TRS Compteur
 
-**Date:** 2026-06-15 (~02:38 UTC)
+**Date:** 2026-06-15 (~02:42 UTC)
 **Local branch:** `devin/1779664896-initial-app` (production / Vercel)
 **Status:** ✅ Auto-push to prod enabled (standing user instruction)
 
@@ -8,24 +8,22 @@
 
 ## This Cycle (Looper — one controlled improvement)
 
-**Goal:** Make every "TRS Consolidé" KpiCard self-documenting with its reporting
-period. The period was only in the filter bar (main card) / once at section level
-(comparison cards), so a printed or screenshotted card carried no date context — a
-gap for GMP reporting where individual cards get exported.
+**Goal:** In Dashboard comparison mode, surface the strongest/weakest production lines
+at a glance. `comparisonData.equipments` rendered in API order, giving no ranking
+signal to a manager comparing lines.
 
-**Change (surgical, 1 file — `Dashboard.tsx`, +17/−14):**
-- `KpiCard` gains an optional `subtitle?: string`, rendered under the title in both
-  the empty-data and main branches (conditional — no empty `<p>`).
-- Both call sites pass `subtitle={`${from} → ${to}`}` (raw ISO → TZ-safe, matches the
-  former section label).
-- **Simplify:** removed the now-redundant section-level "Période comparée" label and
-  its wrapping fragment (each card carries the period now).
-- Drive-by: `aria-hidden="true"` on the decorative `Gauge` icons in the edited header.
+**Change (surgical, 1 file — `Dashboard.tsx`):** sort a *copy* of the equipments by
+`TRS` descending before `.map()`; `(b.total.TRS || 0) - (a.total.TRS || 0)` so a
+zero-lot equipment (NaN/0 TRS) lands last without destabilizing the comparator.
+Position = rank (cards already show TRS prominently).
 
-**Observable output (proof):** `pnpm typecheck` clean across all 4 packages; final
-JSX reviewed (well-formed, no orphan markup); grep confirms the redundant label is gone.
+**Observable output (proof):**
+- `pnpm typecheck` clean across all 4 packages.
+- Node check on representative data: `0.81 > 0.62 > 0.55 > NaN-last`; source array
+  untouched (non-mutating confirmed).
 
-**Prev cycle:** `59bb8cd` — `time.test.ts` (12 tests, engine 63→75). On prod.
+**Prev cycle:** `0bde977` — self-documenting KpiCard period subtitle (+ removed
+redundant "Période comparée" label). On prod.
 
 **Key correctness detail (prev):** `(n).toLocaleString("fr-FR")` groups thousands with a
 *narrow no-break space* (U+202F on modern ICU, U+00A0 on older). The tests strip the
@@ -64,10 +62,11 @@ stay timezone-independent.
 
 ## Next Goal
 
-**Comparison mode — rank equipments by TRS.** `comparisonData.equipments` renders in
-API order; a production manager comparing lines benefits from a deterministic
-best→worst ordering. Surgical: sort a copy of `comparisonData.equipments` by
-`b.total.TRS - a.total.TRS` before `.map()` (stable, non-mutating). Observable output:
-typecheck + a small node check proving the sort order on representative data.
-Alternative if reordering is deemed disorienting: keep API order but add a discreet
-rank badge (#1, #2…) to each comparison KpiCard.
+**Explicit rank badge on comparison KpiCards.** Cards are now TRS-sorted, but the
+ordering is implicit. Add a discreet `#1 / #2 …` badge (thread an optional
+`rank?: number` into `KpiCard`, render near the title) so the ranking is unmistakable
+and survives a single-card screenshot. Surgical: pass `rank={i + 1}` from the sorted
+`.map((ceq, i) => …)`. Observable: typecheck + rendered header markup.
+
+> Note: the app is now heavily polished; remaining cycles are incremental. If a cycle
+> can't find a genuinely useful change, flag it rather than inventing churn.
