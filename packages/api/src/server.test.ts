@@ -169,6 +169,54 @@ describe("golden path + validation + RBAC", () => {
     expect(res.status).toBe(200);
   });
 
+  it("forbids an operator from correcting a lot (403 — supervisor only)", async () => {
+    const res = await request(app)
+      .post(`/api/lots/${lotId}/correct`)
+      .set({ Authorization: `Bearer ${opToken}` })
+      .send({ quantityProduced: 5100, correctionReason: "x", password: "oper123" });
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects a correction with a wrong signing password (401 — Part 11 re-auth)", async () => {
+    const res = await request(app)
+      .post(`/api/lots/${lotId}/correct`)
+      .set({ Authorization: `Bearer ${supToken}` })
+      .send({ quantityProduced: 5100, correctionReason: "saisie erronée", password: "wrong-password" });
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects a correction without a reason (400 — Zod)", async () => {
+    const res = await request(app)
+      .post(`/api/lots/${lotId}/correct`)
+      .set({ Authorization: `Bearer ${supToken}` })
+      .send({ quantityProduced: 5100, password: "super123" });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects a correction making conforming exceed the merged produced (400)", async () => {
+    // Original stored produced = 5000; correcting conforming alone to 6000 must fail
+    // against the MERGED value, not just the incoming fields.
+    const res = await request(app)
+      .post(`/api/lots/${lotId}/correct`)
+      .set({ Authorization: `Bearer ${supToken}` })
+      .send({ quantityConforming: 6000, correctionReason: "test cohérence", password: "super123" });
+    expect(res.status).toBe(400);
+  });
+
+  it("allows a supervisor to correct a closed lot (200) and records a signed amendment", async () => {
+    const res = await request(app)
+      .post(`/api/lots/${lotId}/correct`)
+      .set({ Authorization: `Bearer ${supToken}` })
+      .send({ quantityProduced: 5200, quantityConforming: 5000, correctionReason: "recomptage manuel après contrôle", password: "super123" });
+    expect(res.status).toBe(200);
+    expect(res.body.lot.quantityProduced).toBe(5200);
+    expect(res.body.lot.quantityConforming).toBe(5000);
+    expect(res.body.signature).toBeTruthy();
+    expect(res.body.signature.action).toBe("correct");
+    expect(res.body.signature.meaning).toBe("Correction des données du lot");
+    expect(res.body.signature.userEmail).toBe("superviseur@dpi.local");
+  });
+
   it("forbids an operator from validating a lot (403)", async () => {
     const res = await request(app)
       .post(`/api/lots/${lotId}/validate`)
