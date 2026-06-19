@@ -35,6 +35,7 @@ sessionsRouter.get("/:id", asyncHandler(async (req, res) => {
 
   const dtSelect = {
     id: downtimeEvents.id,
+    sessionId: downtimeEvents.sessionId,
     lotEntryId: downtimeEvents.lotEntryId,
     categoryId: downtimeEvents.categoryId,
     startedAt: downtimeEvents.startedAt,
