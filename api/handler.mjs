@@ -46458,6 +46458,7 @@ sessionsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const data = await db2.select({
     id: downtimeEvents.id,
+    sessionId: downtimeEvents.sessionId,
     lotEntryId: downtimeEvents.lotEntryId,
     categoryId: downtimeEvents.categoryId,
     startedAt: downtimeEvents.startedAt,
@@ -46745,6 +46746,7 @@ lotsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const data = await db2.select({
     id: downtimeEvents.id,
+    sessionId: downtimeEvents.sessionId,
     lotEntryId: downtimeEvents.lotEntryId,
     categoryId: downtimeEvents.categoryId,
     startedAt: downtimeEvents.startedAt,

@@ -236,7 +236,6 @@ function RoomsPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ code: "", name: "", description: "" });
   const [error, setError] = useState("");
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -265,18 +264,16 @@ function RoomsPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const remove = (id: string, name: string) => { setPendingDelete({ id, name }); };
-  const confirmDelete = async () => {
-    if (!pendingDelete) return;
-    try { await api.admin.deleteRoom(pendingDelete.id); toast.success(`Local "${pendingDelete.name}" désactivé`); load(); } catch (e: any) { setError(e.message); }
-    setPendingDelete(null);
-  };
+  const { ask: remove, modal: deleteModal } = useConfirmDelete({
+    label: "Désactiver le local ?", del: api.admin.deleteRoom,
+    done: n => `Local "${n}" désactivé`, reload: load, onError: setError,
+  });
 
   if (loading) return <Spinner />;
 
   return (
     <div>
-      {pendingDelete && <ConfirmDeleteModal label="Désactiver le local ?" name={pendingDelete.name} onConfirm={confirmDelete} onCancel={() => setPendingDelete(null)} />}
+      {deleteModal}
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm text-gray-500">{rooms.length} locaux</p>
         <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" aria-hidden="true" /> Ajouter</button>
@@ -333,7 +330,6 @@ function EquipmentsPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ code: "", name: "", roomId: "", equipmentType: "blistereuse", trsObjective: "75", defaultCadenceUnit: "u/min", microStopThresholdMin: "5" });
   const [error, setError] = useState("");
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -366,12 +362,10 @@ function EquipmentsPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const remove = (id: string, name: string) => { setPendingDelete({ id, name }); };
-  const confirmDelete = async () => {
-    if (!pendingDelete) return;
-    try { await api.admin.deleteEquipment(pendingDelete.id); toast.success(`Équipement "${pendingDelete.name}" désactivé`); load(); } catch (e: any) { setError(e.message); }
-    setPendingDelete(null);
-  };
+  const { ask: remove, modal: deleteModal } = useConfirmDelete({
+    label: "Désactiver l'équipement ?", del: api.admin.deleteEquipment,
+    done: n => `Équipement "${n}" désactivé`, reload: load, onError: setError,
+  });
 
   const roomName = (roomId: string) => rooms.find(r => r.id === roomId)?.name || roomId;
 
@@ -379,7 +373,7 @@ function EquipmentsPanel() {
 
   return (
     <div>
-      {pendingDelete && <ConfirmDeleteModal label="Désactiver l'équipement ?" name={pendingDelete.name} onConfirm={confirmDelete} onCancel={() => setPendingDelete(null)} />}
+      {deleteModal}
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm text-gray-500">{items.length} équipements</p>
         <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" aria-hidden="true" /> Ajouter</button>
@@ -460,7 +454,6 @@ function ProductsPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ code: "", name: "", defaultCadence: "", cadenceUnit: "u/min", unit: "blisters" });
   const [error, setError] = useState("");
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -489,18 +482,16 @@ function ProductsPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const remove = (id: string, name: string) => { setPendingDelete({ id, name }); };
-  const confirmDelete = async () => {
-    if (!pendingDelete) return;
-    try { await api.admin.deleteProduct(pendingDelete.id); toast.success(`Produit "${pendingDelete.name}" désactivé`); load(); } catch (e: any) { setError(e.message); }
-    setPendingDelete(null);
-  };
+  const { ask: remove, modal: deleteModal } = useConfirmDelete({
+    label: "Désactiver le produit ?", del: api.admin.deleteProduct,
+    done: n => `Produit "${n}" désactivé`, reload: load, onError: setError,
+  });
 
   if (loading) return <Spinner />;
 
   return (
     <div>
-      {pendingDelete && <ConfirmDeleteModal label="Désactiver le produit ?" name={pendingDelete.name} onConfirm={confirmDelete} onCancel={() => setPendingDelete(null)} />}
+      {deleteModal}
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm text-gray-500">{items.length} produits</p>
         <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary"><Plus className="h-4 w-4" aria-hidden="true" /> Ajouter</button>
@@ -567,7 +558,6 @@ function CadencesPanel() {
   const [form, setForm] = useState({ productId: "", equipmentId: "", cadenceValue: "", cadenceUnit: "u/min", trsObjective: "" });
   const [error, setError] = useState("");
   const [cadenceSearch, setCadenceSearch] = useState("");
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -591,12 +581,10 @@ function CadencesPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const remove = (id: string, name: string) => { setPendingDelete({ id, name }); };
-  const confirmDelete = async () => {
-    if (!pendingDelete) return;
-    try { await api.admin.deleteCadence(pendingDelete.id); toast.success(`Cadence "${pendingDelete.name}" supprimée`); load(); } catch (e: any) { setError(e.message); }
-    setPendingDelete(null);
-  };
+  const { ask: remove, modal: deleteModal } = useConfirmDelete({
+    label: "Supprimer cette cadence ?", del: api.admin.deleteCadence,
+    done: n => `Cadence "${n}" supprimée`, reload: load, onError: setError,
+  });
 
   // O(1) name lookups — avoids a .find() over the full list per cadence per render
   const productNameMap = useMemo(() => new Map(productsList.map(p => [p.id, p.name] as const)), [productsList]);
@@ -626,7 +614,7 @@ function CadencesPanel() {
 
   return (
     <div>
-      {pendingDelete && <ConfirmDeleteModal label="Supprimer cette cadence ?" name={pendingDelete.name} onConfirm={confirmDelete} onCancel={() => setPendingDelete(null)} />}
+      {deleteModal}
       <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
         <div>
           <p className="text-sm text-gray-500">{cadences.length} cadences configurées</p>
@@ -725,7 +713,6 @@ function DowntimesPanel() {
   const [form, setForm] = useState({ code: "", label: "", famille: FAMILLES[0], isPlanned: false, appliesToEquipmentType: "" });
   const [error, setError] = useState("");
   const [treeView, setTreeView] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -754,12 +741,10 @@ function DowntimesPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  const remove = (id: string, name: string) => { setPendingDelete({ id, name }); };
-  const confirmDelete = async () => {
-    if (!pendingDelete) return;
-    try { await api.admin.deleteDowntimeCategory(pendingDelete.id); toast.success(`Catégorie "${pendingDelete.name}" désactivée`); load(); } catch (e: any) { setError(e.message); }
-    setPendingDelete(null);
-  };
+  const { ask: remove, modal: deleteModal } = useConfirmDelete({
+    label: "Désactiver la catégorie ?", del: api.admin.deleteDowntimeCategory,
+    done: n => `Catégorie "${n}" désactivée`, reload: load, onError: setError,
+  });
 
   const togglePlanned = async (cat: AdminDowntimeCategory) => {
     try {
@@ -778,7 +763,7 @@ function DowntimesPanel() {
 
   return (
     <div>
-      {pendingDelete && <ConfirmDeleteModal label="Désactiver la catégorie ?" name={pendingDelete.name} onConfirm={confirmDelete} onCancel={() => setPendingDelete(null)} />}
+      {deleteModal}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
         <div>
           <p className="text-sm text-gray-500">{items.length} catégories d'arrêts</p>
@@ -1043,6 +1028,24 @@ function ConfirmDeleteModal({ label, name, onConfirm, onCancel }: { label: strin
       </div>
     </div>
   );
+}
+
+// Shared delete-confirmation flow for the admin panels: owns the pending-target
+// state, runs the delete on confirm with a success toast, and renders the modal.
+// Each panel passes its own delete fn + success message; `ask(id, name)` opens it.
+function useConfirmDelete(opts: { label: string; del: (id: string) => Promise<unknown>; done: (name: string) => string; reload: () => void; onError: (msg: string) => void }) {
+  const toast = useToast();
+  const [pending, setPending] = useState<{ id: string; name: string } | null>(null);
+  const confirm = async () => {
+    if (!pending) return;
+    try { await opts.del(pending.id); toast.success(opts.done(pending.name)); opts.reload(); }
+    catch (e: any) { opts.onError(e.message); }
+    setPending(null);
+  };
+  const modal = pending
+    ? <ConfirmDeleteModal label={opts.label} name={pending.name} onConfirm={confirm} onCancel={() => setPending(null)} />
+    : null;
+  return { ask: (id: string, name: string) => setPending({ id, name }), modal };
 }
 
 function FormCard({ title, children, onCancel, onSave }: { title: string; children: React.ReactNode; onCancel: () => void; onSave: () => void | Promise<void> }) {

@@ -202,8 +202,6 @@ export default function SupervisorPage() {
     return m;
   }, [lots, lotDowntimes, lotCadence]);
 
-  const pendingCount = lots.length;
-
   return (
     <div
       className="max-w-2xl mx-auto"

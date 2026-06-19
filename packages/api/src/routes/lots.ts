@@ -209,6 +209,7 @@ lotsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
   const { db } = req;
   const data = await db.select({
     id: downtimeEvents.id,
+    sessionId: downtimeEvents.sessionId,
     lotEntryId: downtimeEvents.lotEntryId,
     categoryId: downtimeEvents.categoryId,
     startedAt: downtimeEvents.startedAt,
