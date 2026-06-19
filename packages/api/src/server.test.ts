@@ -225,6 +225,14 @@ describe("golden path + validation + RBAC", () => {
     expect(res.status).toBe(403);
   });
 
+  it("rejects a lot rejection with no comment (400 — GMP requires a motive)", async () => {
+    const res = await request(app)
+      .post(`/api/lots/${lotId}/validate`)
+      .set({ Authorization: `Bearer ${supToken}` })
+      .send({ action: "reject", password: "super123" });
+    expect(res.status).toBe(400);
+  });
+
   it("requires a password to validate — 400 without it (Part 11 re-auth)", async () => {
     const res = await request(app)
       .post(`/api/lots/${lotId}/validate`)
