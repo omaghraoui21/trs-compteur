@@ -1,8 +1,8 @@
 # LOOP_STATE.md — TRS Compteur
 
-**Date:** 2026-06-15 (~07:40 UTC)
+**Date:** 2026-06-15 (~08:05 UTC)
 **Local branch:** `devin/1779664896-initial-app` (production / Vercel)
-**Status:** ✅ Auto-push to prod enabled (standing user instruction)
+**Status:** ✅ Auto-push to prod enabled · ✅ **CI green** (was red — see below)
 
 ---
 
@@ -10,43 +10,42 @@
 
 | Commit | Change |
 |--------|--------|
-| `b7ead2b` | test(engine): STOPS_GT_DURATION + no-famille fallback branch (97 tests) |
-| `c6c57ea` | fix(a11y): vague a11y finale — Login, ByProductChart, Layout, Supervisor, Admin, Compteur |
-| `ee3ced7` | fix(a11y): aria-hidden sweep Supervisor + Admin; test(engine): isShortStop (95 tests) |
-| `63094cf` | fix(a11y): aria-hidden sweep Dashboard; test(engine): computeProductTrs edge cases (92 tests) |
-| `572826a` | feat: MTBF/MTTR reliability row in live session TRS summary |
-| `c1c8aa2` | fix(ux): silence non-critical 30-day average fetch in TrsSummaryCard |
-| `eae9ca5` | test(engine): cover computeMtbfMttr, computeAClasserMin, computeOeeBenchmark (87 tests) |
+| `528ba84` | test(api): lot rejection requires a comment (GMP motive) |
+| `513bd3f` | **fix(api): sessionId missing from GET /sessions/:id downtime projection — root cause of red CI** |
+| `a68fdcc` | test(api): cover /lots/:id/correct (RBAC, Part 11, coherence) |
+| `83b9cca` | feat(admin): replace confirm() with accessible ConfirmDeleteModal |
+| `5b6304c` | fix(a11y): aria-hidden on pull-to-refresh RefreshCw |
+| `a88a6c4` | test(engine): UNPLANNED_GT_TR session warning (98 tests) |
+| `79d2063` | feat(supervisor): color-coded lot count badge on active tab |
+
+---
+
+## CI Fix (this cycle)
+
+CI had been **red across many commits**. Root cause: `GET /api/sessions/:id`
+built its downtime projection (`dtSelect`) without `sessionId`, so the
+"session detail returns session-level downtimes" integration test saw
+`d.sessionId === undefined` and failed every run. Added `sessionId` to the
+projection; rebuilt `api/handler.mjs`. Run `513bd3f` → **success**.
 
 ---
 
 ## What Is Working (verified)
 
-- ✅ 97 engine tests passing (5 test files)
-- ✅ Vague a11y complète — tous les composants web ont aria-hidden/aria-label sur chaque icône Lucide
+- ✅ 98 engine tests passing (5 files)
+- ✅ API integration suite green in CI (Postgres 16 service) — now incl. 6 new
+  cases: 5× `/lots/:id/correct` + 1× reject-requires-comment
 - ✅ Full `pnpm typecheck` clean (4 packages)
-- ✅ `api/handler.mjs` rebuilt and committed (`572826a`) — includes reliability computation
-
----
-
-## Feature: MTBF/MTTR in live session view
-
-`GET /sessions/:id/trs` now computes `computeMtbfMttr` over all unplanned
-stops (session-level + lot-level), default 5-min micro-stop threshold.
-The `TrsSummaryCard` shows a compact row "Pannes: N · MTBF: Xh00 · MTTR: Y min"
-only when `breakdownCount > 0`; clean sessions stay clean.
+- ✅ `api/handler.mjs` rebuilt + committed (`513bd3f`)
+- ✅ Vague a11y complète; Admin destructive actions use ConfirmDeleteModal
 
 ---
 
 ## Next Goal
 
-La vague a11y est **terminée**. Tous les composants (Login, Compteur, Dashboard, Supervisor, Admin, Layout, BackButton, charts) sont propres.
+App is heavily polished and CI is green. Remaining candidate axes:
+1. **API tests**: `pending-lots?status` filter (closed/validated/rejected/all)
+   has no integration coverage.
+2. If no genuine improvement is found, flag rather than invent churn.
 
-Axes d'amélioration potentiels restants :
-1. **Tests moteur** : `computeSessionTrs` — vérifier si la branche "session sans aucun lot" est testée.
-2. **UX Supervisor** : afficher le nombre de lots dans chaque onglet de statut (badge sur "En attente / Validés / Rejetés").
-3. **Dashboard** : vérifier si l'export CSV inclut les colonnes MTBF/MTTR.
-4. Si aucune amélioration réelle trouvée, signaler plutôt qu'inventer du churn.
-
-> Note: the app is heavily polished; cycles are incremental. If a cycle can't find
-> a genuinely useful change, flag it rather than inventing churn.
+> Cycles are incremental. The loop runs until the user says stop.

@@ -495,3 +495,37 @@ describe("session-level stops + cadence changes (refonte arrêts)", () => {
     expect(c2.status).toBe(409);
   });
 });
+
+describe("dashboard pending-lots status filter", () => {
+  it("rejects an unknown status value (400 — Zod query)", async () => {
+    const res = await request(app)
+      .get("/api/dashboard/pending-lots?status=bogus")
+      .set({ Authorization: `Bearer ${supToken}` });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns the validated golden-path lot with joined context (operator/equipment/date)", async () => {
+    const res = await request(app)
+      .get("/api/dashboard/pending-lots?status=validated")
+      .set({ Authorization: `Bearer ${supToken}` });
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThanOrEqual(1);
+    const lot = res.body[0];
+    expect(lot.status).toBe("validated");
+    // Server-side joins must enrich each lot for the supervisor cards.
+    expect(lot).toHaveProperty("operatorName");
+    expect(lot).toHaveProperty("equipmentCode");
+    expect(lot).toHaveProperty("sessionDate");
+    expect(lot).toHaveProperty("equipmentName");
+  });
+
+  it("defaults to closed lots when no status is given (200 array)", async () => {
+    const res = await request(app)
+      .get("/api/dashboard/pending-lots")
+      .set({ Authorization: `Bearer ${supToken}` });
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.every((l: any) => l.status === "closed")).toBe(true);
+  });
+});
