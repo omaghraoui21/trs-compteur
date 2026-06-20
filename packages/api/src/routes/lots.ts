@@ -195,12 +195,19 @@ lotsRouter.get("/:id/cadence", asyncHandler(async (req, res) => {
 lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
   const { db, userId } = req;
   const { categoryId, durationMinutes, isShortStop, comment } = req.body;
+  const lotId = String(req.params.id);
+
+  const [lot] = await db.select({ id: lotEntries.id, status: lotEntries.status }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
+  if (lot.status === "validated" || lot.status === "rejected") {
+    throw new HttpError(409, "Impossible d'ajouter un arrêt sur un lot déjà décidé par le superviseur");
+  }
 
   const now = new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 60_000);
 
   const [dt] = await db.insert(downtimeEvents).values({
-    lotEntryId: String(req.params.id),
+    lotEntryId: lotId,
     categoryId,
     startedAt: now,
     endedAt,
