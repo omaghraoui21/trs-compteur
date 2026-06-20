@@ -218,7 +218,7 @@ lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(asyn
     createdBy: userId,
   }).returning();
 
-  await audit(db, req, "ADD_DOWNTIME", "downtime", dt.id, { lotId: String(req.params.id), categoryId, durationMinutes });
+  await audit(db, req, "ADD_DOWNTIME", "downtime", dt.id, { lotId, categoryId, durationMinutes });
   res.status(201).json(dt);
 }));
 

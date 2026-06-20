@@ -46387,7 +46387,7 @@ sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (re
     res.status(401).json({ error: "Non authentifi\xE9" });
     return;
   }
-  const [existing] = await db2.select().from(sessions).where(and(eq(sessions.equipmentId, equipmentId), eq(sessions.status, "active"))).limit(1);
+  const [existing] = await db2.select({ id: sessions.id }).from(sessions).where(and(eq(sessions.equipmentId, equipmentId), eq(sessions.status, "active"))).limit(1);
   if (existing) {
     res.status(409).json({ error: "Session d\xE9j\xE0 active pour cet \xE9quipement", sessionId: existing.id });
     return;
@@ -46409,18 +46409,17 @@ sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (re
 sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(async (req, res) => {
   const { db: db2, userId, userRole: userRole2 } = req;
   const now = /* @__PURE__ */ new Date();
-  if (userRole2 === "operator") {
-    const [session2] = await db2.select({ operatorId: sessions.operatorId }).from(sessions).where(eq(sessions.id, String(req.params.id))).limit(1);
-    if (!session2) {
-      res.status(404).json({ error: "Session introuvable" });
-      return;
-    }
-    if (session2.operatorId !== userId) {
-      res.status(403).json({ error: "Acc\xE8s interdit" });
-      return;
-    }
-  }
   const sessionId = String(req.params.id);
+  const [sessionRow] = await db2.select({ operatorId: sessions.operatorId, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  if (!sessionRow) {
+    res.status(404).json({ error: "Session introuvable" });
+    return;
+  }
+  if (userRole2 === "operator" && sessionRow.operatorId !== userId) {
+    res.status(403).json({ error: "Acc\xE8s interdit" });
+    return;
+  }
+  if (sessionRow.status !== "active") throw new HttpError(409, "Session d\xE9j\xE0 ferm\xE9e");
   const activeLots = await db2.select({ id: lotEntries.id, batchNumber: lotEntries.batchNumber }).from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active")));
   await Promise.all([
     db2.update(lotEntries).set({ status: "closed", endedAt: now }).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active"))),
@@ -46498,6 +46497,7 @@ sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(
 }));
 sessionsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
+  const sessionId = String(req.params.id);
   const data = await db2.select({
     id: downtimeEvents.id,
     sessionId: downtimeEvents.sessionId,
@@ -46510,7 +46510,7 @@ sessionsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
     famille: downtimeCategories.famille,
     reason: downtimeCategories.label,
     isPlanned: downtimeCategories.isPlanned
-  }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(and(eq(downtimeEvents.sessionId, String(req.params.id)), isNull(downtimeEvents.lotEntryId)));
+  }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(and(eq(downtimeEvents.sessionId, sessionId), isNull(downtimeEvents.lotEntryId)));
   res.json(data);
 }));
 sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
@@ -46813,7 +46813,7 @@ lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(asyn
     comment,
     createdBy: userId
   }).returning();
-  await audit(db2, req, "ADD_DOWNTIME", "downtime", dt.id, { lotId: String(req.params.id), categoryId, durationMinutes });
+  await audit(db2, req, "ADD_DOWNTIME", "downtime", dt.id, { lotId, categoryId, durationMinutes });
   res.status(201).json(dt);
 }));
 lotsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {

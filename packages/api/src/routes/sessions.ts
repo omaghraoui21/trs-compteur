@@ -78,7 +78,7 @@ sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (re
   if (!userId) { res.status(401).json({ error: "Non authentifié" }); return; }
 
   // Check no active session for this equipment
-  const [existing] = await db.select().from(sessions)
+  const [existing] = await db.select({ id: sessions.id }).from(sessions)
     .where(and(eq(sessions.equipmentId, equipmentId), eq(sessions.status, "active")))
     .limit(1);
   if (existing) {
@@ -111,16 +111,16 @@ sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (re
 sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(async (req, res) => {
   const { db, userId, userRole } = req;
   const now = new Date();
-
-  // H1: Operators may only close their own sessions
-  if (userRole === "operator") {
-    const [session] = await db.select({ operatorId: sessions.operatorId })
-      .from(sessions).where(eq(sessions.id, String(req.params.id))).limit(1);
-    if (!session) { res.status(404).json({ error: "Session introuvable" }); return; }
-    if (session.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
-  }
-
   const sessionId = String(req.params.id);
+
+  // Always fetch — guards 404 for all roles, operator ownership, and double-close.
+  const [sessionRow] = await db.select({ operatorId: sessions.operatorId, status: sessions.status })
+    .from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  if (!sessionRow) { res.status(404).json({ error: "Session introuvable" }); return; }
+  // H1: Operators may only close their own sessions
+  if (userRole === "operator" && sessionRow.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
+  // GMP: prevent duplicate CLOSE_SESSION audit entries from re-closing.
+  if (sessionRow.status !== "active") throw new HttpError(409, "Session déjà fermée");
 
   // Fetch any still-active lots before the batch close so we can audit each one.
   const activeLots = await db.select({ id: lotEntries.id, batchNumber: lotEntries.batchNumber })
@@ -232,6 +232,7 @@ sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(
 
 sessionsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
   const { db } = req;
+  const sessionId = String(req.params.id);
   const data = await db.select({
     id: downtimeEvents.id,
     sessionId: downtimeEvents.sessionId,
@@ -246,7 +247,7 @@ sessionsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
     isPlanned: downtimeCategories.isPlanned,
   }).from(downtimeEvents)
     .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
-    .where(and(eq(downtimeEvents.sessionId, String(req.params.id)), isNull(downtimeEvents.lotEntryId)));
+    .where(and(eq(downtimeEvents.sessionId, sessionId), isNull(downtimeEvents.lotEntryId)));
   res.json(data);
 }));
 
