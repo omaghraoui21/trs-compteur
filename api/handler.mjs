@@ -46940,29 +46940,29 @@ var refRouter = (0, import_express4.Router)();
 refRouter.use(authenticate);
 refRouter.get("/rooms", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
-  const data = await db2.select().from(rooms).where(eq(rooms.isActive, true));
+  const data = await db2.select().from(rooms).where(eq(rooms.isActive, true)).orderBy(asc(rooms.name));
   res.json(data);
 }));
 refRouter.get("/rooms/:roomId/equipments", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
-  const data = await db2.select().from(equipments).where(and(eq(equipments.roomId, String(req.params.roomId)), eq(equipments.isActive, true)));
+  const data = await db2.select().from(equipments).where(and(eq(equipments.roomId, String(req.params.roomId)), eq(equipments.isActive, true))).orderBy(asc(equipments.name));
   res.json(data);
 }));
 refRouter.get("/equipments", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
-  const data = await db2.select().from(equipments).where(eq(equipments.isActive, true));
+  const data = await db2.select().from(equipments).where(eq(equipments.isActive, true)).orderBy(asc(equipments.name));
   res.json(data);
 }));
 refRouter.get("/products", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
-  const data = await db2.select().from(products).where(eq(products.isActive, true));
+  const data = await db2.select().from(products).where(eq(products.isActive, true)).orderBy(asc(products.name));
   res.json(data);
 }));
 refRouter.get("/downtime-categories", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const { equipmentType: eqType } = req.query;
   const typeFilter = eqType ? or(isNull(downtimeCategories.appliesToEquipmentType), eq(downtimeCategories.appliesToEquipmentType, eqType)) : void 0;
-  const data = await db2.select().from(downtimeCategories).where(and(eq(downtimeCategories.isActive, true), typeFilter));
+  const data = await db2.select().from(downtimeCategories).where(and(eq(downtimeCategories.isActive, true), typeFilter)).orderBy(asc(downtimeCategories.famille), asc(downtimeCategories.label));
   res.json(data);
 }));
 refRouter.get("/cadences", asyncHandler(async (req, res) => {
