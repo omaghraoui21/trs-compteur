@@ -46738,15 +46738,17 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
     return;
   }
   const unit = cadenceUnit2 ?? lot.cadenceUnit;
-  await db2.insert(lotCadenceChanges).values({
-    lotEntryId: lotId,
-    oldCadence: String(lot.cadenceUsed),
-    newCadence: String(newCadence),
-    cadenceUnit: unit,
-    reason: reason ?? null,
-    changedBy: userId
-  });
-  const [updated] = await db2.update(lotEntries).set({ cadenceUsed: String(newCadence), cadenceUnit: unit }).where(eq(lotEntries.id, lotId)).returning();
+  const [, [updated]] = await Promise.all([
+    db2.insert(lotCadenceChanges).values({
+      lotEntryId: lotId,
+      oldCadence: String(lot.cadenceUsed),
+      newCadence: String(newCadence),
+      cadenceUnit: unit,
+      reason: reason ?? null,
+      changedBy: userId
+    }),
+    db2.update(lotEntries).set({ cadenceUsed: String(newCadence), cadenceUnit: unit }).where(eq(lotEntries.id, lotId)).returning()
+  ]);
   await audit(db2, req, "CHANGE_CADENCE", "lot", lotId, { from: lot.cadenceUsed, to: newCadence, unit, reason });
   res.json(updated);
 }));

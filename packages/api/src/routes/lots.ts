@@ -154,18 +154,20 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
 
   const unit = cadenceUnit ?? lot.cadenceUnit;
 
-  await db.insert(lotCadenceChanges).values({
-    lotEntryId: lotId,
-    oldCadence: String(lot.cadenceUsed),
-    newCadence: String(newCadence),
-    cadenceUnit: unit,
-    reason: reason ?? null,
-    changedBy: userId,
-  });
-
-  const [updated] = await db.update(lotEntries)
-    .set({ cadenceUsed: String(newCadence), cadenceUnit: unit })
-    .where(eq(lotEntries.id, lotId)).returning();
+  // The insert and update are independent — run in parallel.
+  const [, [updated]] = await Promise.all([
+    db.insert(lotCadenceChanges).values({
+      lotEntryId: lotId,
+      oldCadence: String(lot.cadenceUsed),
+      newCadence: String(newCadence),
+      cadenceUnit: unit,
+      reason: reason ?? null,
+      changedBy: userId,
+    }),
+    db.update(lotEntries)
+      .set({ cadenceUsed: String(newCadence), cadenceUnit: unit })
+      .where(eq(lotEntries.id, lotId)).returning(),
+  ]);
 
   await audit(db, req, "CHANGE_CADENCE", "lot", lotId, { from: lot.cadenceUsed, to: newCadence, unit, reason });
   res.json(updated);
