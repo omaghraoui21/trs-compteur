@@ -47143,30 +47143,33 @@ dashboardRouter.get("/comparison", validateQuery(comparisonQuerySchema), asyncHa
   const { db: db2 } = req;
   const { from, to } = req.query;
   const eqs = await db2.select().from(equipments).where(eq(equipments.isActive, true));
-  const results = [];
-  for (const equipment of eqs) {
-    const closedSessions = await db2.select().from(sessions).where(and(
-      eq(sessions.equipmentId, equipment.id),
-      eq(sessions.status, "closed"),
-      gte(sessions.sessionDate, from),
-      lte(sessions.sessionDate, to)
-    )).orderBy(sessions.sessionDate);
-    const built = await buildSessionsTrs(db2, closedSessions);
+  const allSessions = eqs.length > 0 ? await db2.select().from(sessions).where(and(
+    inArray(sessions.equipmentId, eqs.map((e) => e.id)),
+    eq(sessions.status, "closed"),
+    gte(sessions.sessionDate, from),
+    lte(sessions.sessionDate, to)
+  )).orderBy(sessions.sessionDate) : [];
+  const built = await buildSessionsTrs(db2, allSessions);
+  const sessionsByEquipment = /* @__PURE__ */ new Map();
+  for (const s of allSessions) {
+    (sessionsByEquipment.get(s.equipmentId) ?? sessionsByEquipment.set(s.equipmentId, []).get(s.equipmentId)).push(s);
+  }
+  const results = eqs.map((equipment) => {
+    const closedSessions = sessionsByEquipment.get(equipment.id) ?? [];
     const sessionResults = closedSessions.map((session) => ({
       date: session.sessionDate,
       ...built.get(session.id).sessionTrs
     }));
-    const zoom = computeZoomTrs({ sessions: sessionResults });
-    results.push({
+    return {
       equipmentId: equipment.id,
       equipmentName: equipment.name,
       equipmentCode: equipment.code,
       equipmentType: equipment.equipmentType,
       trsObjective: Number(equipment.trsObjective),
       daily: sessionResults,
-      total: zoom
-    });
-  }
+      total: computeZoomTrs({ sessions: sessionResults })
+    };
+  });
   res.json({ period: { from, to }, equipments: results });
 }));
 dashboardRouter.get("/by-product", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {

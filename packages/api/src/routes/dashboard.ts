@@ -307,36 +307,43 @@ dashboardRouter.get("/comparison", validateQuery(comparisonQuerySchema), asyncHa
 
   type ComparisonResult = { equipmentId: string; equipmentName: string; equipmentCode: string; equipmentType: string | null; trsObjective: number; daily: (SessionTrsResult & { date: string })[]; total: SessionTrsResult };
   const eqs = await db.select().from(equipments).where(eq(equipments.isActive, true));
-  const results: ComparisonResult[] = [];
 
-  for (const equipment of eqs) {
-    const closedSessions = await db.select().from(sessions)
-      .where(and(
-        eq(sessions.equipmentId, equipment.id),
-        eq(sessions.status, "closed"),
-        gte(sessions.sessionDate, from),
-        lte(sessions.sessionDate, to),
-      ))
-      .orderBy(sessions.sessionDate);
+  // Load all sessions for all equipments in one query, then batch-build TRS
+  // for the entire set (6 queries total regardless of equipment count).
+  const allSessions = eqs.length > 0
+    ? await db.select().from(sessions)
+        .where(and(
+          inArray(sessions.equipmentId, eqs.map(e => e.id)),
+          eq(sessions.status, "closed"),
+          gte(sessions.sessionDate, from),
+          lte(sessions.sessionDate, to),
+        ))
+        .orderBy(sessions.sessionDate)
+    : [];
 
-    const built = await buildSessionsTrs(db, closedSessions);
+  const built = await buildSessionsTrs(db, allSessions);
+
+  const sessionsByEquipment = new Map<string, (typeof sessions.$inferSelect)[]>();
+  for (const s of allSessions) {
+    (sessionsByEquipment.get(s.equipmentId) ?? sessionsByEquipment.set(s.equipmentId, []).get(s.equipmentId)!).push(s);
+  }
+
+  const results: ComparisonResult[] = eqs.map(equipment => {
+    const closedSessions = sessionsByEquipment.get(equipment.id) ?? [];
     const sessionResults = closedSessions.map(session => ({
       date: session.sessionDate,
       ...built.get(session.id)!.sessionTrs,
     }));
-
-    const zoom = computeZoomTrs({ sessions: sessionResults });
-
-    results.push({
+    return {
       equipmentId: equipment.id,
       equipmentName: equipment.name,
       equipmentCode: equipment.code,
       equipmentType: equipment.equipmentType,
       trsObjective: Number(equipment.trsObjective),
       daily: sessionResults,
-      total: zoom,
-    });
-  }
+      total: computeZoomTrs({ sessions: sessionResults }),
+    };
+  });
 
   res.json({ period: { from, to }, equipments: results });
 }));
