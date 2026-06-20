@@ -301,7 +301,8 @@ describe("audit trail (21 CFR-style traceability)", () => {
     const rows = await sql`SELECT action FROM audit_log ORDER BY created_at`;
     const actions = rows.map((r: any) => r.action);
     expect(actions.length).toBeGreaterThan(0);
-    // Lot validation must be traceable
+    // Authentication and lot validation must be traceable
+    expect(actions.some((a: string) => a === "LOGIN")).toBe(true);
     expect(actions.some((a: string) => /VALIDATE/i.test(a))).toBe(true);
   });
 
