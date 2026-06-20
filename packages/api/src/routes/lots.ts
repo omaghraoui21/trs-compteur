@@ -336,7 +336,12 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
     db.select({ id: lotEntries.id, status: lotEntries.status }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1),
   ]);
   if (!existing) { res.status(404).json({ error: "Lot introuvable" }); return; }
-  if (existing.status !== "closed") throw new HttpError(409, `Ce lot est déjà ${existing.status === "validated" ? "validé" : "rejeté"} — aucune action requise`);
+  if (existing.status !== "closed") {
+    const desc = existing.status === "validated" ? "déjà validé"
+      : existing.status === "rejected" ? "déjà rejeté"
+      : `en statut « ${existing.status} »`;
+    throw new HttpError(409, `Ce lot est ${desc} — seuls les lots clôturés peuvent être validés ou rejetés`);
+  }
 
   const [lot] = await db.update(lotEntries).set({
     status,

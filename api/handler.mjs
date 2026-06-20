@@ -46908,7 +46908,10 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
     res.status(404).json({ error: "Lot introuvable" });
     return;
   }
-  if (existing.status !== "closed") throw new HttpError(409, `Ce lot est d\xE9j\xE0 ${existing.status === "validated" ? "valid\xE9" : "rejet\xE9"} \u2014 aucune action requise`);
+  if (existing.status !== "closed") {
+    const desc2 = existing.status === "validated" ? "d\xE9j\xE0 valid\xE9" : existing.status === "rejected" ? "d\xE9j\xE0 rejet\xE9" : `en statut \xAB ${existing.status} \xBB`;
+    throw new HttpError(409, `Ce lot est ${desc2} \u2014 seuls les lots cl\xF4tur\xE9s peuvent \xEAtre valid\xE9s ou rejet\xE9s`);
+  }
   const [lot] = await db2.update(lotEntries).set({
     status,
     supervisorId: userId,
