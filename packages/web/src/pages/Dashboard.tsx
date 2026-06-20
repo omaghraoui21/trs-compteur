@@ -102,6 +102,16 @@ export default function DashboardPage() {
     return getPresetDates(zoom === "custom" ? "month" : zoom);
   }, [zoom, customFrom, customTo]);
 
+  const fetchComparison = useCallback(async () => {
+    if (!from || !to) return;
+    try {
+      const compRes = await api.dashboardComparison(from, to);
+      setComparisonData(compRes);
+    } catch {
+      setComparisonData(null);
+    }
+  }, [from, to]);
+
   const fetchData = useCallback(async () => {
     if (!selectedEquipment || !from || !to) return;
     setLoading(true);
@@ -124,15 +134,6 @@ export default function DashboardPage() {
       setHeatmapData(heatRes);
       setDowntimeLog(logRes);
       setPrevData(prevRes);
-
-      if (showComparison) {
-        try {
-          const compRes = await api.dashboardComparison(from, to);
-          setComparisonData(compRes);
-        } catch {
-          setComparisonData(null);
-        }
-      }
     } catch (err: any) {
       toast.error(err.message || "Chargement du tableau de bord échoué");
       setLoadFailed(true);
@@ -146,9 +147,17 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedEquipment, from, to, zoom, showComparison]);
+  }, [selectedEquipment, from, to, zoom]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Comparison is independent of the main data — fetch only when the panel is
+  // opened or the period changes while it's open. This avoids re-fetching all
+  // 7 main endpoints whenever the user toggles the comparison panel.
+  useEffect(() => {
+    if (showComparison) fetchComparison();
+    else setComparisonData(null);
+  }, [showComparison, fetchComparison]);
 
   const eq = equipmentsList.find(e => e.id === selectedEquipment);
   const objective = eq ? Number(eq.trsObjective) : undefined;

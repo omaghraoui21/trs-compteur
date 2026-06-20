@@ -1179,7 +1179,7 @@ function AuditLogPanel() {
           <select id="audit-entity" value={entityFilter} onChange={e => setEntityFilter(e.target.value)}
             className="border rounded-lg px-2 py-1.5 text-sm">
             <option value="">Toutes</option>
-            {["lot", "session", "downtime", "user", "equipment"].map(e => <option key={e} value={e}>{e}</option>)}
+            {["lot", "session", "sessionEvent", "downtime", "user", "equipment", "room", "product", "downtimeCategory", "cadence"].map(e => <option key={e} value={e}>{e}</option>)}
           </select>
         </div>
         <div>
