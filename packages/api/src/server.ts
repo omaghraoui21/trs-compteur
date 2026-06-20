@@ -90,7 +90,7 @@ if (!process.env.VERCEL) {
 
 // Inject db into request
 app.use((req, _res, next) => {
-  (req as any).db = db;
+  req.db = db;
   next();
 });
 
