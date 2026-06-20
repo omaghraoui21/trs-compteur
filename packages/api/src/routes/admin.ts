@@ -35,7 +35,7 @@ adminRouter.post("/rooms", validate(createRoomSchema), asyncHandler(async (req, 
 
 adminRouter.patch("/rooms/:id", validate(updateRoomSchema), asyncHandler(async (req, res) => {
   const { code, name, description, isActive } = req.body;
-  const updates: Record<string, unknown> = {};
+  const updates: Partial<{ code: string; name: string; description: string; isActive: boolean }> = {};
   if (code !== undefined) updates.code = code;
   if (name !== undefined) updates.name = name;
   if (description !== undefined) updates.description = description;
@@ -75,7 +75,7 @@ adminRouter.post("/equipments", validate(createEquipmentSchema), asyncHandler(as
 
 adminRouter.patch("/equipments/:id", validate(updateEquipmentSchema), asyncHandler(async (req, res) => {
   const { code, name, roomId, equipmentType, trsObjective, defaultCadenceUnit, isActive, microStopThresholdMin } = req.body;
-  const updates: Record<string, unknown> = {};
+  const updates: Partial<{ code: string; name: string; roomId: string; equipmentType: string; trsObjective: string; defaultCadenceUnit: string; isActive: boolean; microStopThresholdMin: number }> = {};
   if (code !== undefined) updates.code = code;
   if (name !== undefined) updates.name = name;
   if (roomId !== undefined) updates.roomId = roomId;
@@ -119,7 +119,7 @@ adminRouter.post("/products", validate(createProductSchema), asyncHandler(async 
 
 adminRouter.patch("/products/:id", validate(updateProductSchema), asyncHandler(async (req, res) => {
   const { code, name, defaultCadence, cadenceUnit, unit, isActive } = req.body;
-  const updates: Record<string, unknown> = {};
+  const updates: Partial<{ code: string; name: string; defaultCadence: string; cadenceUnit: string; unit: string; isActive: boolean }> = {};
   if (code !== undefined) updates.code = code;
   if (name !== undefined) updates.name = name;
   if (defaultCadence !== undefined) updates.defaultCadence = defaultCadence;
@@ -160,7 +160,7 @@ adminRouter.post("/downtime-categories", validate(createDowntimeCategorySchema),
 
 adminRouter.patch("/downtime-categories/:id", validate(updateDowntimeCategorySchema), asyncHandler(async (req, res) => {
   const { code, label, famille, isPlanned, appliesToEquipmentType, isActive } = req.body;
-  const updates: Record<string, unknown> = {};
+  const updates: Partial<{ code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null; isActive: boolean }> = {};
   if (code !== undefined) updates.code = code;
   if (label !== undefined) updates.label = label;
   if (famille !== undefined) updates.famille = famille;
