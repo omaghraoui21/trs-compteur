@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { eq, and, or, gte, lte, desc, sql, inArray, isNull, getTableColumns, count } from "drizzle-orm";
 import { sessions, lotEntries, sessionEvents, downtimeEvents, downtimeCategories, equipments, products, lotCadenceChanges, users } from "@trs/db";
+import type { Db } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, computeMtbfMttr, computeAClasserMin } from "@trs/engine";
 import type { ProductLotInput } from "@trs/engine";
 
@@ -28,7 +29,7 @@ interface BuiltSession {
   downtimeDetails: { durationMinutes: number; isPlanned: boolean }[];
 }
 
-async function buildSessionsTrs(db: any, sessionList: any[]): Promise<Map<string, BuiltSession>> {
+async function buildSessionsTrs(db: Db, sessionList: (typeof sessions.$inferSelect)[]): Promise<Map<string, BuiltSession>> {
   const out = new Map<string, BuiltSession>();
   if (sessionList.length === 0) return out;
 
@@ -87,7 +88,9 @@ async function buildSessionsTrs(db: any, sessionList: any[]): Promise<Map<string
       .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
       .where(inArray(downtimeEvents.lotEntryId, lotIds));
     for (const d of dts) {
-      (dtsByLot.get(d.lotEntryId) ?? dtsByLot.set(d.lotEntryId, []).get(d.lotEntryId)!).push(d);
+      const lotEntryId = d.lotEntryId;
+      if (!lotEntryId) continue;
+      (dtsByLot.get(lotEntryId) ?? dtsByLot.set(lotEntryId, []).get(lotEntryId)!).push(d);
     }
   }
 

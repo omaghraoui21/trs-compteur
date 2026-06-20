@@ -46945,7 +46945,9 @@ async function buildSessionsTrs(db2, sessionList) {
       isPlanned: downtimeCategories.isPlanned
     }).from(downtimeEvents).innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id)).where(inArray(downtimeEvents.lotEntryId, lotIds));
     for (const d of dts) {
-      (dtsByLot.get(d.lotEntryId) ?? dtsByLot.set(d.lotEntryId, []).get(d.lotEntryId)).push(d);
+      const lotEntryId = d.lotEntryId;
+      if (!lotEntryId) continue;
+      (dtsByLot.get(lotEntryId) ?? dtsByLot.set(lotEntryId, []).get(lotEntryId)).push(d);
     }
   }
   const allProducts = await db2.select().from(products);
