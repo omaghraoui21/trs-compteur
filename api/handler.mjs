@@ -45901,6 +45901,12 @@ authRouter.post("/logout", validate(refreshSchema), asyncHandler(async (req, res
   const [row] = await db2.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, hashToken(refreshToken))).limit(1);
   if (row) {
     await db2.update(refreshTokens).set({ revokedAt: /* @__PURE__ */ new Date() }).where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt)));
+    const [user] = await db2.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, row.userId)).limit(1);
+    if (user) {
+      req.userId = user.id;
+      req.userEmail = user.email;
+      await audit(db2, req, "LOGOUT", "user", user.id, {});
+    }
   }
   res.json({ ok: true });
 }));

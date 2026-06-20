@@ -118,6 +118,12 @@ authRouter.post("/logout", validate(refreshSchema), asyncHandler(async (req, res
   if (row) {
     await db.update(refreshTokens).set({ revokedAt: new Date() })
       .where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt)));
+    const [user] = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, row.userId)).limit(1);
+    if (user) {
+      req.userId = user.id;
+      req.userEmail = user.email;
+      await audit(db, req, "LOGOUT", "user", user.id, {});
+    }
   }
   res.json({ ok: true });
 }));
