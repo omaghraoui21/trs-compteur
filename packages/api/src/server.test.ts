@@ -496,6 +496,94 @@ describe("session-level stops + cadence changes (refonte arrêts)", () => {
   });
 });
 
+describe("delete downtime endpoints", () => {
+  const auth = { Authorization: `Bearer ${""}` };
+  let sessionId: string;
+  let lotId: string;
+  let sessionDtId: string;
+  let lotDtId: string;
+
+  it("sets up a session with both a session-level and a lot-level downtime", async () => {
+    auth.Authorization = `Bearer ${opToken}`;
+    const eqs = await request(app).get("/api/ref/equipments").set(auth);
+    const rooms = await request(app).get("/api/ref/rooms").set(auth);
+    const cats = await request(app).get("/api/ref/downtime-categories").set(auth);
+    const products = await request(app).get("/api/ref/products").set(auth);
+    const equipmentId = (eqs.body.equipments ?? eqs.body)[0].id;
+    const roomId = (rooms.body.rooms ?? rooms.body)[0].id;
+    const categoryId = (cats.body.categories ?? cats.body)[0].id;
+    const productId = (products.body.products ?? products.body)[0].id;
+
+    const ses = await request(app).post("/api/sessions/open").set(auth).send({ equipmentId, roomId });
+    expect(ses.status).toBe(201);
+    sessionId = ses.body.id ?? ses.body.session?.id;
+
+    const sdRes = await request(app)
+      .post(`/api/sessions/${sessionId}/downtimes`)
+      .set(auth).send({ categoryId, durationMinutes: 10 });
+    expect(sdRes.status).toBe(201);
+    sessionDtId = sdRes.body.id;
+
+    const lot = await request(app).post("/api/lots").set(auth)
+      .send({ sessionId, productId, batchNumber: "DEL-DT-LOT", cadenceUsed: 100, cadenceUnit: "u/min" });
+    expect(lot.status).toBe(201);
+    lotId = lot.body.id ?? lot.body.lot?.id;
+
+    const ldRes = await request(app)
+      .post(`/api/lots/${lotId}/downtimes`)
+      .set(auth).send({ categoryId, durationMinutes: 5 });
+    expect(ldRes.status).toBe(201);
+    lotDtId = ldRes.body.id;
+  });
+
+  it("DELETE /sessions/:id/downtimes/:dtId returns 403 when downtime belongs to a different session", async () => {
+    // sessionDtId belongs to sessionId — a different (all-zeros) sessionId must get 403
+    const res = await request(app)
+      .delete(`/api/sessions/00000000-0000-0000-0000-000000000000/downtimes/${sessionDtId}`)
+      .set(auth);
+    expect(res.status).toBe(403);
+  });
+
+  it("DELETE /sessions/:id/downtimes/:dtId returns 400 when trying to delete a lot-attached stop", async () => {
+    const res = await request(app)
+      .delete(`/api/sessions/${sessionId}/downtimes/${lotDtId}`)
+      .set(auth);
+    expect(res.status).toBe(400);
+  });
+
+  it("DELETE /lots/:id/downtimes/:dtId returns 403 when downtime belongs to a different lot", async () => {
+    const res = await request(app)
+      .delete(`/api/lots/00000000-0000-0000-0000-000000000000/downtimes/${lotDtId}`)
+      .set(auth);
+    expect(res.status).toBe(403);
+  });
+
+  it("DELETE /lots/:id/downtimes/:dtId returns 204 and removes the record", async () => {
+    const res = await request(app)
+      .delete(`/api/lots/${lotId}/downtimes/${lotDtId}`)
+      .set(auth);
+    expect(res.status).toBe(204);
+    const list = await request(app).get(`/api/lots/${lotId}/downtimes`).set(auth);
+    expect(list.body.every((d: any) => d.id !== lotDtId)).toBe(true);
+  });
+
+  it("DELETE /sessions/:id/downtimes/:dtId returns 204 and removes the record", async () => {
+    const res = await request(app)
+      .delete(`/api/sessions/${sessionId}/downtimes/${sessionDtId}`)
+      .set(auth);
+    expect(res.status).toBe(204);
+    const detail = await request(app).get(`/api/sessions/${sessionId}`).set(auth);
+    expect(detail.body.downtimes.every((d: any) => d.id !== sessionDtId)).toBe(true);
+  });
+
+  it("DELETE /sessions/:id/downtimes/:dtId returns 404 for already-deleted downtime", async () => {
+    const res = await request(app)
+      .delete(`/api/sessions/${sessionId}/downtimes/${sessionDtId}`)
+      .set(auth);
+    expect(res.status).toBe(404);
+  });
+});
+
 describe("dashboard pending-lots status filter", () => {
   it("rejects an unknown status value (400 — Zod query)", async () => {
     const res = await request(app)
