@@ -303,6 +303,14 @@ describe("golden path + validation + RBAC", () => {
     expect(res.status).toBe(409);
   });
 
+  it("rejects a re-validation of an already-validated lot (409 — GMP idempotency guard)", async () => {
+    const res = await request(app)
+      .post(`/api/lots/${lotId}/validate`)
+      .set({ Authorization: `Bearer ${supToken}` })
+      .send({ action: "validate", password: "super123" });
+    expect(res.status).toBe(409);
+  });
+
   it("exposes the lot's electronic signatures (Part 11 manifestation)", async () => {
     const res = await request(app)
       .get(`/api/lots/${lotId}/signatures`)

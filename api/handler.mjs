@@ -46859,17 +46859,21 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
   const { action, comment, password } = req.body;
   const status = action === "reject" ? "rejected" : "validated";
   const lotId = String(req.params.id);
-  const signer = await reauthSigner(db2, userId, password);
+  const [signer, [existing]] = await Promise.all([
+    reauthSigner(db2, userId, password),
+    db2.select({ id: lotEntries.id, status: lotEntries.status }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1)
+  ]);
+  if (!existing) {
+    res.status(404).json({ error: "Lot introuvable" });
+    return;
+  }
+  if (existing.status !== "closed") throw new HttpError(409, `Ce lot est d\xE9j\xE0 ${existing.status === "validated" ? "valid\xE9" : "rejet\xE9"} \u2014 aucune action requise`);
   const [lot] = await db2.update(lotEntries).set({
     status,
     supervisorId: userId,
     supervisorComment: comment,
     validatedAt: /* @__PURE__ */ new Date()
   }).where(eq(lotEntries.id, lotId)).returning();
-  if (!lot) {
-    res.status(404).json({ error: "Lot introuvable" });
-    return;
-  }
   const signature = await recordSignature(db2, req, signer, {
     entityType: "lot",
     entityId: lot.id,

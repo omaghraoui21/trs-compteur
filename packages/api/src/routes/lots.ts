@@ -310,8 +310,13 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
   const status = action === "reject" ? "rejected" : "validated";
   const lotId = String(req.params.id);
 
-  // 21 CFR Part 11: re-authenticate the signer at the moment of signing.
-  const signer = await reauthSigner(db, userId!, password);
+  // Re-auth and lot status check in parallel — both reads are independent.
+  const [signer, [existing]] = await Promise.all([
+    reauthSigner(db, userId!, password),
+    db.select({ id: lotEntries.id, status: lotEntries.status }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1),
+  ]);
+  if (!existing) { res.status(404).json({ error: "Lot introuvable" }); return; }
+  if (existing.status !== "closed") throw new HttpError(409, `Ce lot est déjà ${existing.status === "validated" ? "validé" : "rejeté"} — aucune action requise`);
 
   const [lot] = await db.update(lotEntries).set({
     status,
@@ -319,8 +324,6 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
     supervisorComment: comment,
     validatedAt: new Date(),
   }).where(eq(lotEntries.id, lotId)).returning();
-
-  if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
 
   const signature = await recordSignature(db, req, signer, {
     entityType: "lot", entityId: lot.id,
