@@ -652,6 +652,12 @@ export default function CompteurPage() {
                 <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
                   <span className="font-medium text-gray-700">{closedLotsAll.length} lot{closedLotsAll.length > 1 ? "s" : ""}</span>
                   <span className="text-green-700 font-medium">{fmtNumber(totalProd)} produits</span>
+                  {sessionTrs && sessionTrs.DO > 0 && (
+                    <span className="font-semibold px-2 py-0.5 rounded-full text-[10px]"
+                      style={{ backgroundColor: trsColor(sessionTrs.DO) + "22", color: trsColor(sessionTrs.DO) }}>
+                      DO {fmtPct(sessionTrs.DO)}
+                    </span>
+                  )}
                   {tqSession !== null && (
                     <span className="font-semibold px-2 py-0.5 rounded-full text-[10px]"
                       style={{ backgroundColor: trsColor(tqSession) + "22", color: trsColor(tqSession) }}>

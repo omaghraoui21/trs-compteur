@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment, useRef } from "react";
 import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type ProductEquipmentCadence, type AdminUser, type AuditLogEntry } from "@/lib/api";
 import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, List, Network, ChevronDown, ChevronRight, Users, KeyRound, ScrollText, ChevronLeft } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
@@ -1052,13 +1052,17 @@ function FormCard({ title, children, onCancel, onSave }: { title: string; childr
   // Guards against double-submit centrally for every admin panel: the button is
   // disabled while the (possibly async) onSave is in flight.
   const [saving, setSaving] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const handleSave = async () => {
     if (saving) return;
     setSaving(true);
     try { await onSave(); } finally { setSaving(false); }
   };
+  useEffect(() => {
+    cardRef.current?.querySelector<HTMLElement>("input, select, textarea")?.focus();
+  }, []);
   return (
-    <div className="mb-6 p-4 bg-white border rounded-lg shadow-sm">
+    <div ref={cardRef} className="mb-6 p-4 bg-white border rounded-lg shadow-sm">
       <h3 className="text-sm font-semibold text-gray-700 mb-3">{title}</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">{children}</div>
       <div className="flex gap-2 justify-end">
