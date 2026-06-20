@@ -54,6 +54,9 @@ authRouter.post("/login", validate(loginSchema), asyncHandler(async (req, res) =
     expiresAt: refreshExpiry(),
   });
 
+  req.userId = user.id;
+  req.userEmail = user.email;
+  await audit(db, req, "LOGIN", "user", user.id, {});
   const token = signToken(user.id, user.role, user.email);
   res.json({ token, refreshToken, user: publicUser(user) });
 }));

@@ -265,7 +265,7 @@ lotsRouter.post("/:id/correct", requireRole("supervisor", "admin"), validate(cor
   if (!original) { res.status(404).json({ error: "Lot introuvable" }); return; }
   if (original.status !== "closed") throw new HttpError(409, "Seuls les lots clôturés peuvent être corrigés");
 
-  const updates: Record<string, any> = {};
+  const updates: Partial<{ quantityProduced: number; quantityConforming: number; quantityRejected: number; cadenceUsed: string; cadenceUnit: string }> = {};
   if (quantityProduced !== undefined) updates.quantityProduced = quantityProduced;
   if (quantityConforming !== undefined) updates.quantityConforming = quantityConforming;
   if (quantityRejected !== undefined) updates.quantityRejected = quantityRejected;
