@@ -46419,13 +46419,10 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
     }
   }
   await db2.update(lotEntries).set({ status: "closed", endedAt: now }).where(and(eq(lotEntries.sessionId, String(req.params.id)), eq(lotEntries.status, "active")));
-  const openEvents = await db2.select().from(sessionEvents).where(eq(sessionEvents.sessionId, String(req.params.id)));
-  for (const ev of openEvents) {
-    if (!ev.endedAt) {
-      const dur = diffMinutes(ev.startedAt, now);
-      await db2.update(sessionEvents).set({ endedAt: now, durationMinutes: dur }).where(eq(sessionEvents.id, ev.id));
-    }
-  }
+  await db2.update(sessionEvents).set({
+    endedAt: now,
+    durationMinutes: sql`ROUND(EXTRACT(EPOCH FROM (${now.toISOString()}::timestamptz - ${sessionEvents.startedAt})) / 60)::integer`
+  }).where(and(eq(sessionEvents.sessionId, String(req.params.id)), isNull(sessionEvents.endedAt)));
   const notes = req.body.notes?.trim() || null;
   const [session] = await db2.update(sessions).set({ status: "closed", closedAt: now, ...notes !== null ? { notes } : {} }).where(eq(sessions.id, String(req.params.id))).returning();
   if (session) await audit(db2, req, "CLOSE_SESSION", "session", session.id, { notes });

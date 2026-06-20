@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { eq, and, desc, inArray, isNull, max } from "drizzle-orm";
+import { eq, and, desc, inArray, isNull, max, sql } from "drizzle-orm";
 import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories, lotCadenceChanges } from "@trs/db";
-import { computeLotTrs, computeSessionTrs, computeAClasserMin, computeMtbfMttr, diffMinutes } from "@trs/engine";
+import { computeLotTrs, computeSessionTrs, computeAClasserMin, computeMtbfMttr } from "@trs/engine";
 import { authenticate } from "../middleware";
 import { asyncHandler, validate, validateQuery } from "../lib/http";
 import { audit } from "../lib/audit";
@@ -124,15 +124,13 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
     .set({ status: "closed", endedAt: now })
     .where(and(eq(lotEntries.sessionId, String(req.params.id)), eq(lotEntries.status, "active")));
 
-  // Close any open events
-  const openEvents = await db.select().from(sessionEvents)
-    .where(eq(sessionEvents.sessionId, String(req.params.id)));
-  for (const ev of openEvents) {
-    if (!ev.endedAt) {
-      const dur = diffMinutes(ev.startedAt, now);
-      await db.update(sessionEvents).set({ endedAt: now, durationMinutes: dur }).where(eq(sessionEvents.id, ev.id));
-    }
-  }
+  // Close any open session events in a single UPDATE instead of N per-row updates.
+  await db.update(sessionEvents)
+    .set({
+      endedAt: now,
+      durationMinutes: sql<number>`ROUND(EXTRACT(EPOCH FROM (${now.toISOString()}::timestamptz - ${sessionEvents.startedAt})) / 60)::integer`,
+    })
+    .where(and(eq(sessionEvents.sessionId, String(req.params.id)), isNull(sessionEvents.endedAt)));
 
   const notes = req.body.notes?.trim() || null;
   const [session] = await db.update(sessions)
