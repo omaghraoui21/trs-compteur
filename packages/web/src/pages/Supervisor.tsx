@@ -283,6 +283,7 @@ export default function SupervisorPage() {
                 onClick={() => expandLot(lot.id)}
                 aria-expanded={isExpanded}
                 aria-controls={`lot-detail-${lot.id}`}
+                aria-label={`${isExpanded ? "Réduire" : "Développer"} le lot ${lot.batchNumber}`}
                 className="w-full px-4 py-3 text-left hover:bg-gray-50 transition"
               >
                 <div className="flex items-start justify-between gap-2">

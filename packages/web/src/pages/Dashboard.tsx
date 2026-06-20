@@ -91,6 +91,7 @@ export default function DashboardPage() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [equipFailed, setEquipFailed] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [drillCode, setDrillCode] = useState<string | null>(null);
@@ -116,11 +117,14 @@ export default function DashboardPage() {
 
   const fetchComparison = useCallback(async () => {
     if (!from || !to) return;
+    setComparisonLoading(true);
     try {
       const compRes = await api.dashboardComparison(from, to);
       setComparisonData(compRes);
     } catch {
       setComparisonData(null);
+    } finally {
+      setComparisonLoading(false);
     }
   }, [from, to]);
 
@@ -350,7 +354,14 @@ export default function DashboardPage() {
       {!loading && data && (
         <>
           {/* ─── Comparison mode ─────────────────────────────── */}
-          {showComparison && comparisonData && (
+          {showComparison && comparisonLoading && (
+            <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="h-48 bg-gray-100 rounded-xl animate-pulse" />
+              ))}
+            </div>
+          )}
+          {showComparison && !comparisonLoading && comparisonData && (
             <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Best→worst TRS so the strongest/weakest lines surface at a glance.
                   Copy before sort (non-mutating); `|| 0` keeps zero-lot equipments
