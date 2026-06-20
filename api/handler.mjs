@@ -46889,10 +46889,8 @@ refRouter.get("/products", asyncHandler(async (req, res) => {
 refRouter.get("/downtime-categories", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const eqType = req.query.equipmentType;
-  let data = await db2.select().from(downtimeCategories).where(eq(downtimeCategories.isActive, true));
-  if (eqType) {
-    data = data.filter((c) => !c.appliesToEquipmentType || c.appliesToEquipmentType === eqType);
-  }
+  const typeFilter = eqType ? or(isNull(downtimeCategories.appliesToEquipmentType), eq(downtimeCategories.appliesToEquipmentType, eqType)) : void 0;
+  const data = await db2.select().from(downtimeCategories).where(and(eq(downtimeCategories.isActive, true), typeFilter));
   res.json(data);
 }));
 refRouter.get("/cadences", asyncHandler(async (req, res) => {

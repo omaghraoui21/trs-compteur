@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, isNull } from "drizzle-orm";
 import { rooms, equipments, products, downtimeCategories, productEquipmentCadences } from "@trs/db";
 
 import { authenticate } from "../middleware";
@@ -36,10 +36,11 @@ refRouter.get("/products", asyncHandler(async (req, res) => {
 refRouter.get("/downtime-categories", asyncHandler(async (req, res) => {
   const { db } = req;
   const eqType = req.query.equipmentType as string | undefined;
-  let data = await db.select().from(downtimeCategories).where(eq(downtimeCategories.isActive, true));
-  if (eqType) {
-    data = data.filter(c => !c.appliesToEquipmentType || c.appliesToEquipmentType === eqType);
-  }
+  const typeFilter = eqType
+    ? or(isNull(downtimeCategories.appliesToEquipmentType), eq(downtimeCategories.appliesToEquipmentType, eqType))
+    : undefined;
+  const data = await db.select().from(downtimeCategories)
+    .where(and(eq(downtimeCategories.isActive, true), typeFilter));
   res.json(data);
 }));
 
