@@ -115,7 +115,8 @@ lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res
   const { db, userId, userRole } = req;
   const lotId = String(req.params.id);
 
-  const [existing] = await db.select().from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  const [existing] = await db.select({ status: lotEntries.status, operatorId: lotEntries.operatorId })
+    .from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
   if (!existing) { res.status(404).json({ error: "Lot introuvable" }); return; }
   if (existing.status !== "active") throw new HttpError(409, "Seuls les lots actifs peuvent être mis à jour via PATCH — utilisez POST /:id/correct pour les lots clôturés");
   if (userRole === "operator" && existing.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }

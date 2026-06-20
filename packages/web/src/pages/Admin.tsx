@@ -1096,7 +1096,7 @@ const ACTION_LABELS: Record<string, string> = {
   OPEN_SESSION: "Ouverture session", CLOSE_SESSION: "Clôture session",
   ADD_SESSION_EVENT: "Évènement session", ADD_SESSION_DOWNTIME: "Arrêt session",
   DELETE_SESSION_DOWNTIME: "Suppression arrêt session",
-  START_LOT: "Démarrage lot", CLOSE_LOT: "Clôture lot",
+  START_LOT: "Démarrage lot", CLOSE_LOT: "Clôture lot", UPDATE_LOT: "MàJ lot (opérateur)",
   CORRECT_LOT: "Correction lot", VALIDATE_LOT: "Validation lot", REJECT_LOT: "Rejet lot",
   ADD_DOWNTIME: "Ajout arrêt", DELETE_DOWNTIME: "Suppression arrêt",
   CHANGE_CADENCE: "Changement cadence",

@@ -46701,7 +46701,7 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
 lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res) => {
   const { db: db2, userId, userRole: userRole2 } = req;
   const lotId = String(req.params.id);
-  const [existing] = await db2.select().from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  const [existing] = await db2.select({ status: lotEntries.status, operatorId: lotEntries.operatorId }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
   if (!existing) {
     res.status(404).json({ error: "Lot introuvable" });
     return;
