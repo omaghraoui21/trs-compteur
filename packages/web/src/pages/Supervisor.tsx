@@ -15,6 +15,12 @@ function fmtLotDuration(start: string, end: string | null): string {
   return end ? fmtMinutes(diffMinutes(start, end)) : "En cours";
 }
 
+// YYYY-MM-DD → DD/MM/YYYY without UTC-midnight shift
+function fmtSessionDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 function QualityBar({ tq }: { tq: number | null }) {
   const color = tq !== null ? trsColor(tq) : "#9ca3af";
   return (
@@ -89,6 +95,8 @@ export default function SupervisorPage() {
     if (expanded === lotId) { setExpanded(null); return; }
     setExpanded(lotId);
     setCorrecting(null);
+    setComment("");
+    setCommentError("");
     if (lotDowntimes[lotId] !== undefined) return;
     setLoadingDowntimesId(lotId);
     try {
@@ -311,7 +319,7 @@ export default function SupervisorPage() {
                         <User className="h-3 w-3" aria-hidden="true" />{lot.operatorName}
                       </span>
                       <span className="inline-flex items-center gap-0.5">
-                        <CalendarDays className="h-3 w-3" aria-hidden="true" />{new Date(lot.sessionDate).toLocaleDateString("fr-FR")}
+                        <CalendarDays className="h-3 w-3" aria-hidden="true" />{fmtSessionDate(lot.sessionDate)}
                       </span>
                     </div>
                     <QualityBar tq={tq} />
