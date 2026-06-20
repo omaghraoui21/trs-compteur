@@ -412,6 +412,50 @@ describe("user management (admin-only)", () => {
   });
 });
 
+describe("admin reference data CRUD + audit trail", () => {
+  const sup = () => ({ Authorization: `Bearer ${supToken}` });
+  let roomId: string;
+
+  it("supervisor can create a room (201) and it appears in audit log", async () => {
+    const res = await request(app)
+      .post("/api/admin/rooms")
+      .set(sup())
+      .send({ code: "SALLE-TEST", name: "Salle Test" });
+    expect(res.status).toBe(201);
+    roomId = res.body.id;
+    const audit = await sql`SELECT action FROM audit_log WHERE entity_type = 'room' AND entity_id = ${roomId}`;
+    expect(audit.some((r: any) => r.action === "CREATE_ROOM")).toBe(true);
+  });
+
+  it("supervisor can update the room (200) and audit log records it", async () => {
+    const res = await request(app)
+      .patch(`/api/admin/rooms/${roomId}`)
+      .set(sup())
+      .send({ name: "Salle Test Modifiée" });
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe("Salle Test Modifiée");
+    const audit = await sql`SELECT action FROM audit_log WHERE entity_type = 'room' AND entity_id = ${roomId}`;
+    expect(audit.some((r: any) => r.action === "UPDATE_ROOM")).toBe(true);
+  });
+
+  it("deactivating the room soft-deletes it and logs DEACTIVATE_ROOM", async () => {
+    const res = await request(app)
+      .delete(`/api/admin/rooms/${roomId}`)
+      .set(sup());
+    expect(res.status).toBe(200);
+    expect(res.body.isActive).toBe(false);
+    const audit = await sql`SELECT action FROM audit_log WHERE entity_type = 'room' AND entity_id = ${roomId}`;
+    expect(audit.some((r: any) => r.action === "DEACTIVATE_ROOM")).toBe(true);
+  });
+
+  it("operator cannot access admin routes (403)", async () => {
+    const res = await request(app)
+      .get("/api/admin/rooms")
+      .set({ Authorization: `Bearer ${opToken}` });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("self-service password change", () => {
   const auth = () => ({ Authorization: `Bearer ${opToken}` });
 
