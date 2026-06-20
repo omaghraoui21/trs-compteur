@@ -46632,7 +46632,15 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
     res.status(401).json({ error: "Non authentifi\xE9" });
     return;
   }
-  const [activeLot] = await db2.select().from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active"))).limit(1);
+  const [[sessionRow], [activeLot]] = await Promise.all([
+    db2.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
+    db2.select({ id: lotEntries.id }).from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active"))).limit(1)
+  ]);
+  if (!sessionRow) {
+    res.status(404).json({ error: "Session introuvable" });
+    return;
+  }
+  if (sessionRow.status !== "active") throw new HttpError(409, "Impossible de d\xE9marrer un lot dans une session ferm\xE9e");
   if (activeLot) {
     res.status(409).json({ error: "Un lot est d\xE9j\xE0 actif dans cette session", lotId: activeLot.id });
     return;

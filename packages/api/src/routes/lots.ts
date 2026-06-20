@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, and, desc, count, max } from "drizzle-orm";
-import { lotEntries, downtimeEvents, sessionEvents, downtimeCategories, electronicSignatures, lotCadenceChanges } from "@trs/db";
+import { sessions, lotEntries, downtimeEvents, sessionEvents, downtimeCategories, electronicSignatures, lotCadenceChanges } from "@trs/db";
 import { diffMinutes } from "@trs/engine";
 import { authenticate, requireRole } from "../middleware";
 import { asyncHandler, validate, HttpError } from "../lib/http";
@@ -19,10 +19,16 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
 
   if (!userId) { res.status(401).json({ error: "Non authentifié" }); return; }
 
-  // Check no active lot in this session
-  const [activeLot] = await db.select().from(lotEntries)
-    .where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active")))
-    .limit(1);
+  // Verify session exists + is active, and check for an existing active lot — both
+  // reads are against indexed columns; run them in parallel.
+  const [[sessionRow], [activeLot]] = await Promise.all([
+    db.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
+    db.select({ id: lotEntries.id }).from(lotEntries)
+      .where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active")))
+      .limit(1),
+  ]);
+  if (!sessionRow) { res.status(404).json({ error: "Session introuvable" }); return; }
+  if (sessionRow.status !== "active") throw new HttpError(409, "Impossible de démarrer un lot dans une session fermée");
   if (activeLot) {
     res.status(409).json({ error: "Un lot est déjà actif dans cette session", lotId: activeLot.id });
     return;
