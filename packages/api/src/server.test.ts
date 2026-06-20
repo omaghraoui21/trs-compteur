@@ -98,6 +98,24 @@ describe("auth", () => {
     const res = await request(app).get("/api/sessions");
     expect(res.status).toBe(401);
   });
+
+  it("logout revokes the refresh token and writes a LOGOUT audit event", async () => {
+    const loginRes = await request(app)
+      .post("/api/auth/login")
+      .send({ email: "operateur@dpi.local", password: "oper123" });
+    const { refreshToken } = loginRes.body;
+
+    const logoutRes = await request(app).post("/api/auth/logout").send({ refreshToken });
+    expect(logoutRes.status).toBe(200);
+
+    // The revoked token must no longer be usable
+    const retryRes = await request(app).post("/api/auth/refresh").send({ refreshToken });
+    expect(retryRes.status).toBe(401);
+
+    // A LOGOUT row must appear in the audit log
+    const rows = await sql`SELECT action FROM audit_log WHERE action = 'LOGOUT' ORDER BY created_at DESC LIMIT 1`;
+    expect(rows.length).toBe(1);
+  });
 });
 
 describe("golden path + validation + RBAC", () => {
