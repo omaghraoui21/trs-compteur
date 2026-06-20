@@ -15,13 +15,19 @@ interface WaterfallStep {
   lossFill: string;
 }
 
+interface TooltipEntry {
+  dataKey: string;
+  value: number;
+  payload: { fill: string; lossFill: string };
+}
+
 // Custom tooltip: keyed off dataKey (reliable), hides the invisible stacking
 // base and any zero entries, and labels the time bar vs. the loss bar correctly.
-function WaterfallTooltip({ active, payload, label }: any) {
+function WaterfallTooltip({ active, payload, label }: { active?: boolean; payload?: TooltipEntry[]; label?: string }) {
   if (!active || !payload?.length) return null;
   const rows = payload
-    .filter((p: any) => p.dataKey !== "base" && Number(p.value) > 0)
-    .map((p: any) => ({
+    .filter(p => p.dataKey !== "base" && Number(p.value) > 0)
+    .map(p => ({
       name: p.dataKey === "value" ? "Temps" : "Perte",
       value: fmtDuration(Number(p.value)),
       color: p.dataKey === "value" ? p.payload.fill : p.payload.lossFill,
@@ -30,7 +36,7 @@ function WaterfallTooltip({ active, payload, label }: any) {
   return (
     <div className="bg-white border rounded-lg shadow-sm px-3 py-2 text-xs">
       <div className="font-semibold mb-1">{label}</div>
-      {rows.map((r: any, i: number) => (
+      {rows.map((r, i) => (
         <div key={i} className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-sm inline-block" style={{ background: r.color }} />
           <span className="text-gray-600">{r.name} :</span>

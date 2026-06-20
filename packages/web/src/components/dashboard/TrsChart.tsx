@@ -3,7 +3,7 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, ReferenceLine,
 } from "recharts";
-import { groupSessionsByPeriod, type GroupBy } from "@trs/engine";
+import { groupSessionsByPeriod, type GroupBy, type SessionTrsResult } from "@trs/engine";
 import type { DailyTrs } from "@/lib/api";
 
 interface Props {
@@ -28,7 +28,7 @@ export default function TrsChart({ daily, objective }: Props) {
 
   const data = useMemo(() => {
     // Each bucket is re-aggregated as ΣtU/ΣtR — day → week → month always reconcile.
-    const buckets = groupSessionsByPeriod(daily as any, grain);
+    const buckets = groupSessionsByPeriod(daily as (SessionTrsResult & { date: string })[], grain);
     return buckets.map(b => ({
       date: bucketLabel(b.periodKey, grain),
       DO: Math.round(b.DO * 10000) / 100,

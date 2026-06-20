@@ -47578,15 +47578,14 @@ var cleanupHandler = asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const now = /* @__PURE__ */ new Date();
   const oneDayAgo = new Date(now.getTime() - 864e5);
-  const result = await db2.delete(refreshTokens).where(
+  const deleted = await db2.delete(refreshTokens).where(
     or(
       lt(refreshTokens.expiresAt, now),
       and(isNotNull(refreshTokens.revokedAt), lt(refreshTokens.revokedAt, oneDayAgo))
     )
-  );
-  const deleted = result.rowCount ?? 0;
-  console.log(`[maintenance] cleanup-tokens: deleted ${deleted} rows`);
-  res.json({ ok: true, deleted });
+  ).returning({ id: refreshTokens.id });
+  console.log(`[maintenance] cleanup-tokens: deleted ${deleted.length} rows`);
+  res.json({ ok: true, deleted: deleted.length });
 });
 maintenanceRouter.get("/cleanup-tokens", cleanupHandler);
 maintenanceRouter.post("/cleanup-tokens", cleanupHandler);

@@ -31,16 +31,14 @@ const cleanupHandler = asyncHandler(async (req, res) => {
   //   b) revoked for more than 24 h (revokedAt < 24 h ago)
   // The 24-hour buffer preserves recently-rotated tokens so that the grace-window
   // reuse detection in /refresh still has the revoked row to compare against.
-  const result = await db.delete(refreshTokens).where(
+  const deleted = await db.delete(refreshTokens).where(
     or(
       lt(refreshTokens.expiresAt, now),
       and(isNotNull(refreshTokens.revokedAt), lt(refreshTokens.revokedAt, oneDayAgo)),
     ),
-  );
-
-  const deleted = (result as any).rowCount ?? 0;
-  console.log(`[maintenance] cleanup-tokens: deleted ${deleted} rows`);
-  res.json({ ok: true, deleted });
+  ).returning({ id: refreshTokens.id });
+  console.log(`[maintenance] cleanup-tokens: deleted ${deleted.length} rows`);
+  res.json({ ok: true, deleted: deleted.length });
 });
 
 maintenanceRouter.get("/cleanup-tokens", cleanupHandler);
