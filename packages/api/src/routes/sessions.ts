@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, and, desc, inArray, isNull } from "drizzle-orm";
+import { eq, and, desc, inArray, isNull, max } from "drizzle-orm";
 import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories, lotCadenceChanges } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, computeAClasserMin, computeMtbfMttr, diffMinutes } from "@trs/engine";
 import { authenticate } from "../middleware";
@@ -150,10 +150,9 @@ sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async 
   const { db } = req;
   const { eventType, label, durationMinutes, isPlanned, comment } = req.body;
 
-  // Get max sort order
-  const existing = await db.select().from(sessionEvents)
-    .where(eq(sessionEvents.sessionId, String(req.params.id)));
-  const maxOrder = existing.reduce((max, e) => Math.max(max, e.sortOrder), 0);
+  // Use MAX() to avoid loading the full event list just for sort ordering.
+  const [maxSortRow] = await db.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, String(req.params.id)));
+  const maxOrder = maxSortRow?.m ?? 0;
 
   const now = new Date();
   const endedAt = durationMinutes ? new Date(now.getTime() + durationMinutes * 60_000) : undefined;

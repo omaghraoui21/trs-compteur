@@ -91,10 +91,9 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
   if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
   await audit(db, req, "CLOSE_LOT", "lot", lot.id, { quantityProduced, quantityConforming, quantityRejected });
 
-  // Add lot_end event
-  const existingEvents = await db.select().from(sessionEvents)
-    .where(eq(sessionEvents.sessionId, lot.sessionId));
-  const maxOrder = existingEvents.reduce((max, e) => Math.max(max, e.sortOrder), 0);
+  // Add lot_end event — use MAX() to avoid loading the full event list.
+  const [maxSortRow] = await db.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, lot.sessionId));
+  const maxOrder = maxSortRow?.m ?? 0;
 
   await db.insert(sessionEvents).values({
     sessionId: lot.sessionId,

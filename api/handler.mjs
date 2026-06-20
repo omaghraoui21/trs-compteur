@@ -46434,8 +46434,8 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
 sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const { eventType: eventType2, label, durationMinutes, isPlanned, comment } = req.body;
-  const existing = await db2.select().from(sessionEvents).where(eq(sessionEvents.sessionId, String(req.params.id)));
-  const maxOrder = existing.reduce((max2, e) => Math.max(max2, e.sortOrder), 0);
+  const [maxSortRow] = await db2.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, String(req.params.id)));
+  const maxOrder = maxSortRow?.m ?? 0;
   const now = /* @__PURE__ */ new Date();
   const endedAt = durationMinutes ? new Date(now.getTime() + durationMinutes * 6e4) : void 0;
   const [event] = await db2.insert(sessionEvents).values({
@@ -46685,8 +46685,8 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
     return;
   }
   await audit(db2, req, "CLOSE_LOT", "lot", lot.id, { quantityProduced, quantityConforming, quantityRejected });
-  const existingEvents = await db2.select().from(sessionEvents).where(eq(sessionEvents.sessionId, lot.sessionId));
-  const maxOrder = existingEvents.reduce((max2, e) => Math.max(max2, e.sortOrder), 0);
+  const [maxSortRow] = await db2.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, lot.sessionId));
+  const maxOrder = maxSortRow?.m ?? 0;
   await db2.insert(sessionEvents).values({
     sessionId: lot.sessionId,
     eventType: "lot_end",
