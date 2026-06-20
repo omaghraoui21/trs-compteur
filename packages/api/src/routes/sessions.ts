@@ -126,7 +126,7 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
 
   // Close any open events
   const openEvents = await db.select().from(sessionEvents)
-    .where(and(eq(sessionEvents.sessionId, String(req.params.id))));
+    .where(eq(sessionEvents.sessionId, String(req.params.id)));
   for (const ev of openEvents) {
     if (!ev.endedAt) {
       const dur = diffMinutes(ev.startedAt, now);

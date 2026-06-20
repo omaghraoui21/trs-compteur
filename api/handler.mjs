@@ -46401,7 +46401,7 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
     }
   }
   await db2.update(lotEntries).set({ status: "closed", endedAt: now }).where(and(eq(lotEntries.sessionId, String(req.params.id)), eq(lotEntries.status, "active")));
-  const openEvents = await db2.select().from(sessionEvents).where(and(eq(sessionEvents.sessionId, String(req.params.id))));
+  const openEvents = await db2.select().from(sessionEvents).where(eq(sessionEvents.sessionId, String(req.params.id)));
   for (const ev of openEvents) {
     if (!ev.endedAt) {
       const dur = diffMinutes(ev.startedAt, now);
