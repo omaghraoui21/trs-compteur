@@ -319,6 +319,14 @@ describe("golden path + validation + RBAC", () => {
     expect(res.status).toBe(409);
   });
 
+  it("rejects adding a downtime to a validated lot (409 — finalization guard)", async () => {
+    const res = await request(app)
+      .post(`/api/lots/${lotId}/downtimes`)
+      .set({ Authorization: `Bearer ${opToken}` })
+      .send({ categoryId, durationMinutes: 5 });
+    expect(res.status).toBe(409);
+  });
+
   it("exposes the lot's electronic signatures (Part 11 manifestation)", async () => {
     const res = await request(app)
       .get(`/api/lots/${lotId}/signatures`)
@@ -335,6 +343,14 @@ describe("golden path + validation + RBAC", () => {
       .set({ Authorization: `Bearer ${opToken}` })
       .send({});
     expect(res.status).toBe(200);
+  });
+
+  it("rejects double-close of a session (409 — GMP idempotency guard)", async () => {
+    const res = await request(app)
+      .post(`/api/sessions/${sessionId}/close`)
+      .set({ Authorization: `Bearer ${opToken}` })
+      .send({});
+    expect(res.status).toBe(409);
   });
 
   it("rejects starting a lot in a closed session (409 — session status guard)", async () => {
