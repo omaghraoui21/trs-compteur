@@ -47303,6 +47303,7 @@ adminRouter.get("/rooms", asyncHandler(async (req, res) => {
 adminRouter.post("/rooms", validate(createRoomSchema), asyncHandler(async (req, res) => {
   const { code, name, description } = req.body;
   const [row] = await req.db.insert(rooms).values({ code, name, description }).returning();
+  await audit(req.db, req, "CREATE_ROOM", "room", row.id, { code, name });
   res.status(201).json(row);
 }));
 adminRouter.patch("/rooms/:id", validate(updateRoomSchema), asyncHandler(async (req, res) => {
@@ -47321,6 +47322,7 @@ adminRouter.patch("/rooms/:id", validate(updateRoomSchema), asyncHandler(async (
     res.status(404).json({ error: "Local introuvable" });
     return;
   }
+  await audit(req.db, req, "UPDATE_ROOM", "room", row.id, updates);
   res.json(row);
 }));
 adminRouter.delete("/rooms/:id", asyncHandler(async (req, res) => {
@@ -47329,6 +47331,7 @@ adminRouter.delete("/rooms/:id", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "Local introuvable" });
     return;
   }
+  await audit(req.db, req, "DEACTIVATE_ROOM", "room", row.id, {});
   res.json(row);
 }));
 adminRouter.get("/equipments", asyncHandler(async (req, res) => {
@@ -47346,6 +47349,7 @@ adminRouter.post("/equipments", validate(createEquipmentSchema), asyncHandler(as
     defaultCadenceUnit: defaultCadenceUnit || "u/min",
     microStopThresholdMin: microStopThresholdMin ?? 5
   }).returning();
+  await audit(req.db, req, "CREATE_EQUIPMENT", "equipment", row.id, { code, name });
   res.status(201).json(row);
 }));
 adminRouter.patch("/equipments/:id", validate(updateEquipmentSchema), asyncHandler(async (req, res) => {
@@ -47368,6 +47372,7 @@ adminRouter.patch("/equipments/:id", validate(updateEquipmentSchema), asyncHandl
     res.status(404).json({ error: "Equipement introuvable" });
     return;
   }
+  await audit(req.db, req, "UPDATE_EQUIPMENT", "equipment", row.id, updates);
   res.json(row);
 }));
 adminRouter.delete("/equipments/:id", asyncHandler(async (req, res) => {
@@ -47376,6 +47381,7 @@ adminRouter.delete("/equipments/:id", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "Equipement introuvable" });
     return;
   }
+  await audit(req.db, req, "DEACTIVATE_EQUIPMENT", "equipment", row.id, {});
   res.json(row);
 }));
 adminRouter.get("/products", asyncHandler(async (req, res) => {
@@ -47391,6 +47397,7 @@ adminRouter.post("/products", validate(createProductSchema), asyncHandler(async 
     cadenceUnit: cadenceUnit2 || "u/min",
     unit: unit || "unit\xE9s"
   }).returning();
+  await audit(req.db, req, "CREATE_PRODUCT", "product", row.id, { code, name });
   res.status(201).json(row);
 }));
 adminRouter.patch("/products/:id", validate(updateProductSchema), asyncHandler(async (req, res) => {
@@ -47411,6 +47418,7 @@ adminRouter.patch("/products/:id", validate(updateProductSchema), asyncHandler(a
     res.status(404).json({ error: "Produit introuvable" });
     return;
   }
+  await audit(req.db, req, "UPDATE_PRODUCT", "product", row.id, updates);
   res.json(row);
 }));
 adminRouter.delete("/products/:id", asyncHandler(async (req, res) => {
@@ -47419,6 +47427,7 @@ adminRouter.delete("/products/:id", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "Produit introuvable" });
     return;
   }
+  await audit(req.db, req, "DEACTIVATE_PRODUCT", "product", row.id, {});
   res.json(row);
 }));
 adminRouter.get("/downtime-categories", asyncHandler(async (req, res) => {
@@ -47434,6 +47443,7 @@ adminRouter.post("/downtime-categories", validate(createDowntimeCategorySchema),
     isPlanned: isPlanned ?? false,
     appliesToEquipmentType: appliesToEquipmentType || null
   }).returning();
+  await audit(req.db, req, "CREATE_DOWNTIME_CATEGORY", "downtimeCategory", row.id, { code, label, famille });
   res.status(201).json(row);
 }));
 adminRouter.patch("/downtime-categories/:id", validate(updateDowntimeCategorySchema), asyncHandler(async (req, res) => {
@@ -47454,6 +47464,7 @@ adminRouter.patch("/downtime-categories/:id", validate(updateDowntimeCategorySch
     res.status(404).json({ error: "Categorie introuvable" });
     return;
   }
+  await audit(req.db, req, "UPDATE_DOWNTIME_CATEGORY", "downtimeCategory", row.id, updates);
   res.json(row);
 }));
 adminRouter.delete("/downtime-categories/:id", asyncHandler(async (req, res) => {
@@ -47462,6 +47473,7 @@ adminRouter.delete("/downtime-categories/:id", asyncHandler(async (req, res) => 
     res.status(404).json({ error: "Categorie introuvable" });
     return;
   }
+  await audit(req.db, req, "DEACTIVATE_DOWNTIME_CATEGORY", "downtimeCategory", row.id, {});
   res.json(row);
 }));
 adminRouter.get("/cadences", asyncHandler(async (req, res) => {
@@ -47484,6 +47496,7 @@ adminRouter.post("/cadences", validate(createCadenceSchema), asyncHandler(async 
       trsObjective: trsObjective != null ? String(trsObjective) : null
     }
   }).returning();
+  await audit(req.db, req, "UPSERT_CADENCE", "cadence", row.id, { productId, equipmentId, cadenceValue });
   res.status(201).json(row);
 }));
 adminRouter.delete("/cadences/:id", asyncHandler(async (req, res) => {
@@ -47492,6 +47505,7 @@ adminRouter.delete("/cadences/:id", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "Cadence introuvable" });
     return;
   }
+  await audit(req.db, req, "DELETE_CADENCE", "cadence", row.id, {});
   res.json(row);
 }));
 var adminOnly = requireRole("admin");

@@ -28,6 +28,7 @@ adminRouter.get("/rooms", asyncHandler(async (req, res) => {
 adminRouter.post("/rooms", validate(createRoomSchema), asyncHandler(async (req, res) => {
   const { code, name, description } = req.body;
   const [row] = await req.db.insert(rooms).values({ code, name, description }).returning();
+  await audit(req.db, req, "CREATE_ROOM", "room", row.id, { code, name });
   res.status(201).json(row);
 }));
 
@@ -41,12 +42,14 @@ adminRouter.patch("/rooms/:id", validate(updateRoomSchema), asyncHandler(async (
   if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Aucune mise à jour" }); return; }
   const [row] = await req.db.update(rooms).set(updates).where(eq(rooms.id, String(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Local introuvable" }); return; }
+  await audit(req.db, req, "UPDATE_ROOM", "room", row.id, updates);
   res.json(row);
 }));
 
 adminRouter.delete("/rooms/:id", asyncHandler(async (req, res) => {
   const [row] = await req.db.update(rooms).set({ isActive: false }).where(eq(rooms.id, String(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Local introuvable" }); return; }
+  await audit(req.db, req, "DEACTIVATE_ROOM", "room", row.id, {});
   res.json(row);
 }));
 
@@ -65,6 +68,7 @@ adminRouter.post("/equipments", validate(createEquipmentSchema), asyncHandler(as
     defaultCadenceUnit: defaultCadenceUnit || "u/min",
     microStopThresholdMin: microStopThresholdMin ?? 5,
   }).returning();
+  await audit(req.db, req, "CREATE_EQUIPMENT", "equipment", row.id, { code, name });
   res.status(201).json(row);
 }));
 
@@ -82,12 +86,14 @@ adminRouter.patch("/equipments/:id", validate(updateEquipmentSchema), asyncHandl
   if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Aucune mise à jour" }); return; }
   const [row] = await req.db.update(equipments).set(updates).where(eq(equipments.id, String(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Equipement introuvable" }); return; }
+  await audit(req.db, req, "UPDATE_EQUIPMENT", "equipment", row.id, updates);
   res.json(row);
 }));
 
 adminRouter.delete("/equipments/:id", asyncHandler(async (req, res) => {
   const [row] = await req.db.update(equipments).set({ isActive: false }).where(eq(equipments.id, String(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Equipement introuvable" }); return; }
+  await audit(req.db, req, "DEACTIVATE_EQUIPMENT", "equipment", row.id, {});
   res.json(row);
 }));
 
@@ -106,6 +112,7 @@ adminRouter.post("/products", validate(createProductSchema), asyncHandler(async 
     cadenceUnit: cadenceUnit || "u/min",
     unit: unit || "unités",
   }).returning();
+  await audit(req.db, req, "CREATE_PRODUCT", "product", row.id, { code, name });
   res.status(201).json(row);
 }));
 
@@ -121,12 +128,14 @@ adminRouter.patch("/products/:id", validate(updateProductSchema), asyncHandler(a
   if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Aucune mise à jour" }); return; }
   const [row] = await req.db.update(products).set(updates).where(eq(products.id, String(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Produit introuvable" }); return; }
+  await audit(req.db, req, "UPDATE_PRODUCT", "product", row.id, updates);
   res.json(row);
 }));
 
 adminRouter.delete("/products/:id", asyncHandler(async (req, res) => {
   const [row] = await req.db.update(products).set({ isActive: false }).where(eq(products.id, String(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Produit introuvable" }); return; }
+  await audit(req.db, req, "DEACTIVATE_PRODUCT", "product", row.id, {});
   res.json(row);
 }));
 
@@ -144,6 +153,7 @@ adminRouter.post("/downtime-categories", validate(createDowntimeCategorySchema),
     isPlanned: isPlanned ?? false,
     appliesToEquipmentType: appliesToEquipmentType || null,
   }).returning();
+  await audit(req.db, req, "CREATE_DOWNTIME_CATEGORY", "downtimeCategory", row.id, { code, label, famille });
   res.status(201).json(row);
 }));
 
@@ -159,12 +169,14 @@ adminRouter.patch("/downtime-categories/:id", validate(updateDowntimeCategorySch
   if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Aucune mise à jour" }); return; }
   const [row] = await req.db.update(downtimeCategories).set(updates).where(eq(downtimeCategories.id, String(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Categorie introuvable" }); return; }
+  await audit(req.db, req, "UPDATE_DOWNTIME_CATEGORY", "downtimeCategory", row.id, updates);
   res.json(row);
 }));
 
 adminRouter.delete("/downtime-categories/:id", asyncHandler(async (req, res) => {
   const [row] = await req.db.update(downtimeCategories).set({ isActive: false }).where(eq(downtimeCategories.id, String(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Categorie introuvable" }); return; }
+  await audit(req.db, req, "DEACTIVATE_DOWNTIME_CATEGORY", "downtimeCategory", row.id, {});
   res.json(row);
 }));
 
@@ -190,12 +202,14 @@ adminRouter.post("/cadences", validate(createCadenceSchema), asyncHandler(async 
       trsObjective: trsObjective != null ? String(trsObjective) : null,
     },
   }).returning();
+  await audit(req.db, req, "UPSERT_CADENCE", "cadence", row.id, { productId, equipmentId, cadenceValue });
   res.status(201).json(row);
 }));
 
 adminRouter.delete("/cadences/:id", asyncHandler(async (req, res) => {
   const [row] = await req.db.delete(productEquipmentCadences).where(eq(productEquipmentCadences.id, String(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Cadence introuvable" }); return; }
+  await audit(req.db, req, "DELETE_CADENCE", "cadence", row.id, {});
   res.json(row);
 }));
 
