@@ -35,6 +35,10 @@ export const openSessionSchema = z.object({
   roomId: z.string().uuid("roomId invalide"),
 });
 
+export const closeSessionSchema = z.object({
+  notes: z.string().max(2000).optional(),
+});
+
 export const addEventSchema = z.object({
   eventType,
   label: z.string().optional(),

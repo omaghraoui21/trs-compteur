@@ -45660,6 +45660,9 @@ var openSessionSchema = external_exports.object({
   equipmentId: external_exports.string().uuid("equipmentId invalide"),
   roomId: external_exports.string().uuid("roomId invalide")
 });
+var closeSessionSchema = external_exports.object({
+  notes: external_exports.string().max(2e3).optional()
+});
 var addEventSchema = external_exports.object({
   eventType,
   label: external_exports.string().optional(),
@@ -46381,7 +46384,7 @@ sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (re
   await audit(db2, req, "OPEN_SESSION", "session", session.id, { equipmentId, roomId });
   res.status(201).json(session);
 }));
-sessionsRouter.post("/:id/close", asyncHandler(async (req, res) => {
+sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(async (req, res) => {
   const { db: db2, userId, userRole: userRole2 } = req;
   const now = /* @__PURE__ */ new Date();
   if (userRole2 === "operator") {
@@ -46403,7 +46406,7 @@ sessionsRouter.post("/:id/close", asyncHandler(async (req, res) => {
       await db2.update(sessionEvents).set({ endedAt: now, durationMinutes: dur }).where(eq(sessionEvents.id, ev.id));
     }
   }
-  const notes = typeof req.body?.notes === "string" ? req.body.notes.trim() || null : null;
+  const notes = req.body.notes?.trim() || null;
   const [session] = await db2.update(sessions).set({ status: "closed", closedAt: now, ...notes !== null ? { notes } : {} }).where(eq(sessions.id, String(req.params.id))).returning();
   if (session) await audit(db2, req, "CLOSE_SESSION", "session", session.id, { notes });
   res.json(session);
@@ -47108,15 +47111,15 @@ dashboardRouter.get("/pareto", validateQuery(dashboardRangeQuerySchema), asyncHa
       totalMin += dur;
     }
   }
-  const pareto = Object.values(aggregation).sort((a, b2) => b2.totalMin - a.totalMin).map((item) => ({
+  const withPct = Object.values(aggregation).sort((a, b2) => b2.totalMin - a.totalMin).map((item) => ({
     ...item,
     pctOfTotal: totalMin > 0 ? Math.round(item.totalMin / totalMin * 1e4) / 100 : 0
   }));
   let cumul = 0;
-  for (const item of pareto) {
+  const pareto = withPct.map((item) => {
     cumul += item.pctOfTotal;
-    item.cumulPct = Math.round(cumul * 100) / 100;
-  }
+    return { ...item, cumulPct: Math.round(cumul * 100) / 100 };
+  });
   res.json({ pareto, totalMin });
 }));
 dashboardRouter.get("/comparison", validateQuery(comparisonQuerySchema), asyncHandler(async (req, res) => {

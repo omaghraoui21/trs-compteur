@@ -7,7 +7,7 @@ import { asyncHandler, validate, validateQuery } from "../lib/http";
 import { audit } from "../lib/audit";
 import { effectiveLotCadence } from "../lib/cadence";
 import { groupBy, splitPlannedUnplanned } from "../lib/group";
-import { openSessionSchema, addEventSchema, addDowntimeSchema, sessionListQuerySchema } from "../schemas";
+import { openSessionSchema, closeSessionSchema, addEventSchema, addDowntimeSchema, sessionListQuerySchema } from "../schemas";
 
 export const sessionsRouter = Router();
 sessionsRouter.use(authenticate);
@@ -107,7 +107,7 @@ sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (re
 
 // ─── Close a session ──────────────────────────────────────────
 
-sessionsRouter.post("/:id/close", asyncHandler(async (req, res) => {
+sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(async (req, res) => {
   const { db, userId, userRole } = req;
   const now = new Date();
 
@@ -134,7 +134,7 @@ sessionsRouter.post("/:id/close", asyncHandler(async (req, res) => {
     }
   }
 
-  const notes = typeof req.body?.notes === "string" ? req.body.notes.trim() || null : null;
+  const notes = req.body.notes?.trim() || null;
   const [session] = await db.update(sessions)
     .set({ status: "closed", closedAt: now, ...(notes !== null ? { notes } : {}) })
     .where(eq(sessions.id, String(req.params.id)))

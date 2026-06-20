@@ -278,19 +278,18 @@ dashboardRouter.get("/pareto", validateQuery(dashboardRangeQuerySchema), asyncHa
       }
   }
 
-  const pareto = Object.values(aggregation)
+  const withPct = Object.values(aggregation)
     .sort((a, b) => b.totalMin - a.totalMin)
     .map(item => ({
       ...item,
       pctOfTotal: totalMin > 0 ? Math.round((item.totalMin / totalMin) * 10000) / 100 : 0,
     }));
 
-  // Compute cumulative percentages
   let cumul = 0;
-  for (const item of pareto) {
+  const pareto = withPct.map(item => {
     cumul += item.pctOfTotal;
-    (item as any).cumulPct = Math.round(cumul * 100) / 100;
-  }
+    return { ...item, cumulPct: Math.round(cumul * 100) / 100 };
+  });
 
   res.json({ pareto, totalMin });
 }));
