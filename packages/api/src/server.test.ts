@@ -328,6 +328,14 @@ describe("golden path + validation + RBAC", () => {
       .send({});
     expect(res.status).toBe(200);
   });
+
+  it("rejects starting a lot in a closed session (409 — session status guard)", async () => {
+    const res = await request(app)
+      .post("/api/lots")
+      .set({ Authorization: `Bearer ${opToken}` })
+      .send({ sessionId, productId, batchNumber: "SHOULD-FAIL", cadenceUsed: 100, cadenceUnit: "u/min" });
+    expect(res.status).toBe(409);
+  });
 });
 
 describe("audit trail (21 CFR-style traceability)", () => {
