@@ -46797,7 +46797,7 @@ lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(asyn
     res.status(404).json({ error: "Lot introuvable" });
     return;
   }
-  if (lot.status === "validated" || lot.status === "rejected") {
+  if (lot.status !== "active" && lot.status !== "closed") {
     throw new HttpError(409, "Impossible d'ajouter un arr\xEAt sur un lot d\xE9j\xE0 d\xE9cid\xE9 par le superviseur");
   }
   const now = /* @__PURE__ */ new Date();
@@ -46846,7 +46846,7 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     res.status(403).json({ error: "Cet arr\xEAt n'appartient pas \xE0 ce lot" });
     return;
   }
-  if (row.lotStatus === "validated" || row.lotStatus === "rejected") {
+  if (row.lotStatus !== "active" && row.lotStatus !== "closed") {
     throw new HttpError(409, "Impossible de supprimer un arr\xEAt sur un lot d\xE9j\xE0 d\xE9cid\xE9 par le superviseur");
   }
   await db2.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));

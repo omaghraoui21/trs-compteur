@@ -199,7 +199,7 @@ lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(asyn
 
   const [lot] = await db.select({ id: lotEntries.id, status: lotEntries.status }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
   if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
-  if (lot.status === "validated" || lot.status === "rejected") {
+  if (lot.status !== "active" && lot.status !== "closed") {
     throw new HttpError(409, "Impossible d'ajouter un arrêt sur un lot déjà décidé par le superviseur");
   }
 
@@ -260,7 +260,7 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     .where(eq(downtimeEvents.id, dtId)).limit(1);
   if (!row) { res.status(404).json({ error: "Arrêt introuvable" }); return; }
   if (row.lotEntryId !== lotId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à ce lot" }); return; }
-  if (row.lotStatus === "validated" || row.lotStatus === "rejected") {
+  if (row.lotStatus !== "active" && row.lotStatus !== "closed") {
     throw new HttpError(409, "Impossible de supprimer un arrêt sur un lot déjà décidé par le superviseur");
   }
 
