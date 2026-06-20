@@ -46677,17 +46677,16 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
 lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req, res) => {
   const { db: db2, userId, userRole: userRole2 } = req;
   const { quantityProduced, quantityConforming, quantityRejected } = req.body;
-  if (userRole2 === "operator") {
-    const [existing] = await db2.select({ operatorId: lotEntries.operatorId }).from(lotEntries).where(eq(lotEntries.id, String(req.params.id))).limit(1);
-    if (!existing) {
-      res.status(404).json({ error: "Lot introuvable" });
-      return;
-    }
-    if (existing.operatorId !== userId) {
-      res.status(403).json({ error: "Acc\xE8s interdit" });
-      return;
-    }
+  const [existing] = await db2.select({ operatorId: lotEntries.operatorId, status: lotEntries.status }).from(lotEntries).where(eq(lotEntries.id, String(req.params.id))).limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Lot introuvable" });
+    return;
   }
+  if (userRole2 === "operator" && existing.operatorId !== userId) {
+    res.status(403).json({ error: "Acc\xE8s interdit" });
+    return;
+  }
+  if (existing.status !== "active") throw new HttpError(409, `Impossible de cl\xF4turer un lot en statut \xAB ${existing.status} \xBB`);
   const now = /* @__PURE__ */ new Date();
   const [lot] = await db2.update(lotEntries).set({
     quantityProduced: quantityProduced ?? 0,
@@ -46696,24 +46695,21 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
     endedAt: now,
     status: "closed"
   }).where(eq(lotEntries.id, String(req.params.id))).returning();
-  if (!lot) {
-    res.status(404).json({ error: "Lot introuvable" });
-    return;
-  }
-  await audit(db2, req, "CLOSE_LOT", "lot", lot.id, { quantityProduced, quantityConforming, quantityRejected });
-  const [maxSortRow] = await db2.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, lot.sessionId));
+  const closed = lot;
+  await audit(db2, req, "CLOSE_LOT", "lot", closed.id, { quantityProduced, quantityConforming, quantityRejected });
+  const [maxSortRow] = await db2.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, closed.sessionId));
   const maxOrder = maxSortRow?.m ?? 0;
   await db2.insert(sessionEvents).values({
-    sessionId: lot.sessionId,
+    sessionId: closed.sessionId,
     eventType: "lot_end",
     startedAt: now,
     endedAt: now,
     durationMinutes: 0,
     isPlanned: false,
-    lotEntryId: lot.id,
+    lotEntryId: closed.id,
     sortOrder: maxOrder + 1
   });
-  res.json(lot);
+  res.json(closed);
 }));
 lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res) => {
   const { db: db2, userId, userRole: userRole2 } = req;

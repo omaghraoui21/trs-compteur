@@ -76,13 +76,13 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
   const { db, userId, userRole } = req;
   const { quantityProduced, quantityConforming, quantityRejected } = req.body;
 
+  const [existing] = await db.select({ operatorId: lotEntries.operatorId, status: lotEntries.status })
+    .from(lotEntries).where(eq(lotEntries.id, String(req.params.id))).limit(1);
+  if (!existing) { res.status(404).json({ error: "Lot introuvable" }); return; }
   // H2: Operators may only close their own lots
-  if (userRole === "operator") {
-    const [existing] = await db.select({ operatorId: lotEntries.operatorId })
-      .from(lotEntries).where(eq(lotEntries.id, String(req.params.id))).limit(1);
-    if (!existing) { res.status(404).json({ error: "Lot introuvable" }); return; }
-    if (existing.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
-  }
+  if (userRole === "operator" && existing.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
+  // Protect already-finalized lots — closing a validated/rejected lot would overwrite the supervisor's decision.
+  if (existing.status !== "active") throw new HttpError(409, `Impossible de clôturer un lot en statut « ${existing.status} »`);
 
   const now = new Date();
 
@@ -94,25 +94,26 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
     status: "closed",
   }).where(eq(lotEntries.id, String(req.params.id))).returning();
 
-  if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
-  await audit(db, req, "CLOSE_LOT", "lot", lot.id, { quantityProduced, quantityConforming, quantityRejected });
+  // Update is guaranteed to succeed — lot exists and is active (checked above).
+  const closed = lot!;
+  await audit(db, req, "CLOSE_LOT", "lot", closed.id, { quantityProduced, quantityConforming, quantityRejected });
 
   // Add lot_end event — use MAX() to avoid loading the full event list.
-  const [maxSortRow] = await db.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, lot.sessionId));
+  const [maxSortRow] = await db.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, closed.sessionId));
   const maxOrder = maxSortRow?.m ?? 0;
 
   await db.insert(sessionEvents).values({
-    sessionId: lot.sessionId,
+    sessionId: closed.sessionId,
     eventType: "lot_end",
     startedAt: now,
     endedAt: now,
     durationMinutes: 0,
     isPlanned: false,
-    lotEntryId: lot.id,
+    lotEntryId: closed.id,
     sortOrder: maxOrder + 1,
   });
 
-  res.json(lot);
+  res.json(closed);
 }));
 
 // ─── Update lot quantities (while active) ─────────────────────
