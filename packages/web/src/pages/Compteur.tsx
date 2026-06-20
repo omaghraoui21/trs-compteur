@@ -299,7 +299,7 @@ export default function CompteurPage() {
                     setView("pick-room");
                   });
               }}
-              className={`bg-white rounded-xl border p-5 text-left hover:border-blue-500 hover:shadow transition ${BTN_PRIMARY.includes("min-h") ? "min-h-[56px]" : ""}`}
+              className="bg-white rounded-xl border p-5 text-left hover:border-blue-500 hover:shadow transition min-h-[56px]"
             >
               <div className="font-semibold text-lg">{r.name}</div>
               <div className="text-sm text-gray-500">{r.code}</div>
