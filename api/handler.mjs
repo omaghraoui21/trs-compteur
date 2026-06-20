@@ -46898,10 +46898,7 @@ refRouter.get("/downtime-categories", asyncHandler(async (req, res) => {
 refRouter.get("/cadences", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const equipmentId = req.query.equipmentId;
-  let data = await db2.select().from(productEquipmentCadences);
-  if (equipmentId) {
-    data = data.filter((c) => c.equipmentId === equipmentId);
-  }
+  const data = equipmentId ? await db2.select().from(productEquipmentCadences).where(eq(productEquipmentCadences.equipmentId, equipmentId)) : await db2.select().from(productEquipmentCadences);
   res.json(data);
 }));
 
