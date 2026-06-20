@@ -118,7 +118,7 @@ export const api = {
   lotCadenceHistory: (lotId: string) => request<CadenceChange[]>(`/lots/${lotId}/cadence`),
   // 21 CFR Part 11: validation/rejection requires re-authentication (password).
   validateLot: (id: string, action: "validate" | "reject", password: string, comment?: string) =>
-    request<LotEntry & { signature: ElectronicSignature }>(`/lots/${id}/validate`, { method: "POST", body: JSON.stringify({ action, comment, password }) }),
+    request<{ lot: LotEntry; signature: ElectronicSignature }>(`/lots/${id}/validate`, { method: "POST", body: JSON.stringify({ action, comment, password }) }),
   // 21 CFR Part 11: supervisor correction of operator data with signed audit trail.
   correctLot: (id: string, data: CorrectLotInput) =>
     request<{ lot: LotEntry; signature: ElectronicSignature }>(`/lots/${id}/correct`, { method: "POST", body: JSON.stringify(data) }),

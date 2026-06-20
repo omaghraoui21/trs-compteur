@@ -328,7 +328,7 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
   });
 
   await audit(db, req, action === "reject" ? "REJECT_LOT" : "VALIDATE_LOT", "lot", lot.id, { action, comment, signatureId: signature.id });
-  res.json({ ...lot, signature });
+  res.json({ lot, signature });
 }));
 
 // ─── Electronic signatures for a lot (Part 11 manifestation) ──

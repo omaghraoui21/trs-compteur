@@ -46865,7 +46865,7 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
     comment: comment ?? null
   });
   await audit(db2, req, action === "reject" ? "REJECT_LOT" : "VALIDATE_LOT", "lot", lot.id, { action, comment, signatureId: signature.id });
-  res.json({ ...lot, signature });
+  res.json({ lot, signature });
 }));
 lotsRouter.get("/:id/signatures", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
