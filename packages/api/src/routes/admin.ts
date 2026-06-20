@@ -3,7 +3,7 @@ import { eq, and, desc, gte, lte } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { rooms, equipments, products, downtimeCategories, productEquipmentCadences, users, auditLog } from "@trs/db";
 import { authenticate, requireRole } from "../middleware";
-import { asyncHandler, validate, HttpError } from "../lib/http";
+import { asyncHandler, validate, validateQuery, HttpError } from "../lib/http";
 import { audit } from "../lib/audit";
 import {
   createRoomSchema, updateRoomSchema,
@@ -12,6 +12,7 @@ import {
   createDowntimeCategorySchema, updateDowntimeCategorySchema,
   createCadenceSchema,
   createUserSchema, updateUserSchema, resetPasswordSchema,
+  auditLogQuerySchema,
 } from "../schemas";
 
 export const adminRouter = Router();
@@ -262,25 +263,25 @@ adminRouter.post("/users/:id/password", adminOnly, validate(resetPasswordSchema)
 }));
 
 // ─── Audit log viewer (admin + supervisor read-only, GMP traceability) ──────
-adminRouter.get("/audit-log", asyncHandler(async (req, res) => {
-  const { entityType, entityId, action, from, to } = req.query as Record<string, string | undefined>;
-  const limit = Math.min(Number(req.query.limit) || 50, 200);
-  const offset = Number(req.query.offset) || 0;
+adminRouter.get("/audit-log", validateQuery(auditLogQuerySchema), asyncHandler(async (req, res) => {
+  const { entityType, entityId, action, from, to, limit: limitQ, offset: offsetQ } = req.query;
+  const limit = limitQ ?? 50;
+  const offset = offsetQ ?? 0;
 
   const filters: ReturnType<typeof and>[] = [];
-  if (entityType) filters.push(eq(auditLog.entityType, entityType));
-  if (entityId) filters.push(eq(auditLog.entityId, entityId));
-  if (action) filters.push(eq(auditLog.action, action));
-  if (from) filters.push(gte(auditLog.createdAt, new Date(from)));
-  if (to) filters.push(lte(auditLog.createdAt, new Date(to + "T23:59:59Z")));
+  if (entityType) filters.push(eq(auditLog.entityType, entityType as string));
+  if (entityId) filters.push(eq(auditLog.entityId, entityId as string));
+  if (action) filters.push(eq(auditLog.action, action as string));
+  if (from) filters.push(gte(auditLog.createdAt, new Date((from as string) + "T00:00:00Z")));
+  if (to) filters.push(lte(auditLog.createdAt, new Date((to as string) + "T23:59:59Z")));
 
   const rows = await req.db
     .select()
     .from(auditLog)
     .where(filters.length ? and(...filters) : undefined)
     .orderBy(desc(auditLog.createdAt))
-    .limit(limit)
-    .offset(offset);
+    .limit(limit as number)
+    .offset(offset as number);
 
   res.json(rows);
 }));

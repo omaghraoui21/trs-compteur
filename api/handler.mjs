@@ -45810,6 +45810,15 @@ var sessionListQuerySchema = external_exports.object({
   date: isoDate.optional(),
   equipmentId: external_exports.string().uuid("equipmentId invalide").optional()
 });
+var auditLogQuerySchema = external_exports.object({
+  entityType: external_exports.string().optional(),
+  entityId: external_exports.string().optional(),
+  action: external_exports.string().optional(),
+  from: isoDate.optional(),
+  to: isoDate.optional(),
+  limit: external_exports.coerce.number().int().min(1).max(200).optional(),
+  offset: external_exports.coerce.number().int().min(0).optional()
+});
 
 // packages/api/src/routes/auth.ts
 var authRouter = (0, import_express.Router)();
@@ -47550,15 +47559,15 @@ adminRouter.post("/users/:id/password", adminOnly, validate(resetPasswordSchema)
   await audit(req.db, req, "RESET_PASSWORD", "user", id, {});
   res.json(row);
 }));
-adminRouter.get("/audit-log", asyncHandler(async (req, res) => {
-  const { entityType, entityId, action, from, to } = req.query;
-  const limit = Math.min(Number(req.query.limit) || 50, 200);
-  const offset = Number(req.query.offset) || 0;
+adminRouter.get("/audit-log", validateQuery(auditLogQuerySchema), asyncHandler(async (req, res) => {
+  const { entityType, entityId, action, from, to, limit: limitQ, offset: offsetQ } = req.query;
+  const limit = limitQ ?? 50;
+  const offset = offsetQ ?? 0;
   const filters = [];
   if (entityType) filters.push(eq(auditLog.entityType, entityType));
   if (entityId) filters.push(eq(auditLog.entityId, entityId));
   if (action) filters.push(eq(auditLog.action, action));
-  if (from) filters.push(gte(auditLog.createdAt, new Date(from)));
+  if (from) filters.push(gte(auditLog.createdAt, /* @__PURE__ */ new Date(from + "T00:00:00Z")));
   if (to) filters.push(lte(auditLog.createdAt, /* @__PURE__ */ new Date(to + "T23:59:59Z")));
   const rows = await req.db.select().from(auditLog).where(filters.length ? and(...filters) : void 0).orderBy(desc(auditLog.createdAt)).limit(limit).offset(offset);
   res.json(rows);

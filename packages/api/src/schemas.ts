@@ -229,3 +229,13 @@ export const sessionListQuerySchema = z.object({
   date: isoDate.optional(),
   equipmentId: z.string().uuid("equipmentId invalide").optional(),
 });
+
+export const auditLogQuerySchema = z.object({
+  entityType: z.string().optional(),
+  entityId: z.string().optional(),
+  action: z.string().optional(),
+  from: isoDate.optional(),
+  to: isoDate.optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
