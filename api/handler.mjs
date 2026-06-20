@@ -46420,14 +46420,23 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
       return;
     }
   }
-  await db2.update(lotEntries).set({ status: "closed", endedAt: now }).where(and(eq(lotEntries.sessionId, String(req.params.id)), eq(lotEntries.status, "active")));
-  await db2.update(sessionEvents).set({
-    endedAt: now,
-    durationMinutes: sql`ROUND(EXTRACT(EPOCH FROM (${now.toISOString()}::timestamptz - ${sessionEvents.startedAt})) / 60)::integer`
-  }).where(and(eq(sessionEvents.sessionId, String(req.params.id)), isNull(sessionEvents.endedAt)));
+  const sessionId = String(req.params.id);
+  const activeLots = await db2.select({ id: lotEntries.id, batchNumber: lotEntries.batchNumber }).from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active")));
+  await Promise.all([
+    db2.update(lotEntries).set({ status: "closed", endedAt: now }).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active"))),
+    db2.update(sessionEvents).set({
+      endedAt: now,
+      durationMinutes: sql`ROUND(EXTRACT(EPOCH FROM (${now.toISOString()}::timestamptz - ${sessionEvents.startedAt})) / 60)::integer`
+    }).where(and(eq(sessionEvents.sessionId, sessionId), isNull(sessionEvents.endedAt)))
+  ]);
   const notes = req.body.notes?.trim() || null;
-  const [session] = await db2.update(sessions).set({ status: "closed", closedAt: now, ...notes !== null ? { notes } : {} }).where(eq(sessions.id, String(req.params.id))).returning();
-  if (session) await audit(db2, req, "CLOSE_SESSION", "session", session.id, { notes });
+  const [session] = await db2.update(sessions).set({ status: "closed", closedAt: now, ...notes !== null ? { notes } : {} }).where(eq(sessions.id, sessionId)).returning();
+  if (session) {
+    await Promise.all([
+      audit(db2, req, "CLOSE_SESSION", "session", session.id, { notes, autoClosedLotCount: activeLots.length }),
+      ...activeLots.map((l) => audit(db2, req, "CLOSE_LOT", "lot", l.id, { autoClosedBySession: session.id, batchNumber: l.batchNumber }))
+    ]);
+  }
   res.json(session);
 }));
 sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async (req, res) => {

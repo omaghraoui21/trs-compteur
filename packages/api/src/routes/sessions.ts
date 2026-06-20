@@ -120,26 +120,39 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
     if (session.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
   }
 
-  // Close any active lots first
-  await db.update(lotEntries)
-    .set({ status: "closed", endedAt: now })
-    .where(and(eq(lotEntries.sessionId, String(req.params.id)), eq(lotEntries.status, "active")));
+  const sessionId = String(req.params.id);
 
-  // Close any open session events in a single UPDATE instead of N per-row updates.
-  await db.update(sessionEvents)
-    .set({
-      endedAt: now,
-      durationMinutes: sql<number>`ROUND(EXTRACT(EPOCH FROM (${now.toISOString()}::timestamptz - ${sessionEvents.startedAt})) / 60)::integer`,
-    })
-    .where(and(eq(sessionEvents.sessionId, String(req.params.id)), isNull(sessionEvents.endedAt)));
+  // Fetch any still-active lots before the batch close so we can audit each one.
+  const activeLots = await db.select({ id: lotEntries.id, batchNumber: lotEntries.batchNumber })
+    .from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active")));
+
+  // Close any active lots and open session events in parallel — both are
+  // independent batch updates; events also need durationMinutes computed in SQL.
+  await Promise.all([
+    db.update(lotEntries)
+      .set({ status: "closed", endedAt: now })
+      .where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active"))),
+    db.update(sessionEvents)
+      .set({
+        endedAt: now,
+        durationMinutes: sql<number>`ROUND(EXTRACT(EPOCH FROM (${now.toISOString()}::timestamptz - ${sessionEvents.startedAt})) / 60)::integer`,
+      })
+      .where(and(eq(sessionEvents.sessionId, sessionId), isNull(sessionEvents.endedAt))),
+  ]);
 
   const notes = req.body.notes?.trim() || null;
   const [session] = await db.update(sessions)
     .set({ status: "closed", closedAt: now, ...(notes !== null ? { notes } : {}) })
-    .where(eq(sessions.id, String(req.params.id)))
+    .where(eq(sessions.id, sessionId))
     .returning();
 
-  if (session) await audit(db, req, "CLOSE_SESSION", "session", session.id, { notes });
+  if (session) {
+    // GMP: emit CLOSE_LOT for each auto-closed lot so lot-level audit trails are complete.
+    await Promise.all([
+      audit(db, req, "CLOSE_SESSION", "session", session.id, { notes, autoClosedLotCount: activeLots.length }),
+      ...activeLots.map(l => audit(db, req, "CLOSE_LOT", "lot", l.id, { autoClosedBySession: session.id, batchNumber: l.batchNumber })),
+    ]);
+  }
   res.json(session);
 }));
 
