@@ -714,6 +714,38 @@ describe("dashboard pending-lots status filter", () => {
   });
 });
 
+describe("ref endpoints (rooms/:roomId/equipments + cadences)", () => {
+  const auth = () => ({ Authorization: `Bearer ${opToken}` });
+
+  it("GET /ref/rooms/:roomId/equipments returns equipments in that room", async () => {
+    const rooms = await request(app).get("/api/ref/rooms").set(auth());
+    const roomId = (rooms.body.rooms ?? rooms.body)[0].id;
+    const res = await request(app)
+      .get(`/api/ref/rooms/${roomId}/equipments`)
+      .set(auth());
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.every((e: any) => e.roomId === roomId)).toBe(true);
+  });
+
+  it("GET /ref/cadences without filter returns all cadences", async () => {
+    const res = await request(app).get("/api/ref/cadences").set(auth());
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("GET /ref/cadences?equipmentId= filters to that equipment", async () => {
+    const eqs = await request(app).get("/api/ref/equipments").set(auth());
+    const equipmentId = (eqs.body.equipments ?? eqs.body)[0].id;
+    const res = await request(app)
+      .get(`/api/ref/cadences?equipmentId=${equipmentId}`)
+      .set(auth());
+    expect(res.status).toBe(200);
+    expect(res.body.every((c: any) => c.equipmentId === equipmentId)).toBe(true);
+  });
+});
+
 describe("GET /sessions + pending-lots/count", () => {
   it("GET /api/sessions returns an array ordered by openedAt desc", async () => {
     const res = await request(app)
