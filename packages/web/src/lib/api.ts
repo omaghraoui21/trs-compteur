@@ -231,7 +231,24 @@ export interface TrsWarning { code: string; level: "error" | "warning"; message:
 export interface TrsAudit { tF_norme: number; tF_lots: number; tF_delta: number; formula: string }
 export interface ReliabilityMetrics { breakdownCount: number; totalBreakdownMin: number; mtbf: number | null; mttr: number | null; availability: number | null }
 export interface TrsMetrics { tT: number; tO: number; fermeture: number; tAP: number; tR: number; tF: number; tN: number; tU: number; nonQualiteMin: number; ecartCadenceMin: number; totalUnplannedMin: number; DO: number; TP: number; TQ: number; TRS: number; TRG: number; TEEP: number; utilisation: number; lotCount: number; totalProduced: number; totalConforming: number; totalRebut: number; downtimeByFamille: Record<string, number>; downtimeByNorme?: Record<string, number>; warnings?: TrsWarning[]; audit?: TrsAudit; reliability?: ReliabilityMetrics }
-export interface LotTrs extends TrsMetrics { lotId: string; batchNumber?: string }
+export interface LotTrs extends TrsMetrics {
+  lotId: string;
+  batchNumber?: string;
+  productName?: string;
+  productCode?: string;
+  cadenceUsed?: number;
+  cadenceUnit?: string;
+  quantityProduced?: number;
+  quantityConforming?: number;
+  quantityRejected?: number;
+  lotDurationMin?: number;
+  plannedMin?: number;
+  unplannedMin?: number;
+  cadencePerMin?: number;
+  nominalCadencePerMin?: number;
+  ecartCadence?: number;
+  rebut?: number;
+}
 export interface DailyTrs extends TrsMetrics { date: string; notes?: string; lots?: LotTrs[] }
 export interface CadenceChange { id: string; lotEntryId: string; oldCadence: string; newCadence: string; cadenceUnit: string; reason: string | null; changedBy: string | null; changedAt: string }
 export interface SessionTrsResponse { session: TrsMetrics; lots: LotTrs[]; aClasserMin?: number }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
-import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ParetoItem, type ComparisonResponse, type TrsMetrics, type DailyTrs, type ByProductResponse, type SixLossesResponse, type HeatmapResponse, type DowntimeLogEntry, type DowntimeLogResponse } from "@/lib/api";
+import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ParetoItem, type ComparisonResponse, type TrsMetrics, type DailyTrs, type LotTrs, type ByProductResponse, type SixLossesResponse, type HeatmapResponse, type DowntimeLogEntry, type DowntimeLogResponse } from "@/lib/api";
 import { fmtPct, fmtDuration, fmtNumber, trsColor, familleToNorme, computeOeeBenchmark } from "@trs/engine";
 import type { BenchmarkRating } from "@trs/engine";
 import { useToast } from "@/components/Toast";
@@ -165,9 +165,9 @@ export default function DashboardPage() {
     if (!data?.daily?.length) { toast.error("Aucune donnée à exporter pour cette période."); return; }
     const headers = ["Date", "Produit", "Lot", "tT", "tO", "Fermeture", "tAP", "tR", "tF", "tN", "tU", "Lots", "NPR", "NPB", "NPC", "DO", "TP", "TQ", "TRS", "TRG", "Non classé (min)", "Pannes", "MTBF (min)", "MTTR (min)"];
     const rows = data.daily.map(d => {
-      const lots = d.lots || [];
-      const produits = lots.map((l: any) => l.productName).join("+");
-      const batchNums = lots.map((l: any) => l.batchNumber).join("+");
+      const lots: LotTrs[] = d.lots || [];
+      const produits = lots.map(l => l.productName).join("+");
+      const batchNums = lots.map(l => l.batchNumber).join("+");
       const rel = d.reliability;
       return csvRow([
         d.date, produits, batchNums,
@@ -1052,7 +1052,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                   <td className="px-3 py-2 text-right" style={{ color: trsColor(d.TRG) }}>{fmtPct(d.TRG)}</td>
                 </tr>
                 {/* U7: Enhanced lot drill-down */}
-                {expandedDay === d.date && d.lots && d.lots.map((lot: any) => (
+                {expandedDay === d.date && d.lots && d.lots.map((lot: LotTrs) => (
                   <tr key={lot.lotId} className="bg-blue-50/50 text-xs">
                     <td className="px-3 py-1.5"></td>
                     <td className="px-3 py-1.5 text-gray-600 pl-6">
@@ -1063,13 +1063,13 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                       </div>
                       <div className="text-[10px] text-gray-400 mt-0.5">
                         Cadence: {lot.cadencePerMin ? `${lot.cadencePerMin.toFixed(0)} u/min` : "—"}
-                        {lot.unplannedMin > 0 && <span className="ml-2 text-red-500">Arrêts NP: {fmtDuration(lot.unplannedMin)}</span>}
+                        {(lot.unplannedMin ?? 0) > 0 && <span className="ml-2 text-red-500">Arrêts NP: {fmtDuration(lot.unplannedMin ?? 0)}</span>}
                         {lot.ecartCadence != null && lot.ecartCadence > 5 && (
                           <span className="ml-2 text-amber-600">Écart cadence : {fmtDuration(Math.round(lot.ecartCadence))}</span>
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-1.5 text-right text-gray-400">{fmtDuration(lot.lotDurationMin)}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-400">{fmtDuration(lot.lotDurationMin ?? 0)}</td>
                     <td className="px-3 py-1.5 text-right text-gray-400">{fmtDuration(lot.plannedMin || 0)}</td>
                     <td className="px-3 py-1.5 text-right text-gray-400">—</td>
                     <td className="px-3 py-1.5 text-right text-gray-400">{fmtDuration(Math.round(lot.tF))}</td>
