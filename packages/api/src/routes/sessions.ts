@@ -3,7 +3,7 @@ import { eq, and, desc, inArray, isNull, max, sql } from "drizzle-orm";
 import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories, lotCadenceChanges } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, computeAClasserMin, computeMtbfMttr } from "@trs/engine";
 import { authenticate } from "../middleware";
-import { asyncHandler, validate, validateQuery } from "../lib/http";
+import { asyncHandler, validate, validateQuery, HttpError } from "../lib/http";
 import { audit } from "../lib/audit";
 import { effectiveLotCadence } from "../lib/cadence";
 import { groupBy, splitPlannedUnplanned } from "../lib/group";
@@ -161,16 +161,23 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
 sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async (req, res) => {
   const { db } = req;
   const { eventType, label, durationMinutes, isPlanned, comment } = req.body;
+  const sessionId = String(req.params.id);
 
-  // Use MAX() to avoid loading the full event list just for sort ordering.
-  const [maxSortRow] = await db.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, String(req.params.id)));
+  // Session status check + sort-order aggregate run in parallel.
+  const [[sessionRow], [maxSortRow]] = await Promise.all([
+    db.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
+    db.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, sessionId)),
+  ]);
+  if (!sessionRow) { res.status(404).json({ error: "Session introuvable" }); return; }
+  if (sessionRow.status !== "active") throw new HttpError(409, "Impossible d'ajouter un événement à une session fermée");
+
   const maxOrder = maxSortRow?.m ?? 0;
 
   const now = new Date();
   const endedAt = durationMinutes ? new Date(now.getTime() + durationMinutes * 60_000) : undefined;
 
   const [event] = await db.insert(sessionEvents).values({
-    sessionId: String(req.params.id),
+    sessionId,
     eventType,
     label,
     startedAt: now,
@@ -195,8 +202,9 @@ sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(
   const { categoryId, durationMinutes, isShortStop, comment } = req.body;
   const sessionId = String(req.params.id);
 
-  const [session] = await db.select({ id: sessions.id }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  const [session] = await db.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
   if (!session) { res.status(404).json({ error: "Session introuvable" }); return; }
+  if (session.status !== "active") throw new HttpError(409, "Impossible d'ajouter un arrêt à une session fermée");
 
   const now = new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 60_000);

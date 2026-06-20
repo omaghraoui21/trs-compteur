@@ -46442,12 +46442,21 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
 sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const { eventType: eventType2, label, durationMinutes, isPlanned, comment } = req.body;
-  const [maxSortRow] = await db2.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, String(req.params.id)));
+  const sessionId = String(req.params.id);
+  const [[sessionRow], [maxSortRow]] = await Promise.all([
+    db2.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
+    db2.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, sessionId))
+  ]);
+  if (!sessionRow) {
+    res.status(404).json({ error: "Session introuvable" });
+    return;
+  }
+  if (sessionRow.status !== "active") throw new HttpError(409, "Impossible d'ajouter un \xE9v\xE9nement \xE0 une session ferm\xE9e");
   const maxOrder = maxSortRow?.m ?? 0;
   const now = /* @__PURE__ */ new Date();
   const endedAt = durationMinutes ? new Date(now.getTime() + durationMinutes * 6e4) : void 0;
   const [event] = await db2.insert(sessionEvents).values({
-    sessionId: String(req.params.id),
+    sessionId,
     eventType: eventType2,
     label,
     startedAt: now,
@@ -46464,11 +46473,12 @@ sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(
   const { db: db2, userId } = req;
   const { categoryId, durationMinutes, isShortStop, comment } = req.body;
   const sessionId = String(req.params.id);
-  const [session] = await db2.select({ id: sessions.id }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  const [session] = await db2.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
   if (!session) {
     res.status(404).json({ error: "Session introuvable" });
     return;
   }
+  if (session.status !== "active") throw new HttpError(409, "Impossible d'ajouter un arr\xEAt \xE0 une session ferm\xE9e");
   const now = /* @__PURE__ */ new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 6e4);
   const [dt] = await db2.insert(downtimeEvents).values({
