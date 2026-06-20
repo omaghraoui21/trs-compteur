@@ -1090,18 +1090,36 @@ function Field({ label, value, onChange, placeholder, type = "text" }: { label: 
 // ─── Audit Log panel (GMP traceability, 21 CFR Part 11) ──────────────────────
 
 const ACTION_LABELS: Record<string, string> = {
+  // Auth
+  LOGIN: "Connexion", LOGOUT: "Déconnexion", CHANGE_PASSWORD: "Changement mdp",
+  // Sessions & lots
+  OPEN_SESSION: "Ouverture session", CLOSE_SESSION: "Clôture session",
+  ADD_SESSION_EVENT: "Évènement session", ADD_SESSION_DOWNTIME: "Arrêt session",
+  DELETE_SESSION_DOWNTIME: "Suppression arrêt session",
+  START_LOT: "Démarrage lot", CLOSE_LOT: "Clôture lot",
   CORRECT_LOT: "Correction lot", VALIDATE_LOT: "Validation lot", REJECT_LOT: "Rejet lot",
-  START_LOT: "Démarrage lot", CLOSE_LOT: "Clôture lot", OPEN_SESSION: "Ouverture session",
-  CLOSE_SESSION: "Clôture session", CREATE_USER: "Création user", UPDATE_USER: "MàJ user",
-  RESET_PASSWORD: "Reset mdp", ADD_DOWNTIME: "Ajout arrêt", DELETE_DOWNTIME: "Suppression arrêt",
+  ADD_DOWNTIME: "Ajout arrêt", DELETE_DOWNTIME: "Suppression arrêt",
   CHANGE_CADENCE: "Changement cadence",
+  // Admin CRUD
+  CREATE_USER: "Création user", UPDATE_USER: "MàJ user", RESET_PASSWORD: "Reset mdp",
+  CREATE_ROOM: "Création local", UPDATE_ROOM: "MàJ local", DEACTIVATE_ROOM: "Désactivation local",
+  CREATE_EQUIPMENT: "Création équipement", UPDATE_EQUIPMENT: "MàJ équipement", DEACTIVATE_EQUIPMENT: "Désactivation équipement",
+  CREATE_PRODUCT: "Création produit", UPDATE_PRODUCT: "MàJ produit", DEACTIVATE_PRODUCT: "Désactivation produit",
+  CREATE_DOWNTIME_CATEGORY: "Création catégorie", UPDATE_DOWNTIME_CATEGORY: "MàJ catégorie", DEACTIVATE_DOWNTIME_CATEGORY: "Désactivation catégorie",
+  UPSERT_CADENCE: "Cadence produit/équipement", DELETE_CADENCE: "Suppression cadence",
 };
 
 const ACTION_COLOR: Record<string, string> = {
+  LOGIN: "bg-blue-50 text-blue-700",
+  LOGOUT: "bg-gray-100 text-gray-700",
   CORRECT_LOT: "bg-amber-100 text-amber-800",
   VALIDATE_LOT: "bg-green-100 text-green-800",
   REJECT_LOT: "bg-red-100 text-red-800",
   RESET_PASSWORD: "bg-purple-100 text-purple-800",
+  DEACTIVATE_ROOM: "bg-orange-50 text-orange-700",
+  DEACTIVATE_EQUIPMENT: "bg-orange-50 text-orange-700",
+  DEACTIVATE_PRODUCT: "bg-orange-50 text-orange-700",
+  DEACTIVATE_DOWNTIME_CATEGORY: "bg-orange-50 text-orange-700",
 };
 
 const PAGE_SIZE = 50;
