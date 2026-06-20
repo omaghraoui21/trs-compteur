@@ -115,8 +115,15 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
 // ─── Update lot quantities (while active) ─────────────────────
 
 lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res) => {
-  const { db } = req;
-  const updates: Record<string, any> = {};
+  const { db, userId, userRole } = req;
+  const lotId = String(req.params.id);
+
+  const [existing] = await db.select().from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  if (!existing) { res.status(404).json({ error: "Lot introuvable" }); return; }
+  if (existing.status !== "active") throw new HttpError(409, "Seuls les lots actifs peuvent être mis à jour via PATCH — utilisez POST /:id/correct pour les lots clôturés");
+  if (userRole === "operator" && existing.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
+
+  const updates: Partial<{ quantityProduced: number; quantityConforming: number; quantityRejected: number; cadenceUsed: string; cadenceUnit: string }> = {};
   if (req.body.quantityProduced !== undefined) updates.quantityProduced = req.body.quantityProduced;
   if (req.body.quantityConforming !== undefined) updates.quantityConforming = req.body.quantityConforming;
   if (req.body.quantityRejected !== undefined) updates.quantityRejected = req.body.quantityRejected;
@@ -128,9 +135,8 @@ lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res
     return;
   }
 
-  const [lot] = await db.update(lotEntries).set(updates)
-    .where(eq(lotEntries.id, String(req.params.id))).returning();
-  if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
+  const [lot] = await db.update(lotEntries).set(updates).where(eq(lotEntries.id, lotId)).returning();
+  await audit(db, req, "UPDATE_LOT", "lot", lotId, { updates });
   res.json(lot);
 }));
 

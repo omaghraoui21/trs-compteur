@@ -46677,7 +46677,18 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
   res.json(lot);
 }));
 lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res) => {
-  const { db: db2 } = req;
+  const { db: db2, userId, userRole: userRole2 } = req;
+  const lotId = String(req.params.id);
+  const [existing] = await db2.select().from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Lot introuvable" });
+    return;
+  }
+  if (existing.status !== "active") throw new HttpError(409, "Seuls les lots actifs peuvent \xEAtre mis \xE0 jour via PATCH \u2014 utilisez POST /:id/correct pour les lots cl\xF4tur\xE9s");
+  if (userRole2 === "operator" && existing.operatorId !== userId) {
+    res.status(403).json({ error: "Acc\xE8s interdit" });
+    return;
+  }
   const updates = {};
   if (req.body.quantityProduced !== void 0) updates.quantityProduced = req.body.quantityProduced;
   if (req.body.quantityConforming !== void 0) updates.quantityConforming = req.body.quantityConforming;
@@ -46688,11 +46699,8 @@ lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res
     res.status(400).json({ error: "Aucune mise \xE0 jour" });
     return;
   }
-  const [lot] = await db2.update(lotEntries).set(updates).where(eq(lotEntries.id, String(req.params.id))).returning();
-  if (!lot) {
-    res.status(404).json({ error: "Lot introuvable" });
-    return;
-  }
+  const [lot] = await db2.update(lotEntries).set(updates).where(eq(lotEntries.id, lotId)).returning();
+  await audit(db2, req, "UPDATE_LOT", "lot", lotId, { updates });
   res.json(lot);
 }));
 lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(async (req, res) => {

@@ -153,6 +153,15 @@ describe("golden path + validation + RBAC", () => {
     expect(res.body[0]).toHaveProperty("isPlanned");
   });
 
+  it("PATCH /lots/:id updates quantities on an active lot (200)", async () => {
+    const res = await request(app)
+      .patch(`/api/lots/${lotId}`)
+      .set({ Authorization: `Bearer ${opToken}` })
+      .send({ quantityProduced: 100 });
+    expect(res.status).toBe(200);
+    expect(res.body.quantityProduced).toBe(100);
+  });
+
   it("rejects conforming > produced with 400 (Zod refine)", async () => {
     const res = await request(app)
       .post(`/api/lots/${lotId}/close`)
@@ -167,6 +176,14 @@ describe("golden path + validation + RBAC", () => {
       .set({ Authorization: `Bearer ${opToken}` })
       .send({ quantityProduced: 5000, quantityConforming: 4800, quantityRejected: 200 });
     expect(res.status).toBe(200);
+  });
+
+  it("PATCH /lots/:id returns 409 when lot is no longer active", async () => {
+    const res = await request(app)
+      .patch(`/api/lots/${lotId}`)
+      .set({ Authorization: `Bearer ${opToken}` })
+      .send({ quantityProduced: 9999 });
+    expect(res.status).toBe(409);
   });
 
   it("forbids an operator from correcting a lot (403 — supervisor only)", async () => {
