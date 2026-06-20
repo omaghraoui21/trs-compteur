@@ -15789,7 +15789,7 @@ var require_implementation = __commonJS({
     "use strict";
     var ERROR_MESSAGE = "Function.prototype.bind called on incompatible ";
     var toStr = Object.prototype.toString;
-    var max = Math.max;
+    var max2 = Math.max;
     var funcType = "[object Function]";
     var concatty = function concatty2(a, b2) {
       var arr = [];
@@ -15841,7 +15841,7 @@ var require_implementation = __commonJS({
           concatty(args, arguments)
         );
       };
-      var boundLength = max(0, target.length - args.length);
+      var boundLength = max2(0, target.length - args.length);
       var boundArgs = [];
       for (var i = 0; i < boundLength; i++) {
         boundArgs[i] = "$" + i;
@@ -15998,7 +15998,7 @@ var require_get_intrinsic = __commonJS({
     var $URIError = require_uri();
     var abs = require_abs();
     var floor = require_floor();
-    var max = require_max();
+    var max2 = require_max();
     var min = require_min();
     var pow = require_pow();
     var round = require_round();
@@ -16112,7 +16112,7 @@ var require_get_intrinsic = __commonJS({
       "%Object.getPrototypeOf%": $ObjectGPO,
       "%Math.abs%": abs,
       "%Math.floor%": floor,
-      "%Math.max%": max,
+      "%Math.max%": max2,
       "%Math.min%": min,
       "%Math.pow%": pow,
       "%Math.round%": round,
@@ -20793,10 +20793,10 @@ var require_proxy_addr = __commonJS({
       if (pos === -1 && ip.kind() === "ipv6" && ip.isIPv4MappedAddress()) {
         ip = ip.toIPv4Address();
       }
-      var max = ip.kind() === "ipv6" ? 128 : 32;
+      var max2 = ip.kind() === "ipv6" ? 128 : 32;
       var range = pos !== -1 ? note.substring(pos + 1, note.length) : null;
       if (range === null) {
-        range = max;
+        range = max2;
       } else if (DIGIT_REGEXP.test(range)) {
         range = parseInt(range, 10);
       } else if (ip.kind() === "ipv4" && isip(range)) {
@@ -20804,7 +20804,7 @@ var require_proxy_addr = __commonJS({
       } else {
         range = null;
       }
-      if (range <= 0 || range > max) {
+      if (range <= 0 || range > max2) {
         throw new TypeError("invalid range on address: " + note);
       }
       return [ip, range];
@@ -22104,12 +22104,12 @@ var require_cookie = __commonJS({
       } while (index2 < len);
       return obj;
     }
-    function startIndex(str, index2, max) {
+    function startIndex(str, index2, max2) {
       do {
         var code = str.charCodeAt(index2);
         if (code !== 32 && code !== 9) return index2;
-      } while (++index2 < max);
-      return max;
+      } while (++index2 < max2);
+      return max2;
     }
     function endIndex(str, index2, min) {
       while (index2 > min) {
@@ -27905,8 +27905,8 @@ var require_re = __commonJS({
       [LETTERDASHNUMBER, MAX_SAFE_BUILD_LENGTH]
     ];
     var makeSafeRegex = (value) => {
-      for (const [token, max] of safeRegexReplacements) {
-        value = value.split(`${token}*`).join(`${token}{0,${max}}`).split(`${token}+`).join(`${token}{1,${max}}`);
+      for (const [token, max2] of safeRegexReplacements) {
+        value = value.split(`${token}*`).join(`${token}{0,${max2}}`).split(`${token}+`).join(`${token}{1,${max2}}`);
       }
       return value;
     };
@@ -29277,7 +29277,7 @@ var require_max_satisfying = __commonJS({
     var SemVer = require_semver();
     var Range = require_range2();
     var maxSatisfying = (versions, range, options) => {
-      let max = null;
+      let max2 = null;
       let maxSV = null;
       let rangeObj = null;
       try {
@@ -29287,13 +29287,13 @@ var require_max_satisfying = __commonJS({
       }
       versions.forEach((v) => {
         if (rangeObj.test(v)) {
-          if (!max || maxSV.compare(v) === -1) {
-            max = v;
-            maxSV = new SemVer(max, options);
+          if (!max2 || maxSV.compare(v) === -1) {
+            max2 = v;
+            maxSV = new SemVer(max2, options);
           }
         }
       });
-      return max;
+      return max2;
     };
     module.exports = maxSatisfying;
   }
@@ -29536,17 +29536,17 @@ var require_simplify = __commonJS({
         set.push([first, null]);
       }
       const ranges = [];
-      for (const [min, max] of set) {
-        if (min === max) {
+      for (const [min, max2] of set) {
+        if (min === max2) {
           ranges.push(min);
-        } else if (!max && min === v[0]) {
+        } else if (!max2 && min === v[0]) {
           ranges.push("*");
-        } else if (!max) {
+        } else if (!max2) {
           ranges.push(`>=${min}`);
         } else if (min === v[0]) {
-          ranges.push(`<=${max}`);
+          ranges.push(`<=${max2}`);
         } else {
-          ranges.push(`${min} - ${max}`);
+          ranges.push(`${min} - ${max2}`);
         }
       }
       const simplified = ranges.join(" || ");
@@ -33599,17 +33599,17 @@ function exists(subquery) {
 function notExists(subquery) {
   return sql`not exists ${subquery}`;
 }
-function between(column, min, max) {
+function between(column, min, max2) {
   return sql`${column} between ${bindIfParam(min, column)} and ${bindIfParam(
-    max,
+    max2,
     column
   )}`;
 }
-function notBetween(column, min, max) {
+function notBetween(column, min, max2) {
   return sql`${column} not between ${bindIfParam(
     min,
     column
-  )} and ${bindIfParam(max, column)}`;
+  )} and ${bindIfParam(max2, column)}`;
 }
 function like(column, value) {
   return sql`${column} like ${value}`;
@@ -35454,6 +35454,9 @@ function mapRelationalRow(tablesConfig, tableConfig, row, buildQueryResultSelect
 function count(expression) {
   return sql`count(${expression || sql.raw("*")})`.mapWith(Number);
 }
+function max(expression) {
+  return sql`max(${expression})`.mapWith(is(expression, Column) ? expression : String);
+}
 
 // node_modules/.pnpm/drizzle-orm@0.38.4_@types+react@19.2.15_postgres@3.4.9_react@19.2.6/node_modules/drizzle-orm/migrator.js
 import crypto from "node:crypto";
@@ -36151,7 +36154,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   const {
     sslnegotiation,
     ssl,
-    max,
+    max: max2,
     user,
     host,
     port,
@@ -36576,7 +36579,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       }
     }
     final && (final(), final = null);
-    if (result.command === "BEGIN" && max !== 1 && !connection2.reserved)
+    if (result.command === "BEGIN" && max2 !== 1 && !connection2.reserved)
       return errored(Errors.generic("UNSAFE_TRANSACTION", "Only use sql.begin, sql.reserved or max: 1"));
     if (query.options.simple)
       return BindComplete();
@@ -37182,13 +37185,13 @@ function largeObject(sql2, oid, mode = 131072 | 262144) {
         start = 0,
         end = Infinity
       } = {}) {
-        let max = end - start;
+        let max2 = end - start;
         start && await lo.seek(start);
         return new Stream2.Readable({
           highWaterMark,
           async read(size2) {
-            const l = size2 > max ? size2 - max : size2;
-            max -= size2;
+            const l = size2 > max2 ? size2 - max2 : size2;
+            max2 -= size2;
             const [{ data }] = await lo.read(l);
             this.push(data);
             if (data.length < size2)
@@ -37483,8 +37486,8 @@ function Postgres(a, b2) {
   function onopen(c) {
     if (queries.length === 0)
       return move(c, open);
-    let max = Math.ceil(queries.length / (connecting.length + 1)), ready = true;
-    while (ready && queries.length && max-- > 0) {
+    let max2 = Math.ceil(queries.length / (connecting.length + 1)), ready = true;
+    while (ready && queries.length && max2-- > 0) {
       const query = queries.shift();
       if (query.reserve)
         return query.reserve(c);
@@ -43134,14 +43137,14 @@ var ZodString = class _ZodString extends ZodType {
     return min;
   }
   get maxLength() {
-    let max = null;
+    let max2 = null;
     for (const ch of this._def.checks) {
       if (ch.kind === "max") {
-        if (max === null || ch.value < max)
-          max = ch.value;
+        if (max2 === null || ch.value < max2)
+          max2 = ch.value;
       }
     }
-    return max;
+    return max2;
   }
 };
 ZodString.create = (params) => {
@@ -43355,20 +43358,20 @@ var ZodNumber = class _ZodNumber extends ZodType {
     return min;
   }
   get maxValue() {
-    let max = null;
+    let max2 = null;
     for (const ch of this._def.checks) {
       if (ch.kind === "max") {
-        if (max === null || ch.value < max)
-          max = ch.value;
+        if (max2 === null || ch.value < max2)
+          max2 = ch.value;
       }
     }
-    return max;
+    return max2;
   }
   get isInt() {
     return !!this._def.checks.find((ch) => ch.kind === "int" || ch.kind === "multipleOf" && util.isInteger(ch.value));
   }
   get isFinite() {
-    let max = null;
+    let max2 = null;
     let min = null;
     for (const ch of this._def.checks) {
       if (ch.kind === "finite" || ch.kind === "int" || ch.kind === "multipleOf") {
@@ -43377,11 +43380,11 @@ var ZodNumber = class _ZodNumber extends ZodType {
         if (min === null || ch.value > min)
           min = ch.value;
       } else if (ch.kind === "max") {
-        if (max === null || ch.value < max)
-          max = ch.value;
+        if (max2 === null || ch.value < max2)
+          max2 = ch.value;
       }
     }
-    return Number.isFinite(min) && Number.isFinite(max);
+    return Number.isFinite(min) && Number.isFinite(max2);
   }
 };
 ZodNumber.create = (params) => {
@@ -43546,14 +43549,14 @@ var ZodBigInt = class _ZodBigInt extends ZodType {
     return min;
   }
   get maxValue() {
-    let max = null;
+    let max2 = null;
     for (const ch of this._def.checks) {
       if (ch.kind === "max") {
-        if (max === null || ch.value < max)
-          max = ch.value;
+        if (max2 === null || ch.value < max2)
+          max2 = ch.value;
       }
     }
-    return max;
+    return max2;
   }
 };
 ZodBigInt.create = (params) => {
@@ -43680,14 +43683,14 @@ var ZodDate = class _ZodDate extends ZodType {
     return min != null ? new Date(min) : null;
   }
   get maxDate() {
-    let max = null;
+    let max2 = null;
     for (const ch of this._def.checks) {
       if (ch.kind === "max") {
-        if (max === null || ch.value < max)
-          max = ch.value;
+        if (max2 === null || ch.value < max2)
+          max2 = ch.value;
       }
     }
-    return max != null ? new Date(max) : null;
+    return max2 != null ? new Date(max2) : null;
   }
 };
 ZodDate.create = (params) => {
@@ -46432,7 +46435,7 @@ sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async 
   const { db: db2 } = req;
   const { eventType: eventType2, label, durationMinutes, isPlanned, comment } = req.body;
   const existing = await db2.select().from(sessionEvents).where(eq(sessionEvents.sessionId, String(req.params.id)));
-  const maxOrder = existing.reduce((max, e) => Math.max(max, e.sortOrder), 0);
+  const maxOrder = existing.reduce((max2, e) => Math.max(max2, e.sortOrder), 0);
   const now = /* @__PURE__ */ new Date();
   const endedAt = durationMinutes ? new Date(now.getTime() + durationMinutes * 6e4) : void 0;
   const [event] = await db2.insert(sessionEvents).values({
@@ -46626,8 +46629,12 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
     res.status(409).json({ error: "Un lot est d\xE9j\xE0 actif dans cette session", lotId: activeLot.id });
     return;
   }
-  const existingLots = await db2.select().from(lotEntries).where(eq(lotEntries.sessionId, sessionId));
-  const lotOrder = existingLots.length + 1;
+  const [[lotCountRow], [maxSortRow]] = await Promise.all([
+    db2.select({ n: count() }).from(lotEntries).where(eq(lotEntries.sessionId, sessionId)),
+    db2.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, sessionId))
+  ]);
+  const lotOrder = (lotCountRow?.n ?? 0) + 1;
+  const maxOrder = maxSortRow?.m ?? 0;
   const now = /* @__PURE__ */ new Date();
   const [lot] = await db2.insert(lotEntries).values({
     sessionId,
@@ -46640,8 +46647,6 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
     startedAt: now,
     status: "active"
   }).returning();
-  const existingEvents = await db2.select().from(sessionEvents).where(eq(sessionEvents.sessionId, sessionId));
-  const maxOrder = existingEvents.reduce((max, e) => Math.max(max, e.sortOrder), 0);
   await db2.insert(sessionEvents).values({
     sessionId,
     eventType: "lot_start",
@@ -46681,7 +46686,7 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
   }
   await audit(db2, req, "CLOSE_LOT", "lot", lot.id, { quantityProduced, quantityConforming, quantityRejected });
   const existingEvents = await db2.select().from(sessionEvents).where(eq(sessionEvents.sessionId, lot.sessionId));
-  const maxOrder = existingEvents.reduce((max, e) => Math.max(max, e.sortOrder), 0);
+  const maxOrder = existingEvents.reduce((max2, e) => Math.max(max2, e.sortOrder), 0);
   await db2.insert(sessionEvents).values({
     sessionId: lot.sessionId,
     eventType: "lot_end",

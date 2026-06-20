@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, count, max } from "drizzle-orm";
 import { lotEntries, downtimeEvents, sessionEvents, downtimeCategories, electronicSignatures, lotCadenceChanges } from "@trs/db";
 import { diffMinutes } from "@trs/engine";
 import { authenticate, requireRole } from "../middleware";
@@ -28,10 +28,13 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
     return;
   }
 
-  // Get lot order
-  const existingLots = await db.select().from(lotEntries)
-    .where(eq(lotEntries.sessionId, sessionId));
-  const lotOrder = existingLots.length + 1;
+  // Use aggregates to avoid loading full row sets just for ordering values.
+  const [[lotCountRow], [maxSortRow]] = await Promise.all([
+    db.select({ n: count() }).from(lotEntries).where(eq(lotEntries.sessionId, sessionId)),
+    db.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, sessionId)),
+  ]);
+  const lotOrder = (lotCountRow?.n ?? 0) + 1;
+  const maxOrder = maxSortRow?.m ?? 0;
 
   const now = new Date();
 
@@ -47,11 +50,6 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
     startedAt: now,
     status: "active",
   }).returning();
-
-  // Add lot_start event to session timeline
-  const existingEvents = await db.select().from(sessionEvents)
-    .where(eq(sessionEvents.sessionId, sessionId));
-  const maxOrder = existingEvents.reduce((max, e) => Math.max(max, e.sortOrder), 0);
 
   await db.insert(sessionEvents).values({
     sessionId,
