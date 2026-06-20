@@ -102,10 +102,10 @@ export const api = {
   updateLot: (id: string, data: Partial<CloseLotInput & { cadenceUsed: number; cadenceUnit: string }>) =>
     request<LotEntry>(`/lots/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   addDowntime: (lotId: string, data: AddDowntimeInput) =>
-    request<any>(`/lots/${lotId}/downtimes`, { method: "POST", body: JSON.stringify(data) }),
+    request<LotDowntime>(`/lots/${lotId}/downtimes`, { method: "POST", body: JSON.stringify(data) }),
   // Session-level stop (inter-lot: changeover, cleaning, waiting — no active lot).
   addSessionDowntime: (sessionId: string, data: AddDowntimeInput) =>
-    request<any>(`/sessions/${sessionId}/downtimes`, { method: "POST", body: JSON.stringify(data) }),
+    request<LotDowntime>(`/sessions/${sessionId}/downtimes`, { method: "POST", body: JSON.stringify(data) }),
   lotDowntimes: (lotId: string) => request<LotDowntime[]>(`/lots/${lotId}/downtimes`),
   deleteDowntime: (lotId: string, dtId: string) =>
     request<void>(`/lots/${lotId}/downtimes/${dtId}`, { method: "DELETE" }),
