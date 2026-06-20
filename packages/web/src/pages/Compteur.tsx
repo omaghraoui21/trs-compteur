@@ -290,8 +290,14 @@ export default function CompteurPage() {
               key={r.id}
               onClick={() => {
                 setSelectedRoom(r);
-                api.equipments(r.id).then(setEquipmentsList);
+                setEquipmentsList([]);
                 setView("pick-equip");
+                api.equipments(r.id)
+                  .then(setEquipmentsList)
+                  .catch((err: any) => {
+                    toast.error(err.message || "Impossible de charger les équipements");
+                    setView("pick-room");
+                  });
               }}
               className={`bg-white rounded-xl border p-5 text-left hover:border-blue-500 hover:shadow transition ${BTN_PRIMARY.includes("min-h") ? "min-h-[56px]" : ""}`}
             >
@@ -312,6 +318,9 @@ export default function CompteurPage() {
       <div className="max-w-lg mx-auto">
         <BackButton onClick={() => setView("pick-room")} />
         <h2 className="text-xl font-bold mb-4">{selectedRoom?.name} — Équipement</h2>
+        {equipmentsList.length === 0 ? (
+          <ListSkeleton rows={3} />
+        ) : (
         <div className="grid gap-3">
           {equipmentsList.map(eq => {
             const accent = equipmentAccent(eq.equipmentType);
@@ -342,6 +351,7 @@ export default function CompteurPage() {
             );
           })}
         </div>
+        )}
       </div>
     );
   }
