@@ -35,7 +35,7 @@ refRouter.get("/products", asyncHandler(async (req, res) => {
 
 refRouter.get("/downtime-categories", asyncHandler(async (req, res) => {
   const { db } = req;
-  const eqType = req.query.equipmentType as string | undefined;
+  const { equipmentType: eqType } = req.query as { equipmentType?: string };
   const typeFilter = eqType
     ? or(isNull(downtimeCategories.appliesToEquipmentType), eq(downtimeCategories.appliesToEquipmentType, eqType))
     : undefined;
@@ -46,7 +46,7 @@ refRouter.get("/downtime-categories", asyncHandler(async (req, res) => {
 
 refRouter.get("/cadences", asyncHandler(async (req, res) => {
   const { db } = req;
-  const equipmentId = req.query.equipmentId as string | undefined;
+  const { equipmentId } = req.query as { equipmentId?: string };
   const data = equipmentId
     ? await db.select().from(productEquipmentCadences).where(eq(productEquipmentCadences.equipmentId, equipmentId))
     : await db.select().from(productEquipmentCadences);

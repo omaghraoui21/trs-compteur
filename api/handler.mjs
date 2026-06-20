@@ -46334,7 +46334,7 @@ sessionsRouter.use(authenticate);
 sessionsRouter.get("/", validateQuery(sessionListQuerySchema), asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const { date: date2, equipmentId } = req.query;
-  let conditions = [];
+  const conditions = [];
   if (date2) conditions.push(eq(sessions.sessionDate, date2));
   if (equipmentId) conditions.push(eq(sessions.equipmentId, equipmentId));
   const data = await db2.select().from(sessions).where(conditions.length > 0 ? and(...conditions) : void 0).orderBy(desc(sessions.openedAt));
@@ -46899,14 +46899,14 @@ refRouter.get("/products", asyncHandler(async (req, res) => {
 }));
 refRouter.get("/downtime-categories", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
-  const eqType = req.query.equipmentType;
+  const { equipmentType: eqType } = req.query;
   const typeFilter = eqType ? or(isNull(downtimeCategories.appliesToEquipmentType), eq(downtimeCategories.appliesToEquipmentType, eqType)) : void 0;
   const data = await db2.select().from(downtimeCategories).where(and(eq(downtimeCategories.isActive, true), typeFilter));
   res.json(data);
 }));
 refRouter.get("/cadences", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
-  const equipmentId = req.query.equipmentId;
+  const { equipmentId } = req.query;
   const data = equipmentId ? await db2.select().from(productEquipmentCadences).where(eq(productEquipmentCadences.equipmentId, equipmentId)) : await db2.select().from(productEquipmentCadences);
   res.json(data);
 }));

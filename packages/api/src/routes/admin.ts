@@ -264,24 +264,26 @@ adminRouter.post("/users/:id/password", adminOnly, validate(resetPasswordSchema)
 
 // ─── Audit log viewer (admin + supervisor read-only, GMP traceability) ──────
 adminRouter.get("/audit-log", validateQuery(auditLogQuerySchema), asyncHandler(async (req, res) => {
-  const { entityType, entityId, action, from, to, limit: limitQ, offset: offsetQ } = req.query;
+  const { entityType, entityId, action, from, to, limit: limitQ, offset: offsetQ } = req.query as {
+    entityType?: string; entityId?: string; action?: string; from?: string; to?: string; limit?: number; offset?: number;
+  };
   const limit = limitQ ?? 50;
   const offset = offsetQ ?? 0;
 
   const filters: ReturnType<typeof and>[] = [];
-  if (entityType) filters.push(eq(auditLog.entityType, entityType as string));
-  if (entityId) filters.push(eq(auditLog.entityId, entityId as string));
-  if (action) filters.push(eq(auditLog.action, action as string));
-  if (from) filters.push(gte(auditLog.createdAt, new Date((from as string) + "T00:00:00Z")));
-  if (to) filters.push(lte(auditLog.createdAt, new Date((to as string) + "T23:59:59Z")));
+  if (entityType) filters.push(eq(auditLog.entityType, entityType));
+  if (entityId) filters.push(eq(auditLog.entityId, entityId));
+  if (action) filters.push(eq(auditLog.action, action));
+  if (from) filters.push(gte(auditLog.createdAt, new Date(from + "T00:00:00Z")));
+  if (to) filters.push(lte(auditLog.createdAt, new Date(to + "T23:59:59Z")));
 
   const rows = await req.db
     .select()
     .from(auditLog)
     .where(filters.length ? and(...filters) : undefined)
     .orderBy(desc(auditLog.createdAt))
-    .limit(limit as number)
-    .offset(offset as number);
+    .limit(limit)
+    .offset(offset);
 
   res.json(rows);
 }));

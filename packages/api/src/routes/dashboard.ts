@@ -174,17 +174,17 @@ async function buildSessionsTrs(db: Db, sessionList: (typeof sessions.$inferSele
 
 dashboardRouter.get("/trs", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
-  const { equipmentId, from, to } = req.query;
+  const { equipmentId, from, to } = req.query as { equipmentId: string; from: string; to: string };
 
-  const [equipment] = await db.select().from(equipments).where(eq(equipments.id, equipmentId as string)).limit(1);
+  const [equipment] = await db.select().from(equipments).where(eq(equipments.id, equipmentId)).limit(1);
   const microStopThreshold = equipment?.microStopThresholdMin != null ? Number(equipment.microStopThresholdMin) : 5;
 
   const closedSessions = await db.select().from(sessions)
     .where(and(
-      eq(sessions.equipmentId, equipmentId as string),
+      eq(sessions.equipmentId, equipmentId),
       eq(sessions.status, "closed"),
-      gte(sessions.sessionDate, from as string),
-      lte(sessions.sessionDate, to as string),
+      gte(sessions.sessionDate, from),
+      lte(sessions.sessionDate, to),
     ))
     .orderBy(sessions.sessionDate);
 
@@ -220,15 +220,15 @@ dashboardRouter.get("/trs", validateQuery(dashboardRangeQuerySchema), asyncHandl
 
 dashboardRouter.get("/pareto", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
-  const { equipmentId, from, to } = req.query;
+  const { equipmentId, from, to } = req.query as { equipmentId: string; from: string; to: string };
 
   // Get all closed sessions in range
   const closedSessions = await db.select().from(sessions)
     .where(and(
-      eq(sessions.equipmentId, equipmentId as string),
+      eq(sessions.equipmentId, equipmentId),
       eq(sessions.status, "closed"),
-      gte(sessions.sessionDate, from as string),
-      lte(sessions.sessionDate, to as string),
+      gte(sessions.sessionDate, from),
+      lte(sessions.sessionDate, to),
     ));
 
   const sessionIds = closedSessions.map(s => s.id);
@@ -303,7 +303,7 @@ dashboardRouter.get("/pareto", validateQuery(dashboardRangeQuerySchema), asyncHa
 
 dashboardRouter.get("/comparison", validateQuery(comparisonQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
-  const { from, to } = req.query;
+  const { from, to } = req.query as { from: string; to: string };
 
   type ComparisonResult = { equipmentId: string; equipmentName: string; equipmentCode: string; equipmentType: string | null; trsObjective: number; daily: (SessionTrsResult & { date: string })[]; total: SessionTrsResult };
   const eqs = await db.select().from(equipments).where(eq(equipments.isActive, true));
@@ -314,8 +314,8 @@ dashboardRouter.get("/comparison", validateQuery(comparisonQuerySchema), asyncHa
       .where(and(
         eq(sessions.equipmentId, equipment.id),
         eq(sessions.status, "closed"),
-        gte(sessions.sessionDate, from as string),
-        lte(sessions.sessionDate, to as string),
+        gte(sessions.sessionDate, from),
+        lte(sessions.sessionDate, to),
       ))
       .orderBy(sessions.sessionDate);
 
@@ -345,14 +345,14 @@ dashboardRouter.get("/comparison", validateQuery(comparisonQuerySchema), asyncHa
 
 dashboardRouter.get("/by-product", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
-  const { equipmentId, from, to } = req.query;
+  const { equipmentId, from, to } = req.query as { equipmentId: string; from: string; to: string };
 
   const closedSessions = await db.select().from(sessions)
     .where(and(
-      eq(sessions.equipmentId, equipmentId as string),
+      eq(sessions.equipmentId, equipmentId),
       eq(sessions.status, "closed"),
-      gte(sessions.sessionDate, from as string),
-      lte(sessions.sessionDate, to as string),
+      gte(sessions.sessionDate, from),
+      lte(sessions.sessionDate, to),
     ));
 
   const productLots: ProductLotInput[] = [];
@@ -377,18 +377,18 @@ dashboardRouter.get("/by-product", validateQuery(dashboardRangeQuerySchema), asy
 
 dashboardRouter.get("/six-losses", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
-  const { equipmentId, from, to } = req.query;
+  const { equipmentId, from, to } = req.query as { equipmentId: string; from: string; to: string };
 
   // Get equipment for micro-stop threshold
-  const [equipment] = await db.select().from(equipments).where(eq(equipments.id, equipmentId as string)).limit(1);
+  const [equipment] = await db.select().from(equipments).where(eq(equipments.id, equipmentId)).limit(1);
   const microStopThreshold = equipment?.microStopThresholdMin != null ? Number(equipment.microStopThresholdMin) : 5;
 
   const closedSessions = await db.select().from(sessions)
     .where(and(
-      eq(sessions.equipmentId, equipmentId as string),
+      eq(sessions.equipmentId, equipmentId),
       eq(sessions.status, "closed"),
-      gte(sessions.sessionDate, from as string),
-      lte(sessions.sessionDate, to as string),
+      gte(sessions.sessionDate, from),
+      lte(sessions.sessionDate, to),
     ))
     .orderBy(sessions.sessionDate);
 
@@ -434,14 +434,14 @@ dashboardRouter.get("/six-losses", validateQuery(dashboardRangeQuerySchema), asy
 
 dashboardRouter.get("/heatmap", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
-  const { equipmentId, from, to } = req.query;
+  const { equipmentId, from, to } = req.query as { equipmentId: string; from: string; to: string };
 
   const closedSessions = await db.select().from(sessions)
     .where(and(
-      eq(sessions.equipmentId, equipmentId as string),
+      eq(sessions.equipmentId, equipmentId),
       eq(sessions.status, "closed"),
-      gte(sessions.sessionDate, from as string),
-      lte(sessions.sessionDate, to as string),
+      gte(sessions.sessionDate, from),
+      lte(sessions.sessionDate, to),
     ))
     .orderBy(sessions.sessionDate);
 
@@ -470,16 +470,16 @@ dashboardRouter.get("/heatmap", validateQuery(dashboardRangeQuerySchema), asyncH
 // session range, newest first.
 dashboardRouter.get("/downtime-log", validateQuery(dashboardRangeQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
-  const { equipmentId, from, to } = req.query;
+  const { equipmentId, from, to } = req.query as { equipmentId: string; from: string; to: string };
 
   // Two index-friendly queries instead of a coalesce() join condition (which
   // can't use an index): lot-attached stops (via the lot's session) and
   // session-level stops (via downtime_events.session_id), merged + sorted in memory.
   const periodFilter = and(
-    eq(sessions.equipmentId, equipmentId as string),
+    eq(sessions.equipmentId, equipmentId),
     eq(sessions.status, "closed"),
-    gte(sessions.sessionDate, from as string),
-    lte(sessions.sessionDate, to as string),
+    gte(sessions.sessionDate, from),
+    lte(sessions.sessionDate, to),
   );
   const cols = {
     id: downtimeEvents.id,
