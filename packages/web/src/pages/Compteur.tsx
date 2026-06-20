@@ -1104,10 +1104,10 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
   const toast = useToast();
 
   const [lotDts, setLotDts] = useState<LotDowntime[]>([]);
-  const fetchLotDts = async () => {
+  const fetchLotDts = useCallback(async () => {
     try { setLotDts(await api.lotDowntimes(lot.id)); } catch { /* non-critical */ }
-  };
-  useEffect(() => { fetchLotDts(); }, [lot.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lot.id]);
+  useEffect(() => { fetchLotDts(); }, [fetchLotDts]);
 
   // Cadence can be adjusted mid-lot (logged for audit + time-weighted TRS).
   const [editingCadence, setEditingCadence] = useState(false);
