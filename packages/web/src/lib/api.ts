@@ -79,10 +79,11 @@ export const api = {
   cadences: (equipmentId?: string) => request<ProductEquipmentCadence[]>(`/ref/cadences${equipmentId ? `?equipmentId=${equipmentId}` : ""}`),
 
   // Sessions
-  sessions: (params?: { date?: string; equipmentId?: string }) => {
+  sessions: (params?: { date?: string; equipmentId?: string; status?: "active" | "closed" }) => {
     const q = new URLSearchParams();
     if (params?.date) q.set("date", params.date);
     if (params?.equipmentId) q.set("equipmentId", params.equipmentId);
+    if (params?.status) q.set("status", params.status);
     return request<Session[]>(`/sessions?${q}`);
   },
   session: (id: string) => request<SessionDetail>(`/sessions/${id}`),

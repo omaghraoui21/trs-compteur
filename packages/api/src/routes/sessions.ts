@@ -16,10 +16,11 @@ sessionsRouter.use(authenticate);
 
 sessionsRouter.get("/", validateQuery(sessionListQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
-  const { date, equipmentId } = req.query as { date?: string; equipmentId?: string };
+  const { date, equipmentId, status } = req.query as { date?: string; equipmentId?: string; status?: "active" | "closed" };
   const conditions = [];
   if (date) conditions.push(eq(sessions.sessionDate, date));
   if (equipmentId) conditions.push(eq(sessions.equipmentId, equipmentId));
+  if (status) conditions.push(eq(sessions.status, status));
   const data = await db.select().from(sessions)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(sessions.openedAt));

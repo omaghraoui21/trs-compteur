@@ -45811,7 +45811,8 @@ var comparisonQuerySchema = external_exports.object({
 });
 var sessionListQuerySchema = external_exports.object({
   date: isoDate.optional(),
-  equipmentId: external_exports.string().uuid("equipmentId invalide").optional()
+  equipmentId: external_exports.string().uuid("equipmentId invalide").optional(),
+  status: external_exports.enum(["active", "closed"]).optional()
 });
 var auditLogQuerySchema = external_exports.object({
   entityType: external_exports.string().optional(),
@@ -46342,10 +46343,11 @@ var sessionsRouter = (0, import_express2.Router)();
 sessionsRouter.use(authenticate);
 sessionsRouter.get("/", validateQuery(sessionListQuerySchema), asyncHandler(async (req, res) => {
   const { db: db2 } = req;
-  const { date: date2, equipmentId } = req.query;
+  const { date: date2, equipmentId, status } = req.query;
   const conditions = [];
   if (date2) conditions.push(eq(sessions.sessionDate, date2));
   if (equipmentId) conditions.push(eq(sessions.equipmentId, equipmentId));
+  if (status) conditions.push(eq(sessions.status, status));
   const data = await db2.select().from(sessions).where(conditions.length > 0 ? and(...conditions) : void 0).orderBy(desc(sessions.openedAt));
   res.json(data);
 }));

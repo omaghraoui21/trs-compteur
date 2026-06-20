@@ -198,9 +198,9 @@ export default function CompteurPage() {
       setCategories(cats);
       setCadences(cads);
 
-      // Check for existing active session
-      const allSessions = await api.sessions({ equipmentId: eq.id });
-      const active = allSessions.find(s => s.status === "active");
+      // Fetch only active sessions for this equipment (server-side filter avoids
+      // loading the full session history on every equipment selection).
+      const [active] = await api.sessions({ equipmentId: eq.id, status: "active" });
       if (active) {
         setActiveSession(active);
         sessionCtx.set({ name: eq.name, openedAt: new Date(active.openedAt) });

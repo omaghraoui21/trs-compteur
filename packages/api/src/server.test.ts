@@ -805,6 +805,22 @@ describe("GET /sessions + pending-lots/count", () => {
     expect(res.body.every((s: any) => s.equipmentId === equipmentId)).toBe(true);
   });
 
+  it("GET /api/sessions?status=closed returns only closed sessions", async () => {
+    const res = await request(app)
+      .get("/api/sessions?status=closed")
+      .set({ Authorization: `Bearer ${opToken}` });
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.every((s: any) => s.status === "closed")).toBe(true);
+  });
+
+  it("GET /api/sessions?status=bogus rejects with 400 (Zod enum)", async () => {
+    const res = await request(app)
+      .get("/api/sessions?status=bogus")
+      .set({ Authorization: `Bearer ${opToken}` });
+    expect(res.status).toBe(400);
+  });
+
   it("GET /api/dashboard/pending-lots/count returns a numeric count", async () => {
     const res = await request(app)
       .get("/api/dashboard/pending-lots/count")

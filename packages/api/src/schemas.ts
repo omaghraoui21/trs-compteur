@@ -228,6 +228,7 @@ export const comparisonQuerySchema = z.object({
 export const sessionListQuerySchema = z.object({
   date: isoDate.optional(),
   equipmentId: z.string().uuid("equipmentId invalide").optional(),
+  status: z.enum(["active", "closed"]).optional(),
 });
 
 export const auditLogQuerySchema = z.object({
