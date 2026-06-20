@@ -41567,11 +41567,10 @@ var validateQuery = makeValidator("query");
 
 // packages/api/src/lib/audit.ts
 async function audit(db2, req, action, entityType, entityId, payload) {
-  const actor = req;
   try {
     await db2.insert(auditLog).values({
-      actorId: actor.userId ?? null,
-      actorEmail: actor.userEmail ?? "unknown",
+      actorId: req.userId ?? null,
+      actorEmail: req.userEmail ?? "unknown",
       action,
       entityType,
       entityId: entityId ?? null,

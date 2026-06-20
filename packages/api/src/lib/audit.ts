@@ -10,11 +10,10 @@ export async function audit(
   entityId: string | undefined,
   payload?: object,
 ) {
-  const actor = req as any;
   try {
     await db.insert(auditLog).values({
-      actorId: actor.userId ?? null,
-      actorEmail: actor.userEmail ?? "unknown",
+      actorId: req.userId ?? null,
+      actorEmail: req.userEmail ?? "unknown",
       action,
       entityType,
       entityId: entityId ?? null,
@@ -28,7 +27,7 @@ export async function audit(
       action,
       entityType,
       entityId,
-      actor: (req as any).userEmail,
+      actor: req.userEmail,
       error: err instanceof Error ? err.message : String(err),
     });
     // In production, alert via external monitoring (e.g. Sentry) rather than
