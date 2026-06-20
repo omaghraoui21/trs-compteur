@@ -301,8 +301,9 @@ describe("audit trail (21 CFR-style traceability)", () => {
     const rows = await sql`SELECT action FROM audit_log ORDER BY created_at`;
     const actions = rows.map((r: any) => r.action);
     expect(actions.length).toBeGreaterThan(0);
-    // Authentication and lot validation must be traceable
+    // Authentication, correction, and lot validation must be traceable
     expect(actions.some((a: string) => a === "LOGIN")).toBe(true);
+    expect(actions.some((a: string) => a === "CORRECT_LOT")).toBe(true);
     expect(actions.some((a: string) => /VALIDATE/i.test(a))).toBe(true);
   });
 
@@ -712,6 +713,15 @@ describe("dashboard pending-lots status filter", () => {
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body.every((l: any) => l.status === "closed")).toBe(true);
+  });
+
+  it("status=all returns lots regardless of status (includes validated)", async () => {
+    const res = await request(app)
+      .get("/api/dashboard/pending-lots?status=all")
+      .set({ Authorization: `Bearer ${supToken}` });
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.some((l: any) => l.status === "validated")).toBe(true);
   });
 });
 
