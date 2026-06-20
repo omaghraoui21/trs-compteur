@@ -257,11 +257,18 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   const sessionId = String(req.params.id);
   const dtId = String(req.params.dtId);
 
-  const [dt] = await db.select({ id: downtimeEvents.id, sessionId: downtimeEvents.sessionId, lotEntryId: downtimeEvents.lotEntryId })
-    .from(downtimeEvents).where(eq(downtimeEvents.id, dtId)).limit(1);
+  // Join with the session to check ownership + session status in one query.
+  const [dt] = await db.select({
+    id: downtimeEvents.id, sessionId: downtimeEvents.sessionId, lotEntryId: downtimeEvents.lotEntryId,
+    sessionStatus: sessions.status,
+  })
+    .from(downtimeEvents)
+    .innerJoin(sessions, eq(downtimeEvents.sessionId, sessions.id))
+    .where(eq(downtimeEvents.id, dtId)).limit(1);
   if (!dt) { res.status(404).json({ error: "Arrêt introuvable" }); return; }
   if (dt.sessionId !== sessionId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à cette session" }); return; }
   if (dt.lotEntryId !== null) { res.status(400).json({ error: "Cet arrêt est rattaché à un lot — utilisez DELETE /lots/:id/downtimes/:dtId" }); return; }
+  if (dt.sessionStatus !== "active") throw new HttpError(409, "Impossible de supprimer un arrêt d'une session déjà fermée");
 
   await db.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
   await audit(db, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });

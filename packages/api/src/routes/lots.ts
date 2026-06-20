@@ -246,10 +246,16 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   const lotId = String(req.params.id);
   const dtId = String(req.params.dtId);
 
-  const [dt] = await db.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId })
-    .from(downtimeEvents).where(eq(downtimeEvents.id, dtId)).limit(1);
-  if (!dt) { res.status(404).json({ error: "Arrêt introuvable" }); return; }
-  if (dt.lotEntryId !== lotId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à ce lot" }); return; }
+  // Join with the lot so we can check ownership + lot status in one query.
+  const [row] = await db.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId, lotStatus: lotEntries.status })
+    .from(downtimeEvents)
+    .innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id))
+    .where(eq(downtimeEvents.id, dtId)).limit(1);
+  if (!row) { res.status(404).json({ error: "Arrêt introuvable" }); return; }
+  if (row.lotEntryId !== lotId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à ce lot" }); return; }
+  if (row.lotStatus === "validated" || row.lotStatus === "rejected") {
+    throw new HttpError(409, "Impossible de supprimer un arrêt sur un lot déjà décidé par le superviseur");
+  }
 
   await db.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
   await audit(db, req, "DELETE_DOWNTIME", "downtime", dtId, { lotId });

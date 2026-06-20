@@ -46517,7 +46517,12 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const sessionId = String(req.params.id);
   const dtId = String(req.params.dtId);
-  const [dt] = await db2.select({ id: downtimeEvents.id, sessionId: downtimeEvents.sessionId, lotEntryId: downtimeEvents.lotEntryId }).from(downtimeEvents).where(eq(downtimeEvents.id, dtId)).limit(1);
+  const [dt] = await db2.select({
+    id: downtimeEvents.id,
+    sessionId: downtimeEvents.sessionId,
+    lotEntryId: downtimeEvents.lotEntryId,
+    sessionStatus: sessions.status
+  }).from(downtimeEvents).innerJoin(sessions, eq(downtimeEvents.sessionId, sessions.id)).where(eq(downtimeEvents.id, dtId)).limit(1);
   if (!dt) {
     res.status(404).json({ error: "Arr\xEAt introuvable" });
     return;
@@ -46530,6 +46535,7 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     res.status(400).json({ error: "Cet arr\xEAt est rattach\xE9 \xE0 un lot \u2014 utilisez DELETE /lots/:id/downtimes/:dtId" });
     return;
   }
+  if (dt.sessionStatus !== "active") throw new HttpError(409, "Impossible de supprimer un arr\xEAt d'une session d\xE9j\xE0 ferm\xE9e");
   await db2.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
   await audit(db2, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });
   res.status(204).send();
@@ -46822,14 +46828,17 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const lotId = String(req.params.id);
   const dtId = String(req.params.dtId);
-  const [dt] = await db2.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId }).from(downtimeEvents).where(eq(downtimeEvents.id, dtId)).limit(1);
-  if (!dt) {
+  const [row] = await db2.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId, lotStatus: lotEntries.status }).from(downtimeEvents).innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).where(eq(downtimeEvents.id, dtId)).limit(1);
+  if (!row) {
     res.status(404).json({ error: "Arr\xEAt introuvable" });
     return;
   }
-  if (dt.lotEntryId !== lotId) {
+  if (row.lotEntryId !== lotId) {
     res.status(403).json({ error: "Cet arr\xEAt n'appartient pas \xE0 ce lot" });
     return;
+  }
+  if (row.lotStatus === "validated" || row.lotStatus === "rejected") {
+    throw new HttpError(409, "Impossible de supprimer un arr\xEAt sur un lot d\xE9j\xE0 d\xE9cid\xE9 par le superviseur");
   }
   await db2.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
   await audit(db2, req, "DELETE_DOWNTIME", "downtime", dtId, { lotId });
