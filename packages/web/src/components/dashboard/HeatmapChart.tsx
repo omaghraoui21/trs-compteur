@@ -39,10 +39,9 @@ export default function HeatmapChart({ heatmap }: Props) {
   const weeks: Map<string, { date: string; day: number; trs: number; do_: number; tp: number; tq: number; lots: number }[]> = new Map();
 
   for (const dp of heatmap) {
-    const d = new Date(dp.date + "T00:00:00");
-    const dayOfWeek = (d.getDay() + 6) % 7; // Mon=0, Sun=6
-    const weekStart = new Date(d);
-    weekStart.setDate(weekStart.getDate() - dayOfWeek);
+    const d = new Date(dp.date + "T00:00:00Z");
+    const dayOfWeek = (d.getUTCDay() + 6) % 7; // Mon=0, Sun=6
+    const weekStart = new Date(d.getTime() - dayOfWeek * 86_400_000);
     const weekKey = weekStart.toISOString().slice(0, 10);
 
     if (!weeks.has(weekKey)) weeks.set(weekKey, []);
