@@ -713,3 +713,34 @@ describe("dashboard pending-lots status filter", () => {
     expect(res.body.every((l: any) => l.status === "closed")).toBe(true);
   });
 });
+
+describe("GET /sessions + pending-lots/count", () => {
+  it("GET /api/sessions returns an array ordered by openedAt desc", async () => {
+    const res = await request(app)
+      .get("/api/sessions")
+      .set({ Authorization: `Bearer ${opToken}` });
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThanOrEqual(1);
+    expect(res.body[0]).toHaveProperty("id");
+    expect(res.body[0]).toHaveProperty("status");
+  });
+
+  it("GET /api/sessions?equipmentId= filters by equipment", async () => {
+    const eqs = await request(app).get("/api/ref/equipments").set({ Authorization: `Bearer ${opToken}` });
+    const equipmentId = (eqs.body.equipments ?? eqs.body)[0].id;
+    const res = await request(app)
+      .get(`/api/sessions?equipmentId=${equipmentId}`)
+      .set({ Authorization: `Bearer ${opToken}` });
+    expect(res.status).toBe(200);
+    expect(res.body.every((s: any) => s.equipmentId === equipmentId)).toBe(true);
+  });
+
+  it("GET /api/dashboard/pending-lots/count returns a numeric count", async () => {
+    const res = await request(app)
+      .get("/api/dashboard/pending-lots/count")
+      .set({ Authorization: `Bearer ${supToken}` });
+    expect(res.status).toBe(200);
+    expect(typeof res.body.count).toBe("number");
+  });
+});
