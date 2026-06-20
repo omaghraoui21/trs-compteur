@@ -295,6 +295,14 @@ describe("golden path + validation + RBAC", () => {
     expect(res.body.signature.userEmail).toBe("superviseur@dpi.local");
   });
 
+  it("rejects a correction attempt on an already-validated lot (409)", async () => {
+    const res = await request(app)
+      .post(`/api/lots/${lotId}/correct`)
+      .set({ Authorization: `Bearer ${supToken}` })
+      .send({ quantityProduced: 5000, correctionReason: "trop tard", password: "super123" });
+    expect(res.status).toBe(409);
+  });
+
   it("exposes the lot's electronic signatures (Part 11 manifestation)", async () => {
     const res = await request(app)
       .get(`/api/lots/${lotId}/signatures`)
