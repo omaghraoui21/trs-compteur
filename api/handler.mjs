@@ -47532,6 +47532,7 @@ adminRouter.post("/users", adminOnly, validate(createUserSchema), asyncHandler(a
 }));
 adminRouter.patch("/users/:id", adminOnly, validate(updateUserSchema), asyncHandler(async (req, res) => {
   const id = String(req.params.id);
+  if (Object.keys(req.body).length === 0) throw new HttpError(400, "Aucune mise \xE0 jour");
   if (id === req.userId) {
     if (req.body.isActive === false) throw new HttpError(400, "Vous ne pouvez pas d\xE9sactiver votre propre compte");
     if (req.body.role && req.body.role !== "admin") throw new HttpError(400, "Vous ne pouvez pas changer votre propre r\xF4le");

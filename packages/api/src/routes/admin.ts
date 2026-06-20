@@ -240,6 +240,7 @@ adminRouter.post("/users", adminOnly, validate(createUserSchema), asyncHandler(a
 
 adminRouter.patch("/users/:id", adminOnly, validate(updateUserSchema), asyncHandler(async (req, res) => {
   const id = String(req.params.id);
+  if (Object.keys(req.body).length === 0) throw new HttpError(400, "Aucune mise à jour");
   // Guard against self-lockout: an admin cannot demote or deactivate themselves.
   if (id === req.userId) {
     if (req.body.isActive === false) throw new HttpError(400, "Vous ne pouvez pas désactiver votre propre compte");
