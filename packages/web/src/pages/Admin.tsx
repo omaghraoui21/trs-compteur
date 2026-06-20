@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type ProductEquipmentCadence, type AdminUser, type AuditLogEntry } from "@/lib/api";
 import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, List, Network, ChevronDown, ChevronRight, Users, KeyRound, ScrollText, ChevronLeft } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
@@ -1222,8 +1222,8 @@ function AuditLogPanel() {
                   const isExpanded = expanded === e.id;
                   const actionCls = ACTION_COLOR[e.action] ?? "bg-gray-100 text-gray-700";
                   return (
-                    <>
-                      <tr key={e.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpanded(isExpanded ? null : e.id)}>
+                    <Fragment key={e.id}>
+                      <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpanded(isExpanded ? null : e.id)}>
                         <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap font-mono">
                           {new Date(e.createdAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                         </td>
@@ -1242,7 +1242,7 @@ function AuditLogPanel() {
                         </td>
                       </tr>
                       {isExpanded && e.payload && (
-                        <tr key={`${e.id}-payload`}>
+                        <tr>
                           <td colSpan={6} className="px-4 py-2 bg-gray-50 border-b">
                             <pre className="text-[11px] text-gray-600 whitespace-pre-wrap break-all font-mono max-h-40 overflow-auto">
                               {(() => { try { return JSON.stringify(JSON.parse(e.payload), null, 2); } catch { return e.payload; } })()}
@@ -1250,7 +1250,7 @@ function AuditLogPanel() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>
