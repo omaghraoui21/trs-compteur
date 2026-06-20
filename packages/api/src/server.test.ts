@@ -513,6 +513,41 @@ describe("session-level stops + cadence changes (refonte arrêts)", () => {
   });
 });
 
+describe("POST /sessions/:id/events", () => {
+  const auth = { Authorization: `Bearer ${""}` };
+  let sessionId: string;
+
+  it("sets up a session", async () => {
+    auth.Authorization = `Bearer ${opToken}`;
+    const eqs = await request(app).get("/api/ref/equipments").set(auth);
+    const rooms = await request(app).get("/api/ref/rooms").set(auth);
+    const equipmentId = (eqs.body.equipments ?? eqs.body)[0].id;
+    const roomId = (rooms.body.rooms ?? rooms.body)[0].id;
+    const ses = await request(app).post("/api/sessions/open").set(auth).send({ equipmentId, roomId });
+    expect(ses.status).toBe(201);
+    sessionId = ses.body.id ?? ses.body.session?.id;
+  });
+
+  it("records a nettoyage event (201)", async () => {
+    const res = await request(app)
+      .post(`/api/sessions/${sessionId}/events`)
+      .set(auth)
+      .send({ eventType: "nettoyage", durationMinutes: 30, isPlanned: true });
+    expect(res.status).toBe(201);
+    expect(res.body.eventType).toBe("nettoyage");
+    expect(res.body.sessionId).toBe(sessionId);
+    expect(res.body.sortOrder).toBeGreaterThanOrEqual(1);
+  });
+
+  it("rejects an unknown eventType (400 — Zod enum)", async () => {
+    const res = await request(app)
+      .post(`/api/sessions/${sessionId}/events`)
+      .set(auth)
+      .send({ eventType: "invalid_type", durationMinutes: 5 });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("delete downtime endpoints", () => {
   const auth = { Authorization: `Bearer ${""}` };
   let sessionId: string;
