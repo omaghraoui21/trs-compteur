@@ -3,7 +3,7 @@ import { eq, and, or, gte, lte, desc, sql, inArray, isNull, getTableColumns, cou
 import { sessions, lotEntries, sessionEvents, downtimeEvents, downtimeCategories, equipments, products, lotCadenceChanges, users } from "@trs/db";
 import type { Db } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, computeMtbfMttr, computeAClasserMin } from "@trs/engine";
-import type { ProductLotInput } from "@trs/engine";
+import type { ProductLotInput, LotTrsResult, SessionTrsResult } from "@trs/engine";
 
 import { authenticate } from "../middleware";
 import { asyncHandler, validateQuery } from "../lib/http";
@@ -22,7 +22,7 @@ dashboardRouter.use(authenticate);
 
 interface BuiltSession {
   sessionTrs: ReturnType<typeof computeSessionTrs>;
-  lotDetails: any[];
+  lotDetails: object[];
   productLots: ProductLotInput[];
   plannedStopsMin: number;
   aClasserMin: number;
@@ -64,15 +64,17 @@ async function buildSessionsTrs(db: Db, sessionList: (typeof sessions.$inferSele
   }
 
   // 2. All lots for these sessions
+  type LotRow = typeof lotEntries.$inferSelect;
   const lots = await db.select().from(lotEntries).where(inArray(lotEntries.sessionId, sessionIds));
-  const lotsBySession = new Map<string, any[]>();
+  const lotsBySession = new Map<string, LotRow[]>();
   for (const l of lots) {
     (lotsBySession.get(l.sessionId) ?? lotsBySession.set(l.sessionId, []).get(l.sessionId)!).push(l);
   }
 
   // 3. All downtimes (category-joined) for these lots
-  const lotIds = lots.map((l: any) => l.id);
-  const dtsByLot = new Map<string, any[]>();
+  const lotIds = lots.map(l => l.id);
+  type DtRow = { id: string; lotEntryId: string | null; durationMinutes: number; categoryId: string; comment: string | null; categoryCode: string; categoryLabel: string; famille: string | null; isPlanned: boolean };
+  const dtsByLot = new Map<string, DtRow[]>();
   if (lotIds.length > 0) {
     const dts = await db.select({
       id: downtimeEvents.id,
@@ -96,21 +98,21 @@ async function buildSessionsTrs(db: Db, sessionList: (typeof sessions.$inferSele
 
   // 4. Products (small reference table) → lookup map
   const allProducts = await db.select().from(products);
-  const productById = new Map<string, any>(allProducts.map((p: any) => [p.id, p]));
+  const productById = new Map(allProducts.map(p => [p.id, p]));
 
   // 5. Cadence changes per lot → time-weighted nominal cadence.
   const cadenceChangeRows = lotIds.length > 0
     ? await db.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds))
     : [];
-  const changesByLot = groupBy(cadenceChangeRows, (c: any) => c.lotEntryId as string);
+  const changesByLot = groupBy(cadenceChangeRows, c => c.lotEntryId ?? "");
 
   for (const session of sessionList) {
     const plannedStopsMin = plannedBySession.get(session.id) ?? 0;
     const sessionUnplannedMin = unplannedBySession.get(session.id) ?? 0;
     const sessionLots = lotsBySession.get(session.id) ?? [];
 
-    const lotDetails: any[] = [];
-    const lotResults: any[] = [];
+    const lotDetails: object[] = [];
+    const lotResults: (LotTrsResult & { produced: number; conforming: number })[] = [];
     const productLots: ProductLotInput[] = [];
     // Six-losses/pareto consume every stop — include the session-level ones.
     const downtimeDetails: { durationMinutes: number; isPlanned: boolean }[] = [
@@ -128,7 +130,7 @@ async function buildSessionsTrs(db: Db, sessionList: (typeof sessions.$inferSele
         conforming: lot.quantityConforming,
         startedAt: lot.startedAt,
         endedAt: lot.endedAt ?? session.closedAt!,
-        downtimes: dts.map((d: any) => ({ durationMinutes: d.durationMinutes, isPlanned: d.isPlanned, famille: d.famille })),
+        downtimes: dts.map(d => ({ durationMinutes: d.durationMinutes, isPlanned: d.isPlanned, famille: d.famille ?? undefined })),
       });
       const product = productById.get(lot.productId);
       for (const d of dts) downtimeDetails.push({ durationMinutes: d.durationMinutes, isPlanned: d.isPlanned });
@@ -160,7 +162,7 @@ async function buildSessionsTrs(db: Db, sessionList: (typeof sessions.$inferSele
       openedAt: session.openedAt, closedAt: session.closedAt!, plannedStopsMin,
       unplannedStopsMin: sessionUnplannedMin, lots: lotResults,
     });
-    const lotsDurationMin = lotResults.reduce((s: number, l: any) => s + (l.lotDurationMin ?? 0), 0);
+    const lotsDurationMin = lotResults.reduce((s, l) => s + (l.lotDurationMin ?? 0), 0);
     const aClasserMin = computeAClasserMin(sessionTrs.tO, lotsDurationMin, plannedStopsMin, sessionUnplannedMin);
     out.set(session.id, { sessionTrs, lotDetails, productLots, plannedStopsMin, downtimeDetails, aClasserMin });
   }
@@ -186,7 +188,7 @@ dashboardRouter.get("/trs", validateQuery(dashboardRangeQuerySchema), asyncHandl
     ))
     .orderBy(sessions.sessionDate);
 
-  const sessionResults: any[] = [];
+  const sessionResults: (SessionTrsResult & { date: string; notes?: string | null; aClasserMin: number; lots: object[]; reliability: ReturnType<typeof computeMtbfMttr> })[] = [];
   const allDowntimes: { durationMinutes: number; isPlanned: boolean }[] = [];
   let totalAClasserMin = 0;
 
@@ -229,7 +231,7 @@ dashboardRouter.get("/pareto", validateQuery(dashboardRangeQuerySchema), asyncHa
       lte(sessions.sessionDate, to as string),
     ));
 
-  const sessionIds = closedSessions.map((s: any) => s.id);
+  const sessionIds = closedSessions.map(s => s.id);
   if (sessionIds.length === 0) {
     res.json({ pareto: [], totalMin: 0 });
     return;
@@ -303,8 +305,9 @@ dashboardRouter.get("/comparison", validateQuery(comparisonQuerySchema), asyncHa
   const { db } = req;
   const { from, to } = req.query;
 
+  type ComparisonResult = { equipmentId: string; equipmentName: string; equipmentCode: string; equipmentType: string | null; trsObjective: number; daily: (SessionTrsResult & { date: string })[]; total: SessionTrsResult };
   const eqs = await db.select().from(equipments).where(eq(equipments.isActive, true));
-  const results: any[] = [];
+  const results: ComparisonResult[] = [];
 
   for (const equipment of eqs) {
     const closedSessions = await db.select().from(sessions)
@@ -317,7 +320,7 @@ dashboardRouter.get("/comparison", validateQuery(comparisonQuerySchema), asyncHa
       .orderBy(sessions.sessionDate);
 
     const built = await buildSessionsTrs(db, closedSessions);
-    const sessionResults = closedSessions.map((session: any) => ({
+    const sessionResults = closedSessions.map(session => ({
       date: session.sessionDate,
       ...built.get(session.id)!.sessionTrs,
     }));
@@ -353,7 +356,7 @@ dashboardRouter.get("/by-product", validateQuery(dashboardRangeQuerySchema), asy
     ));
 
   const productLots: ProductLotInput[] = [];
-  const sessionResults: any[] = [];
+  const sessionResults: SessionTrsResult[] = [];
 
   // Batch-build all sessions (fixed query count). Period tR comes from the same
   // engine used everywhere else (tR = tO − tAP).
@@ -391,13 +394,13 @@ dashboardRouter.get("/six-losses", validateQuery(dashboardRangeQuerySchema), asy
 
   // Batch-build TRS for every session (fixed query count).
   const built = await buildSessionsTrs(db, closedSessions);
-  const sessionResults = closedSessions.map((s: any) => built.get(s.id)!.sessionTrs);
+  const sessionResults = closedSessions.map(s => built.get(s.id)!.sessionTrs);
 
   // All downtime details (famille + isShortStop) in ONE query, grouped by session.
   type Dt = { durationMinutes: number; famille: string; isPlanned: boolean; isShortStop: boolean | null };
   const dtsBySession = new Map<string, Dt[]>();
   const allDowntimeDetails: Dt[] = [];
-  const sessionIds = closedSessions.map((s: any) => s.id);
+  const sessionIds = closedSessions.map(s => s.id);
   if (sessionIds.length > 0) {
     const rows = await db.select({
       sessionId: sql<string>`coalesce(${lotEntries.sessionId}, ${downtimeEvents.sessionId})`.as("session_id"),
@@ -419,7 +422,7 @@ dashboardRouter.get("/six-losses", validateQuery(dashboardRangeQuerySchema), asy
   const zoom = computeZoomTrs({ sessions: sessionResults });
   const sixLosses = computeSixBigLosses(zoom, allDowntimeDetails, microStopThreshold);
 
-  const dailyLosses = closedSessions.map((session: any, i: number) => {
+  const dailyLosses = closedSessions.map((session, i: number) => {
     const dayLosses = computeSixBigLosses(sessionResults[i], dtsBySession.get(session.id) ?? [], microStopThreshold);
     return { date: session.sessionDate, ...dayLosses };
   });
@@ -443,7 +446,7 @@ dashboardRouter.get("/heatmap", validateQuery(dashboardRangeQuerySchema), asyncH
     .orderBy(sessions.sessionDate);
 
   const built = await buildSessionsTrs(db, closedSessions);
-  const heatmapData = closedSessions.map((session: any) => {
+  const heatmapData = closedSessions.map(session => {
     const { sessionTrs } = built.get(session.id)!;
     return {
       date: session.sessionDate,
@@ -501,8 +504,8 @@ dashboardRouter.get("/downtime-log", validateQuery(dashboardRangeQuerySchema), a
   ]);
 
   const log = [...lotRows, ...sessionRows]
-    .sort((a: any, b: any) => b.startedAt.getTime() - a.startedAt.getTime())
-    .map((r: any) => ({ ...r, startedAt: r.startedAt.toISOString() }));
+    .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
+    .map(r => ({ ...r, startedAt: r.startedAt.toISOString() }));
 
   res.json({ period: { from, to, equipmentId }, log });
 }));

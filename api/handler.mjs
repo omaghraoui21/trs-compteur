@@ -46953,7 +46953,7 @@ async function buildSessionsTrs(db2, sessionList) {
   const allProducts = await db2.select().from(products);
   const productById = new Map(allProducts.map((p) => [p.id, p]));
   const cadenceChangeRows = lotIds.length > 0 ? await db2.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds)) : [];
-  const changesByLot = groupBy(cadenceChangeRows, (c) => c.lotEntryId);
+  const changesByLot = groupBy(cadenceChangeRows, (c) => c.lotEntryId ?? "");
   for (const session of sessionList) {
     const plannedStopsMin = plannedBySession.get(session.id) ?? 0;
     const sessionUnplannedMin = unplannedBySession.get(session.id) ?? 0;
@@ -46975,7 +46975,7 @@ async function buildSessionsTrs(db2, sessionList) {
         conforming: lot.quantityConforming,
         startedAt: lot.startedAt,
         endedAt: lot.endedAt ?? session.closedAt,
-        downtimes: dts.map((d) => ({ durationMinutes: d.durationMinutes, isPlanned: d.isPlanned, famille: d.famille }))
+        downtimes: dts.map((d) => ({ durationMinutes: d.durationMinutes, isPlanned: d.isPlanned, famille: d.famille ?? void 0 }))
       });
       const product = productById.get(lot.productId);
       for (const d of dts) downtimeDetails.push({ durationMinutes: d.durationMinutes, isPlanned: d.isPlanned });
