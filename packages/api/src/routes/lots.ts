@@ -244,8 +244,8 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   if (!dt) { res.status(404).json({ error: "Arrêt introuvable" }); return; }
   if (dt.lotEntryId !== lotId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à ce lot" }); return; }
 
-  await audit(db, req, "DELETE_DOWNTIME", "downtime", dtId, { lotId });
   await db.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
+  await audit(db, req, "DELETE_DOWNTIME", "downtime", dtId, { lotId });
   res.status(204).send();
 }));
 

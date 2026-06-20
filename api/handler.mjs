@@ -46511,8 +46511,8 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     res.status(400).json({ error: "Cet arr\xEAt est rattach\xE9 \xE0 un lot \u2014 utilisez DELETE /lots/:id/downtimes/:dtId" });
     return;
   }
-  await audit(db2, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });
   await db2.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
+  await audit(db2, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });
   res.status(204).send();
 }));
 sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
@@ -46808,8 +46808,8 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     res.status(403).json({ error: "Cet arr\xEAt n'appartient pas \xE0 ce lot" });
     return;
   }
-  await audit(db2, req, "DELETE_DOWNTIME", "downtime", dtId, { lotId });
   await db2.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
+  await audit(db2, req, "DELETE_DOWNTIME", "downtime", dtId, { lotId });
   res.status(204).send();
 }));
 lotsRouter.post("/:id/correct", requireRole("supervisor", "admin"), validate(correctLotSchema), asyncHandler(async (req, res) => {

@@ -242,8 +242,8 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   if (dt.sessionId !== sessionId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à cette session" }); return; }
   if (dt.lotEntryId !== null) { res.status(400).json({ error: "Cet arrêt est rattaché à un lot — utilisez DELETE /lots/:id/downtimes/:dtId" }); return; }
 
-  await audit(db, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });
   await db.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
+  await audit(db, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });
   res.status(204).send();
 }));
 
