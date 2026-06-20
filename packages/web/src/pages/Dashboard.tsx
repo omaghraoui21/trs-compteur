@@ -16,8 +16,19 @@ import HeatmapChart from "@/components/dashboard/HeatmapChart";
 
 type ZoomLevel = "day" | "week" | "month" | "custom";
 
+// UTC-based: used when the input Date was derived from an ISO string (UTC midnight).
 function dateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+// Local-time-based: used when the input Date was derived from the user's clock
+// (new Date(), new Date(y, m, d)) — toISOString() would shift to UTC and
+// produce the wrong calendar date for users in UTC+1/+2 after midnight.
+function localDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
 }
 
 function shiftDays(iso: string, days: number): string {
@@ -42,23 +53,24 @@ function getPreviousPeriod(from: string, to: string, zoom: ZoomLevel): { from: s
 
 function getPresetDates(zoom: ZoomLevel, ref = new Date()): { from: string; to: string } {
   if (zoom === "day") {
-    const s = dateStr(ref);
+    const s = localDateStr(ref);
     return { from: s, to: s };
   }
   if (zoom === "week") {
-    // ISO calendar week: Monday → Sunday
+    // ISO calendar week: Monday → Sunday — use local getDay()/setDate() and
+    // localDateStr to avoid UTC offset shifting the result date.
     const d = new Date(ref);
     const dow = (d.getDay() + 6) % 7; // Monday = 0
     const mon = new Date(d);
     mon.setDate(d.getDate() - dow);
     const sun = new Date(mon);
     sun.setDate(mon.getDate() + 6);
-    return { from: dateStr(mon), to: dateStr(sun) };
+    return { from: localDateStr(mon), to: localDateStr(sun) };
   }
   // month: 1st → last day of the calendar month
   const first = new Date(ref.getFullYear(), ref.getMonth(), 1);
   const last = new Date(ref.getFullYear(), ref.getMonth() + 1, 0);
-  return { from: dateStr(first), to: dateStr(last) };
+  return { from: localDateStr(first), to: localDateStr(last) };
 }
 
 export default function DashboardPage() {
