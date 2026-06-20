@@ -170,6 +170,7 @@ sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async 
     comment,
   }).returning();
 
+  await audit(db, req, "ADD_SESSION_EVENT", "sessionEvent", event.id, { sessionId: event.sessionId, eventType, durationMinutes });
   res.status(201).json(event);
 }));
 

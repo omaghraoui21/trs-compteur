@@ -46429,6 +46429,7 @@ sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async 
     sortOrder: maxOrder + 1,
     comment
   }).returning();
+  await audit(db2, req, "ADD_SESSION_EVENT", "sessionEvent", event.id, { sessionId: event.sessionId, eventType: eventType2, durationMinutes });
   res.status(201).json(event);
 }));
 sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
