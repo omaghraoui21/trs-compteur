@@ -204,6 +204,14 @@ describe("golden path + validation + RBAC", () => {
     expect(res.status).toBe(409);
   });
 
+  it("POST /lots/:id/close returns 409 on a closed lot (status guard)", async () => {
+    const res = await request(app)
+      .post(`/api/lots/${lotId}/close`)
+      .set({ Authorization: `Bearer ${opToken}` })
+      .send({ quantityProduced: 1000, quantityConforming: 900 });
+    expect(res.status).toBe(409);
+  });
+
   it("forbids an operator from correcting a lot (403 — supervisor only)", async () => {
     const res = await request(app)
       .post(`/api/lots/${lotId}/correct`)
