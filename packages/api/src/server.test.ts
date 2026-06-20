@@ -777,3 +777,38 @@ describe("GET /sessions + pending-lots/count", () => {
     expect(typeof res.body.count).toBe("number");
   });
 });
+
+describe("GET /admin/audit-log", () => {
+  it("returns audit rows for admin (200)", async () => {
+    const res = await request(app)
+      .get("/api/admin/audit-log")
+      .set({ Authorization: `Bearer ${admToken}` });
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThan(0);
+    expect(res.body[0]).toHaveProperty("action");
+    expect(res.body[0]).toHaveProperty("actorEmail");
+  });
+
+  it("rejects a malformed date (400 — Zod validation)", async () => {
+    const res = await request(app)
+      .get("/api/admin/audit-log?from=not-a-date")
+      .set({ Authorization: `Bearer ${admToken}` });
+    expect(res.status).toBe(400);
+  });
+
+  it("filters by action query param", async () => {
+    const res = await request(app)
+      .get("/api/admin/audit-log?action=LOGIN")
+      .set({ Authorization: `Bearer ${admToken}` });
+    expect(res.status).toBe(200);
+    expect(res.body.every((r: any) => r.action === "LOGIN")).toBe(true);
+  });
+
+  it("blocks access for operators (403)", async () => {
+    const res = await request(app)
+      .get("/api/admin/audit-log")
+      .set({ Authorization: `Bearer ${opToken}` });
+    expect(res.status).toBe(403);
+  });
+});
