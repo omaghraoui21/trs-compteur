@@ -290,6 +290,8 @@ export default function DashboardPage() {
         </div>
 
         {zoom === "custom" && (() => {
+          const today = new Date().toISOString().slice(0, 10);
+          const dateFuture = !!customTo && customTo > today;
           const dateRangeInvalid = !!customFrom && !!customTo && customTo < customFrom;
           return (
             <div className="flex flex-wrap items-center gap-2">
@@ -299,10 +301,14 @@ export default function DashboardPage() {
               <input type="date" value={customTo}
                 onChange={e => setCustomTo(e.target.value)}
                 min={customFrom || undefined}
+                max={today}
                 aria-label="Date de fin"
-                aria-invalid={dateRangeInvalid}
-                className={`border rounded-lg px-2 py-2 text-sm ${dateRangeInvalid ? "border-red-400" : ""}`} />
-              {dateRangeInvalid && (
+                aria-invalid={dateFuture || dateRangeInvalid}
+                className={`border rounded-lg px-2 py-2 text-sm ${(dateFuture || dateRangeInvalid) ? "border-red-400" : ""}`} />
+              {dateFuture && (
+                <p role="alert" className="text-xs text-red-600 w-full">La date de fin ne peut pas être dans le futur.</p>
+              )}
+              {!dateFuture && dateRangeInvalid && (
                 <p role="alert" className="text-xs text-red-600 w-full">La date de fin doit être égale ou postérieure à la date de début.</p>
               )}
             </div>

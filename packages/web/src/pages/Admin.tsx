@@ -103,6 +103,10 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
   };
 
   const toggleActive = async (u: AdminUser) => {
+    if (u.isActive) {
+      const ok = window.confirm(`Désactiver ${u.displayName} ? Cette personne ne pourra plus se connecter.`);
+      if (!ok) return;
+    }
     try { await api.admin.updateUser(u.id, { isActive: !u.isActive }); load(); }
     catch (e: any) { toast.error(e.message || "Mise à jour échouée"); }
   };

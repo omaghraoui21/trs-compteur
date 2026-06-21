@@ -543,6 +543,7 @@ dashboardRouter.get("/pending-lots", requireRole("supervisor", "admin"), validat
     .innerJoin(users, eq(lotEntries.operatorId, users.id))
     .innerJoin(equipments, eq(sessions.equipmentId, equipments.id))
     .where(whereClause!)
+    .limit(100)
     .orderBy(desc(lotEntries.endedAt));
 
   res.json(lots);

@@ -373,7 +373,7 @@ export default function SupervisorPage() {
                   </div>
 
                   <div className="flex gap-4 text-sm flex-wrap">
-                    <span><span className="text-gray-500">Cadence:</span> {lot.cadenceUsed} {lot.cadenceUnit}</span>
+                    <span><span className="text-gray-500">Cadence:</span> {lot.cadenceUsed != null ? `${lot.cadenceUsed} ${lot.cadenceUnit ?? ""}` : "—"}</span>
                     {tq !== null && (
                       <span>
                         <span className="text-gray-500">TQ:</span>{" "}

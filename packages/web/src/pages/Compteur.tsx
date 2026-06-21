@@ -1733,6 +1733,12 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
 
         {/* Two clear sections: NON planifié (red) then planifié (orange).
             Famille filter pills narrow the grid; TRS badge shows metric impact. */}
+        {categories.length === 0 && (
+          <div className="py-6 text-center text-sm text-gray-400">
+            Aucune catégorie d'arrêt configurée.<br />
+            <span className="text-xs">Demandez à un administrateur d'en créer dans le panneau Admin.</span>
+          </div>
+        )}
         {sections.map(section => (
           <div key={section.title} className={`rounded-xl border p-3 ${section.planned ? "border-amber-200 bg-amber-50/40" : "border-red-200 bg-red-50/40"}`}>
             <div className="flex items-center gap-2 mb-1">
