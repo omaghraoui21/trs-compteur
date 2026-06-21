@@ -29,6 +29,9 @@ jobs:
       # The API integration suite creates/drops its own throwaway databases
       # using this admin connection.
       TEST_PG_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres
+      # Local CI postgres container has no TLS certs — disable SSL requirement.
+      # Production (Railway/Vercel) uses ssl:"require" by default.
+      DB_SSL: "false"
 
     steps:
       - uses: actions/checkout@v4
