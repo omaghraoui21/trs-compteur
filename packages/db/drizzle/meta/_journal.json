@@ -78,6 +78,13 @@
       "when": 1750586400000,
       "tag": "0010_fix_session_event_duration_constraint",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1750672800000,
+      "tag": "0011_gxp_session_events_immutability",
+      "breakpoints": true
     }
   ]
 }
