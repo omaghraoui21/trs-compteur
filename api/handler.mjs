@@ -83030,10 +83030,17 @@ authRouter.post("/refresh", validate(refreshSchema), asyncHandler(async (req, re
     res.status(401).json({ error: "Refresh token invalide" });
     return;
   }
-  if (row.revokedAt && Date.now() - row.revokedAt.getTime() > REUSE_GRACE_MS) {
-    await db3.update(refreshTokens).set({ revokedAt: /* @__PURE__ */ new Date() }).where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt)));
-    res.status(401).json({ error: "R\xE9utilisation d\xE9tect\xE9e \u2014 session r\xE9voqu\xE9e" });
-    return;
+  if (row.revokedAt) {
+    if (Date.now() - row.revokedAt.getTime() > REUSE_GRACE_MS) {
+      await db3.update(refreshTokens).set({ revokedAt: /* @__PURE__ */ new Date() }).where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt)));
+      res.status(401).json({ error: "R\xE9utilisation d\xE9tect\xE9e \u2014 session r\xE9voqu\xE9e" });
+      return;
+    }
+    const [activeSibling] = await db3.select({ id: refreshTokens.id }).from(refreshTokens).where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt))).limit(1);
+    if (!activeSibling) {
+      res.status(401).json({ error: "Session r\xE9voqu\xE9e \u2014 reconnectez-vous" });
+      return;
+    }
   }
   if (row.expiresAt.getTime() < Date.now()) {
     res.status(401).json({ error: "Refresh token expir\xE9" });
@@ -83679,17 +83686,17 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     sessionId: downtimeEvents.sessionId,
     lotEntryId: downtimeEvents.lotEntryId,
     sessionStatus: sessions.status
-  }).from(downtimeEvents).innerJoin(sessions, eq(downtimeEvents.sessionId, sessions.id)).where(eq(downtimeEvents.id, dtId)).limit(1);
+  }).from(downtimeEvents).leftJoin(sessions, eq(downtimeEvents.sessionId, sessions.id)).where(eq(downtimeEvents.id, dtId)).limit(1);
   if (!dt2) {
     res.status(404).json({ error: "Arr\xEAt introuvable" });
     return;
   }
-  if (dt2.sessionId !== sessionId) {
-    res.status(403).json({ error: "Cet arr\xEAt n'appartient pas \xE0 cette session" });
-    return;
-  }
   if (dt2.lotEntryId !== null) {
     res.status(400).json({ error: "Cet arr\xEAt est rattach\xE9 \xE0 un lot \u2014 utilisez DELETE /lots/:id/downtimes/:dtId" });
+    return;
+  }
+  if (dt2.sessionId !== sessionId) {
+    res.status(403).json({ error: "Cet arr\xEAt n'appartient pas \xE0 cette session" });
     return;
   }
   if (dt2.sessionStatus !== "active") throw new HttpError(409, "Impossible de supprimer un arr\xEAt d'une session d\xE9j\xE0 ferm\xE9e");
@@ -84857,12 +84864,14 @@ if (isProd && !allowedOrigin) {
 }
 app.use((0, import_cors.default)({ origin: allowedOrigin || (isProd ? false : "*") }));
 app.use(import_express11.default.json({ limit: "1mb" }));
+var isTest = process.env.NODE_ENV === "test";
 var authLimiter = rate_limit_default({
   windowMs: 15 * 60 * 1e3,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Trop de tentatives, r\xE9essayez dans 15 minutes" }
+  message: { error: "Trop de tentatives, r\xE9essayez dans 15 minutes" },
+  skip: () => isTest
 });
 var apiLimiter = rate_limit_default({
   windowMs: 15 * 60 * 1e3,
@@ -84870,7 +84879,7 @@ var apiLimiter = rate_limit_default({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Trop de requ\xEAtes, r\xE9essayez dans quelques minutes" },
-  skip: (req) => req.path === "/health"
+  skip: (req) => isTest || req.path === "/health"
 });
 var db2 = createDb();
 var __dirname = path.dirname(fileURLToPath(import.meta.url));

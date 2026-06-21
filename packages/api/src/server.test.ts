@@ -624,6 +624,12 @@ describe("session-level stops + cadence changes (refonte arrêts)", () => {
     const c2 = await request(app).post(`/api/lots/${lotId}/cadence`).set(auth).send({ newCadence: 90 });
     expect(c2.status).toBe(409);
   });
+
+  // Free the equipment for later describe blocks — one active session per
+  // equipment is enforced server-side, so leaving this open would 409 the next open.
+  afterAll(async () => {
+    if (sessionId) await request(app).post(`/api/sessions/${sessionId}/close`).set(auth).send({});
+  });
 });
 
 describe("POST /sessions/:id/events", () => {
@@ -658,6 +664,10 @@ describe("POST /sessions/:id/events", () => {
       .set(auth)
       .send({ eventType: "invalid_type", durationMinutes: 5 });
     expect(res.status).toBe(400);
+  });
+
+  afterAll(async () => {
+    if (sessionId) await request(app).post(`/api/sessions/${sessionId}/close`).set(auth).send({});
   });
 });
 
@@ -746,6 +756,10 @@ describe("delete downtime endpoints", () => {
       .delete(`/api/sessions/${sessionId}/downtimes/${sessionDtId}`)
       .set(auth);
     expect(res.status).toBe(404);
+  });
+
+  afterAll(async () => {
+    if (sessionId) await request(app).post(`/api/sessions/${sessionId}/close`).set(auth).send({});
   });
 });
 

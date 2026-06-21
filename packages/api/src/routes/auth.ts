@@ -73,14 +73,29 @@ authRouter.post("/refresh", validate(refreshSchema), asyncHandler(async (req, re
     return;
   }
 
-  // Reuse detection: a revoked token is being replayed. Outside the grace window
-  // this means a stolen/leaked token → revoke the entire family. Inside the window
-  // it's a benign concurrent refresh, so we fall through and issue a fresh token.
-  if (row.revokedAt && Date.now() - row.revokedAt.getTime() > REUSE_GRACE_MS) {
-    await db.update(refreshTokens).set({ revokedAt: new Date() })
-      .where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt)));
-    res.status(401).json({ error: "Réutilisation détectée — session révoquée" });
-    return;
+  // Reuse detection: a revoked token is being replayed.
+  if (row.revokedAt) {
+    // Outside the grace window this means a stolen/leaked token → revoke the
+    // entire family.
+    if (Date.now() - row.revokedAt.getTime() > REUSE_GRACE_MS) {
+      await db.update(refreshTokens).set({ revokedAt: new Date() })
+        .where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt)));
+      res.status(401).json({ error: "Réutilisation détectée — session révoquée" });
+      return;
+    }
+    // Inside the grace window, only a benign concurrent rotation is tolerated —
+    // and a rotation always leaves a newer, non-revoked token in the family.
+    // If the family has been fully revoked (explicit logout, or a prior
+    // reuse-revoke), there is no active sibling, so reject immediately rather
+    // than re-issuing — otherwise logout would not take effect for 10 s.
+    const [activeSibling] = await db.select({ id: refreshTokens.id })
+      .from(refreshTokens)
+      .where(and(eq(refreshTokens.familyId, row.familyId), isNull(refreshTokens.revokedAt)))
+      .limit(1);
+    if (!activeSibling) {
+      res.status(401).json({ error: "Session révoquée — reconnectez-vous" });
+      return;
+    }
   }
 
   if (row.expiresAt.getTime() < Date.now()) {

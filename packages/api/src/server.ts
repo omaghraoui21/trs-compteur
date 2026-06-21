@@ -49,6 +49,11 @@ app.use(cors({ origin: allowedOrigin || (isProd ? false : "*") }));
 // Explicit body-size limit (defends against oversized-payload abuse)
 app.use(express.json({ limit: "1mb" }));
 
+// Rate limiters are disabled under test: the integration suite drives many
+// auth/API calls from a single IP (127.0.0.1) and would otherwise trip the
+// limits, so the limiters themselves are infra config, not under test.
+const isTest = process.env.NODE_ENV === "test";
+
 // H3: Brute-force protection on auth (10 attempts / 15 min per IP)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -56,6 +61,7 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Trop de tentatives, réessayez dans 15 minutes" },
+  skip: () => isTest,
 });
 
 // Global API rate limiter — protects heavy dashboard/aggregation queries from DoS.
@@ -67,7 +73,7 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Trop de requêtes, réessayez dans quelques minutes" },
-  skip: (req) => req.path === "/health",
+  skip: (req) => isTest || req.path === "/health",
 });
 
 const db = createDb();
