@@ -1030,6 +1030,13 @@ describe("isoWeekKey / periodKey", () => {
     expect(periodKey("2026-05-28", "month")).toBe("2026-05");
     expect(periodKey("2026-05-28", "week")).toBe("2026-W22");
   });
+
+  it("handles ISO year-boundary: Dec 30–31 2024 belong to week 1 of 2025", () => {
+    expect(isoWeekKey("2024-12-30")).toBe("2025-W01"); // Monday of W01-2025
+    expect(isoWeekKey("2024-12-31")).toBe("2025-W01"); // Tuesday
+    expect(isoWeekKey("2024-12-29")).toBe("2024-W52"); // Sunday, still 2024
+    expect(isoWeekKey("2025-01-01")).toBe("2025-W01"); // Wednesday
+  });
 });
 
 describe("groupSessionsByPeriod", () => {
