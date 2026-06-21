@@ -1,4 +1,5 @@
 import "dotenv/config";
+import * as Sentry from "@sentry/node";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -19,6 +20,13 @@ import { adminRouter } from "./routes/admin";
 import { maintenanceRouter } from "./routes/maintenance";
 import { HttpError, asyncHandler } from "./lib/http";
 import type { Request, Response, NextFunction } from "express";
+
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV ?? "development",
+  });
+}
 
 const app = express();
 
@@ -133,6 +141,12 @@ if (STATIC_ROOT && existsSync(STATIC_ROOT)) {
   });
 }
 
+// Sentry error handler — must be registered after all routes and before the
+// terminal error handler so it captures unhandled Express errors.
+if (process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app);
+}
+
 // Terminal error handler — keeps failed requests from hanging and returns JSON.
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof HttpError) {
@@ -140,6 +154,9 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     return;
   }
   console.error("Unhandled error:", err);
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureException(err);
+  }
   res.status(500).json({ error: "Erreur serveur" });
 });
 

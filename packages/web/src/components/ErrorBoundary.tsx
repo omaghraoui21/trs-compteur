@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { RefreshCw } from "lucide-react";
 
@@ -13,6 +14,9 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[ErrorBoundary]", error, info.componentStack);
+    if (typeof window !== "undefined" && import.meta.env.VITE_SENTRY_DSN) {
+      Sentry.captureException(error);
+    }
   }
 
   render() {
