@@ -410,11 +410,11 @@ export default function DashboardPage() {
           </div>
 
           {/* ─── Pareto drill-down modal ─────────────────────── */}
-          {drillCode && paretoData && downtimeLog && (
+          {drillCode && paretoData && (
             <ParetoDrillModal
               code={drillCode}
               pareto={paretoData.pareto}
-              log={downtimeLog.log}
+              log={downtimeLog?.log ?? []}
               onClose={() => setDrillCode(null)}
             />
           )}
