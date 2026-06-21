@@ -300,7 +300,7 @@ export default function CompteurPage() {
                     setView("pick-room");
                   });
               }}
-              className="bg-white rounded-xl border p-5 text-left hover:border-blue-500 hover:shadow transition min-h-[56px]"
+              className="bg-white rounded-xl border p-5 text-left hover:border-blue-400 hover:bg-blue-50 hover:shadow active:ring-2 active:ring-blue-500 transition min-h-[56px]"
             >
               <div className="font-semibold text-lg">{r.name}</div>
               <div className="text-sm text-gray-500">{r.code}</div>
@@ -329,7 +329,7 @@ export default function CompteurPage() {
               <button
                 key={eq.id}
                 onClick={() => handleEquipmentSelect(eq)}
-                className={`bg-white rounded-xl border p-5 text-left hover:shadow-md transition min-h-[56px] ${accent.cardBorder}`}
+                className={`bg-white rounded-xl border p-5 text-left hover:shadow-md hover:border-blue-400 hover:bg-blue-50 active:ring-2 active:ring-blue-500 transition min-h-[56px] ${accent.cardBorder}`}
               >
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-lg ${accent.timerBg}`}>
@@ -761,7 +761,7 @@ export default function CompteurPage() {
                 {urgentUnclassified ? (
                   <button onClick={() => setView("add-downtime")}
                     className={`flex-1 bg-red-600 text-white ${BTN_PRIMARY} hover:bg-red-700`}>
-                    <AlertTriangle className={BTN_ICON} aria-hidden="true" /> Classez le temps non couvert
+                    <AlertTriangle className={BTN_ICON} aria-hidden="true" /> Classer le temps non couvert
                   </button>
                 ) : (
                   <>
@@ -849,7 +849,7 @@ function LiveSessionBar({ elapsed, sessionTrs, aClasserMin }: {
     <div className="grid grid-cols-4 gap-2 mb-4">
       {metrics.map(m => (
         <div key={m.label} className={`rounded-xl border px-2 py-4 text-center ${SEV_BORDER[m.sev ?? "ok"]}`}>
-          <div className="text-[10px] text-gray-500 uppercase tracking-wide leading-tight">{m.label}</div>
+          <div className="text-[11px] text-gray-500 uppercase tracking-wide leading-tight">{m.label}</div>
           <div className="text-xl font-bold mt-0.5 leading-tight tabular-nums"
             style={{ color: m.sev ? SEV_COLOR[m.sev] : m.color }}>
             {m.value}
@@ -1187,7 +1187,7 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
   };
 
   return (
-    <div className="bg-green-50 rounded-xl border-2 border-green-300 shadow-sm mb-4 p-4">
+    <div className="bg-green-50 rounded-xl border-2 border-green-600 border-l-4 border-l-green-600 shadow-sm mb-4 p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-bold text-green-800 flex items-center gap-2">
           <Play className="h-5 w-5" aria-hidden="true" /> Lot actif: {lot.batchNumber}
@@ -1552,7 +1552,7 @@ function DeclaredDowntimesList({ title, downtimes, onDelete }: {
                   {dt.isPlanned ? "P" : "NP"}
                 </span>
                 <span className="text-xs text-gray-400 shrink-0">{dt.famille}</span>
-                <span className="text-sm font-medium text-gray-700 flex-1 truncate">{dt.reason}</span>
+                <span className="text-sm font-medium text-gray-700 flex-1 truncate" title={dt.reason}>{dt.reason}</span>
                 <span className="text-sm tabular-nums text-gray-500 shrink-0">{fmtDuration(dt.durationMinutes)}</span>
                 <button onClick={() => setConfirmId(dt.id)} aria-label="Supprimer"
                   className="p-2 rounded text-gray-400 hover:text-red-500 transition shrink-0">

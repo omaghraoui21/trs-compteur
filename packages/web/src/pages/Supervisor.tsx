@@ -317,11 +317,14 @@ export default function SupervisorPage() {
                       {warnings.length > 0 && (
                         <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full">{warnings.length} alerte{warnings.length > 1 ? "s" : ""}</span>
                       )}
+                      {lot.status === "closed" && (
+                        <span className="bg-amber-100 text-amber-700 text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-0.5"><Clock className="h-3 w-3" aria-hidden="true" />En attente</span>
+                      )}
                       {lot.status === "validated" && (
-                        <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full flex items-center gap-0.5"><Check className="h-3 w-3" aria-hidden="true" />Validé</span>
+                        <span className="bg-green-100 text-green-700 text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-0.5"><Check className="h-3 w-3" aria-hidden="true" />Validé</span>
                       )}
                       {lot.status === "rejected" && (
-                        <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full flex items-center gap-0.5"><X className="h-3 w-3" aria-hidden="true" />Rejeté</span>
+                        <span className="bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-0.5"><X className="h-3 w-3" aria-hidden="true" />Rejeté</span>
                       )}
                     </div>
                     {/* Context: product · equipment · operator · date */}
@@ -500,7 +503,7 @@ export default function SupervisorPage() {
                               { key: "qRej"  as const, label: "Rebut",         placeholder: String(lot.quantityRejected),    hasErr: rejErr },
                             ].map(f => (
                               <div key={f.key}>
-                                <label htmlFor={`corr-${f.key}-${lot.id}`} className="block text-[10px] text-amber-700 mb-0.5">{f.label}</label>
+                                <label htmlFor={`corr-${f.key}-${lot.id}`} className={`block text-[10px] mb-0.5 ${f.hasErr ? "text-red-600 font-semibold" : "text-amber-700"}`}>{f.label}</label>
                                 <input
                                   id={`corr-${f.key}-${lot.id}`}
                                   type="number" inputMode="numeric" min="0"
@@ -615,7 +618,7 @@ export default function SupervisorPage() {
                           onClick={() => openSign(lot.id, "reject")}
                           disabled={submitting}
                           aria-busy={submitting}
-                          className="flex-1 bg-red-100 text-red-700 rounded-lg py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-red-200 transition disabled:opacity-40 disabled:pointer-events-none"
+                          className="flex-1 bg-red-600 text-white rounded-lg py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-red-700 transition disabled:opacity-40 disabled:pointer-events-none"
                         >
                           {submitting && pendingSign?.lotId === lot.id && pendingSign.action === "reject"
                             ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
