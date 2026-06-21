@@ -48,7 +48,7 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
-            className="w-full border rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+            className="w-full border rounded-lg px-3 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
             placeholder="operateur@dpi.local"
             required
           />
@@ -63,16 +63,16 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
-              className="w-full border rounded-lg px-3 py-2.5 pr-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              className="w-full border rounded-lg px-3 py-3 pr-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
               required
             />
             <button
               type="button"
               onClick={() => setShowPassword(v => !v)}
               aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus-visible:ring-2 focus-visible:ring-blue-400 rounded p-0.5 transition"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus-visible:ring-2 focus-visible:ring-blue-400 rounded p-2 transition"
             >
-              {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+              {showPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
             </button>
           </div>
         </div>

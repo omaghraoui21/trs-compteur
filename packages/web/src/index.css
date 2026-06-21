@@ -7,7 +7,8 @@
     @apply w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
   }
   .btn-primary {
-    @apply flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:pointer-events-none;
+    /* min-h-[44px]: comfortable touch target for gloved tablet operators */
+    @apply flex items-center gap-2 px-4 py-2 min-h-[44px] text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:pointer-events-none;
   }
 }
 
