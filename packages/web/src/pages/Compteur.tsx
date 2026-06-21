@@ -296,6 +296,7 @@ export default function CompteurPage() {
                   .then(setEquipmentsList)
                   .catch((err: any) => {
                     toast.error(err.message || "Impossible de charger les équipements");
+                    setSelectedRoom(null);
                     setView("pick-room");
                   });
               }}
@@ -702,8 +703,8 @@ export default function CompteurPage() {
                           <span className="ml-auto inline-flex items-center gap-1.5">
                             <span className="text-xs font-medium text-gray-400">TP {fmtPct(lotTrs.TP)}</span>
                             <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                              style={{ backgroundColor: trsColor(lotTrs.TP * lotTrs.TQ) + "22", color: trsColor(lotTrs.TP * lotTrs.TQ) }}>
-                              TRS {fmtPct(lotTrs.TP * lotTrs.TQ)}
+                              style={{ backgroundColor: trsColor(lotTrs.TRS) + "22", color: trsColor(lotTrs.TRS) }}>
+                              TRS {fmtPct(lotTrs.TRS)}
                             </span>
                           </span>
                         )}
@@ -1163,6 +1164,7 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
   const warns = warnings.filter(w => w.level === "warning");
 
   const handleClose = async () => {
+    if (closing) return;
     // U4: Show confirmation dialog with warnings
     if (warnings.length > 0 && !showConfirm) {
       setShowConfirm(true);
@@ -1276,7 +1278,7 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
           {warnings.map((w, i) => <div key={i} className="text-xs text-amber-700">• {w.msg}</div>)}
           <div className="flex gap-2 mt-3">
             <button onClick={() => setShowConfirm(false)} className={`flex-1 border border-gray-300 text-gray-700 ${BTN_PRIMARY} hover:bg-gray-50`}>Annuler</button>
-            <button onClick={handleClose} className={`flex-1 bg-amber-600 text-white ${BTN_PRIMARY} hover:bg-amber-700`}>Confirmer</button>
+            <button onClick={handleClose} disabled={closing} className={`flex-1 bg-amber-600 text-white ${BTN_PRIMARY} hover:bg-amber-700 disabled:opacity-50`}>Confirmer</button>
           </div>
         </div>
       )}
