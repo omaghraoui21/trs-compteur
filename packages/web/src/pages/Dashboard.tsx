@@ -94,6 +94,7 @@ export default function DashboardPage() {
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [csvLoading, setCsvLoading] = useState(false);
   const [drillCode, setDrillCode] = useState<string | null>(null);
   const toast = useToast();
 
@@ -188,6 +189,9 @@ export default function DashboardPage() {
 
   const exportCsv = () => {
     if (!data?.daily?.length) { toast.error("Aucune donnée à exporter pour cette période."); return; }
+    if (csvLoading) return;
+    setCsvLoading(true);
+    try {
     const headers = ["Date", "Produit", "Lot", "tT", "tO", "Fermeture", "tAP", "tR", "tF", "tN", "tU", "Lots", "NPR", "NPB", "NPC", "DO", "TP", "TQ", "TRS", "TRG", "Non classé (min)", "Pannes", "MTBF (min)", "MTTR (min)"];
     const rows = data.daily.map(d => {
       const lots: LotTrs[] = d.lots || [];
@@ -223,6 +227,9 @@ export default function DashboardPage() {
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Export CSV téléchargé");
+    } finally {
+      setCsvLoading(false);
+    }
   };
 
   const exportPdf = async () => {
@@ -321,9 +328,10 @@ export default function DashboardPage() {
             className={`flex items-center gap-1 px-3 py-2 text-sm rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${showComparison ? "bg-blue-50 border-blue-300 text-blue-700" : "text-gray-600 hover:bg-gray-50"}`}>
             <ArrowLeftRight className="h-4 w-4" aria-hidden="true" /> Comparer
           </button>
-          <button onClick={exportCsv}
-            className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border text-gray-600 hover:bg-gray-50">
-            <Download className="h-4 w-4" aria-hidden="true" /> CSV
+          <button onClick={exportCsv} disabled={csvLoading}
+            className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+            {csvLoading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Download className="h-4 w-4" aria-hidden="true" />}
+            {csvLoading ? "CSV…" : "CSV"}
           </button>
           <button onClick={exportPdf} disabled={pdfLoading}
             className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -833,10 +841,12 @@ function KpiCard({ metrics, title, subtitle, rank, objective, prevMetrics }: { m
           { label: "DO",   value: metrics.DO,   prev: prevMetrics?.DO,   rating: bench.ratings.DO },
           { label: "TP",   value: metrics.TP,   prev: prevMetrics?.TP,   rating: bench.ratings.TP },
           { label: "TQ",   value: metrics.TQ,   prev: prevMetrics?.TQ,   rating: bench.ratings.TQ },
-        ] as { label: string; value: number; prev?: number; rating: BenchmarkRating | null }[]).map(item => (
-          <div key={item.label} className="bg-gray-50 rounded-xl p-3">
-            <div className="text-xs text-gray-500 mb-1">{item.label}</div>
-            <div className="text-2xl font-bold" style={{ color: ["TRS", "TRG"].includes(item.label) ? trsColor(item.value) : undefined }}>
+        ] as { label: string; value: number; prev?: number; rating: BenchmarkRating | null }[]).map(item => {
+          const isHeadline = item.label === "TRS";
+          return (
+          <div key={item.label} className={`rounded-xl p-3 ${isHeadline ? "bg-blue-50 ring-1 ring-blue-200" : "bg-gray-50"}`}>
+            <div className={`text-xs mb-1 ${isHeadline ? "text-blue-700 font-semibold" : "text-gray-500"}`}>{item.label}</div>
+            <div className={`font-bold ${isHeadline ? "text-3xl" : "text-2xl"}`} style={{ color: ["TRS", "TRG"].includes(item.label) ? trsColor(item.value) : undefined }}>
               {fmtPct(item.value)}
             </div>
             {item.prev != null && prevMetrics && prevMetrics.lotCount > 0 && (
@@ -844,7 +854,8 @@ function KpiCard({ metrics, title, subtitle, rank, objective, prevMetrics }: { m
             )}
             {item.rating && <div className="mt-1"><BenchmarkBadge rating={item.rating} /></div>}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Production summary strip */}
@@ -928,7 +939,7 @@ function WarningsBanner({ warnings, audit }: { warnings?: TrsMetrics["warnings"]
       {errors.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" aria-hidden="true" />
-          <div className="text-xs text-red-700 space-y-0.5">
+          <div className="text-xs text-red-800 space-y-0.5">
             {errors.map((w, i) => <div key={i}>{w.message}</div>)}
           </div>
         </div>
@@ -936,7 +947,7 @@ function WarningsBanner({ warnings, audit }: { warnings?: TrsMetrics["warnings"]
       {warns.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" aria-hidden="true" />
-          <div className="text-xs text-amber-700 space-y-0.5">
+          <div className="text-xs text-amber-800 space-y-0.5">
             {warns.map((w, i) => <div key={i}>{w.message}</div>)}
           </div>
         </div>

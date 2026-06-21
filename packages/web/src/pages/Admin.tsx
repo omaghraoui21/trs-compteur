@@ -35,7 +35,7 @@ export default function AdminPage() {
     <div className="max-w-6xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <Settings className="h-6 w-6 text-blue-700" aria-hidden="true" />
-        <h1 className="text-2xl font-bold text-gray-800">Configuration</h1>
+        <h1 className="text-xl font-bold text-gray-800">Configuration</h1>
       </div>
 
       <div role="tablist" className="flex overflow-x-auto border-b mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
@@ -204,7 +204,7 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
 
       {pwFor && (
         <div
-          className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
           role="presentation"
           onClick={() => setPwFor(null)}
           onKeyDown={e => { if (e.key === "Escape") setPwFor(null); }}
@@ -912,8 +912,23 @@ function DowntimeTree({ categories }: { categories: AdminDowntimeCategory[] }) {
   const toggle = (key: string) =>
     setCollapsed(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
 
+  // All famille node keys across both branches — used by collapse-all.
+  const allKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const branch of TREE_BRANCHES)
+      for (const c of categories)
+        if (c.isPlanned === branch.isPlanned) keys.add(`${branch.isPlanned}-${c.famille}`);
+    return keys;
+  }, [categories]);
+
   return (
     <div className="mb-6 space-y-3">
+      {categories.length > 0 && (
+        <div className="flex justify-end gap-2 text-xs">
+          <button onClick={() => setCollapsed(new Set())} className="px-2.5 py-1 border rounded text-gray-500 hover:bg-gray-50">Tout déplier</button>
+          <button onClick={() => setCollapsed(new Set(allKeys))} className="px-2.5 py-1 border rounded text-gray-500 hover:bg-gray-50">Tout replier</button>
+        </div>
+      )}
       {TREE_BRANCHES.map(branch => {
         const branchCats = categories.filter(c => c.isPlanned === branch.isPlanned);
         if (branchCats.length === 0) return null;
@@ -1018,7 +1033,7 @@ function IconBtn({ icon: Icon, onClick, title, className = "text-gray-500 hover:
 
 function ConfirmDeleteModal({ label, name, onConfirm, onCancel }: { label: string; name: string; onConfirm: () => void; onCancel: () => void }) {
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4"
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
          role="presentation" onClick={onCancel} onKeyDown={e => { if (e.key === "Escape") onCancel(); }}>
       <div className="bg-white rounded-xl p-5 w-full max-w-sm shadow-xl"
            role="dialog" aria-modal="true" aria-labelledby="confirm-del-title"

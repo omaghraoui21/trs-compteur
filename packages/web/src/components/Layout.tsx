@@ -149,18 +149,22 @@ export default function Layout({ children }: { children: ReactNode }) {
               }`
             }
           >
-            <div className="relative">
-              <item.icon className="h-5 w-5" aria-hidden="true" />
-              {item.to === "/" && equipmentName && (
-                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-              )}
-              {item.to === "/supervisor" && pendingCount > 0 && (
-                <span className="absolute -top-1 -right-2 text-[9px] bg-red-500 text-white font-bold px-1 py-px rounded-full min-w-[15px] text-center leading-none" aria-label={`${pendingCount} lot${pendingCount > 1 ? "s" : ""} en attente`}>
-                  {pendingCount > 99 ? "99+" : pendingCount}
-                </span>
-              )}
-            </div>
-            {item.short}
+            {({ isActive }) => (
+              <>
+                <div className={`relative rounded-full px-3 py-1 transition ${isActive ? "bg-blue-50" : ""}`}>
+                  <item.icon className="h-5 w-5" aria-hidden="true" />
+                  {item.to === "/" && equipmentName && (
+                    <span className="absolute top-0.5 right-1 h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  )}
+                  {item.to === "/supervisor" && pendingCount > 0 && (
+                    <span className="absolute -top-0.5 right-0 text-[9px] bg-red-500 text-white font-bold px-1 py-px rounded-full min-w-[15px] text-center leading-none" aria-label={`${pendingCount} lot${pendingCount > 1 ? "s" : ""} en attente`}>
+                      {pendingCount > 99 ? "99+" : pendingCount}
+                    </span>
+                  )}
+                </div>
+                {item.short}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>

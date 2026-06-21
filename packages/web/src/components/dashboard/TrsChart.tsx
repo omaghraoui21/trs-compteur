@@ -5,6 +5,7 @@ import {
 } from "recharts";
 import { groupSessionsByPeriod, type GroupBy, type SessionTrsResult } from "@trs/engine";
 import type { DailyTrs } from "@/lib/api";
+import { chartTheme } from "./chartTheme";
 
 interface Props {
   daily: DailyTrs[];
@@ -59,18 +60,18 @@ export default function TrsChart({ daily, objective }: Props) {
       </div>
       <ResponsiveContainer width="100%" height={300}>
         <ComposedChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-          <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={v => `${v}%`} />
+          <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.gridStroke} />
+          <XAxis dataKey="date" tick={{ fontSize: chartTheme.axisFont }} />
+          <YAxis domain={[0, 100]} tick={{ fontSize: chartTheme.axisFont }} tickFormatter={v => `${v}%`} />
           <Tooltip
             formatter={(value, name) => [`${Number(value).toFixed(1)}%`, String(name)]}
             labelFormatter={l => `Période: ${l}`}
           />
           <Legend wrapperStyle={{ fontSize: 12 }} />
 
-          <Bar dataKey="DO" name="DO" fill="#60a5fa" opacity={0.7} stackId="kpi" barSize={20} />
-          <Bar dataKey="TP" name="TP" fill="#34d399" opacity={0.7} stackId="kpi2" barSize={20} />
-          <Bar dataKey="TQ" name="TQ" fill="#a78bfa" opacity={0.7} stackId="kpi3" barSize={20} />
+          <Bar dataKey="DO" name="DO" fill="#60a5fa" opacity={chartTheme.barOpacity} stackId="kpi" barSize={20} />
+          <Bar dataKey="TP" name="TP" fill="#34d399" opacity={chartTheme.barOpacity} stackId="kpi2" barSize={20} />
+          <Bar dataKey="TQ" name="TQ" fill="#a78bfa" opacity={chartTheme.barOpacity} stackId="kpi3" barSize={20} />
 
           <Line type="monotone" dataKey="TRS" name="TRS" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 4 }} />
           <Line type="monotone" dataKey="TRG" name="TRG" stroke="#f97316" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />

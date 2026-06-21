@@ -1,6 +1,7 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from "recharts";
 import { fmtDuration } from "@trs/engine";
 import type { TrsMetrics } from "@/lib/api";
+import { chartTheme } from "./chartTheme";
 
 interface Props {
   metrics: TrsMetrics;
@@ -83,16 +84,16 @@ export default function WaterfallChart({ metrics }: Props) {
 
       <ResponsiveContainer width="100%" height={340}>
         <BarChart data={data} margin={{ top: 20, right: 10, left: 0, bottom: 30 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-          <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-40} textAnchor="end" height={60} />
-          <YAxis tick={{ fontSize: 11 }} tickFormatter={v => fmtDuration(v)} />
+          <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.gridStroke} vertical={false} />
+          <XAxis dataKey="name" tick={{ fontSize: chartTheme.axisFont }} interval={0} angle={-40} textAnchor="end" height={60} />
+          <YAxis tick={{ fontSize: chartTheme.axisFont }} tickFormatter={v => fmtDuration(v)} />
           <Tooltip content={<WaterfallTooltip />} cursor={{ fill: "rgba(0,0,0,0.03)" }} />
 
           {/* Invisible base bar for stacking */}
           <Bar dataKey="base" stackId="a" fill="transparent" name="invisible" />
 
           {/* Value bars (the time buckets) */}
-          <Bar dataKey="value" stackId="a" name="Temps" radius={[3, 3, 0, 0]}>
+          <Bar dataKey="value" stackId="a" name="Temps" radius={[3, 3, 0, 0]} opacity={chartTheme.barOpacity}>
             {data.map((d, i) => (
               <Cell key={`v-${i}`} fill={d.fill || "transparent"} />
             ))}
@@ -104,7 +105,7 @@ export default function WaterfallChart({ metrics }: Props) {
           </Bar>
 
           {/* Loss bars */}
-          <Bar dataKey="loss" stackId="b" name="Perte" radius={[3, 3, 0, 0]}>
+          <Bar dataKey="loss" stackId="b" name="Perte" radius={[3, 3, 0, 0]} opacity={chartTheme.barOpacity}>
             {data.map((d, i) => (
               <Cell key={`l-${i}`} fill={d.lossFill || "transparent"} />
             ))}

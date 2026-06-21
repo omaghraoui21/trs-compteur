@@ -4,6 +4,7 @@ import {
 } from "recharts";
 import { fmtDuration } from "@trs/engine";
 import type { ParetoItem } from "@/lib/api";
+import { chartTheme } from "./chartTheme";
 
 const COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#8b5cf6", "#ec4899", "#6b7280"];
 
@@ -30,15 +31,15 @@ export default function ParetoChart({ pareto, totalMin, onSelectCode }: Props) {
 
       <ResponsiveContainer width="100%" height={280}>
         <ComposedChart data={top10} margin={{ top: 5, right: 10, left: 0, bottom: 60 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+          <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.gridStroke} />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 10, angle: -35, textAnchor: "end" }}
+            tick={{ fontSize: chartTheme.axisFont, angle: -35, textAnchor: "end" }}
             interval={0}
             height={80}
           />
-          <YAxis yAxisId="left" tick={{ fontSize: 11 }} tickFormatter={v => `${v} min`} />
-          <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={v => `${v}%`} />
+          <YAxis yAxisId="left" tick={{ fontSize: chartTheme.axisFont }} tickFormatter={v => `${v} min`} />
+          <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: chartTheme.axisFont }} tickFormatter={v => `${v}%`} />
           <Tooltip
             formatter={(value, name) => {
               const v = Number(value);
@@ -48,7 +49,7 @@ export default function ParetoChart({ pareto, totalMin, onSelectCode }: Props) {
 
           <Bar yAxisId="left" dataKey="totalMin" name="Durée" barSize={30}>
             {top10.map((_, i) => (
-              <Cell key={i} fill={COLORS[i % COLORS.length]} opacity={0.85} />
+              <Cell key={i} fill={COLORS[i % COLORS.length]} opacity={chartTheme.barOpacity} />
             ))}
           </Bar>
 
