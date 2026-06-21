@@ -39,3 +39,8 @@ export function createDb(url = connectionString) {
 }
 
 export type Db = ReturnType<typeof createDb>;
+
+// The transaction handle passed to `db.transaction(async (tx) => …)`. Helpers
+// that must run inside a transaction (audit, e-signatures) accept `DbOrTx` so
+// they can be called with either the root db or a transaction handle.
+export type DbOrTx = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];

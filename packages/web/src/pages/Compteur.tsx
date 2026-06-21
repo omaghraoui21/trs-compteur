@@ -1375,6 +1375,9 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!productId || !batch || !cadence) return;
+    // Mirror the submit button's disabled rule so an Enter-press can't bypass
+    // the batch-format check and POST an invalid batch number.
+    if (!/^[A-Z0-9-_./]{1,30}$/.test(batch)) return;
     // Show confirmation step for first lot or when cadence deviates >20%
     if (previousLots.length === 0 || cadenceWarning) {
       setStep("confirm");

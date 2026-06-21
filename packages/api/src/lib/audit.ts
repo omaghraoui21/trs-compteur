@@ -1,9 +1,10 @@
 import type { Request } from "express";
+import * as Sentry from "@sentry/node";
 import { auditLog } from "@trs/db";
-import type { Db } from "@trs/db";
+import type { DbOrTx } from "@trs/db";
 
 export async function audit(
-  db: Db,
+  db: DbOrTx,
   req: Request,
   action: string,
   entityType: string,
@@ -30,7 +31,11 @@ export async function audit(
       actor: req.userEmail,
       error: err instanceof Error ? err.message : String(err),
     });
-    // In production, alert via external monitoring (e.g. Sentry) rather than
-    // swallowing. Wire an error-reporting integration here if available.
+    // Surface to external monitoring so a missing audit trail can't go
+    // unnoticed (no-op when Sentry is not configured).
+    Sentry.captureException(err, {
+      tags: { kind: "audit_write_failure", action, entityType },
+      extra: { entityId, actor: req.userEmail },
+    });
   }
 }

@@ -92,6 +92,8 @@ export async function mockLotRoutes(page: Page) {
   await json(page, /\/api\/lots\/lot-1\/downtimes/, [DOWNTIME_EVENT]);
   // GET /api/lots/:id/cadence
   await json(page, /\/api\/lots\/lot-1\/cadence/, []);
+  // GET /api/lots/:id/signatures — fetched when a supervisor expands a lot card.
+  await json(page, /\/api\/lots\/lot-1\/signatures/, []);
 }
 
 export async function mockDashboardRoutes(page: Page) {

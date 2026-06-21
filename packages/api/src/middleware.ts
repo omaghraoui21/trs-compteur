@@ -35,7 +35,9 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
     return;
   }
   try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { sub: string; role: string; email?: string };
+    // Pin the accepted algorithm (tokens are signed HS256) to rule out
+    // algorithm-confusion attacks.
+    const payload = jwt.verify(header.slice(7), JWT_SECRET, { algorithms: ["HS256"] }) as { sub: string; role: string; email?: string };
     req.userId = payload.sub;
     req.userRole = payload.role;
     req.userEmail = payload.email;

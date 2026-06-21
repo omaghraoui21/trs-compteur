@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, gte, lte, isNull } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { rooms, equipments, products, downtimeCategories, productEquipmentCadences, users, auditLog } from "@trs/db";
+import { rooms, equipments, products, downtimeCategories, productEquipmentCadences, users, auditLog, refreshTokens } from "@trs/db";
+import type { Db } from "@trs/db";
 import { authenticate, requireRole } from "../middleware";
 import { asyncHandler, validate, validateQuery, HttpError } from "../lib/http";
 import { audit } from "../lib/audit";
@@ -18,6 +19,16 @@ import {
 export const adminRouter = Router();
 adminRouter.use(authenticate);
 adminRouter.use(requireRole("admin", "supervisor"));
+
+// bcrypt work factor (OWASP ≥ 12).
+const BCRYPT_COST = 12;
+
+// Revoke a user's outstanding refresh tokens — used when their credentials,
+// active status, or role change, so existing sessions can't outlive the change.
+async function revokeUserTokens(db: Db, userId: string) {
+  await db.update(refreshTokens).set({ revokedAt: new Date() })
+    .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
+}
 
 // ─── Rooms CRUD ─────────────────────────────────────────
 
@@ -233,7 +244,7 @@ adminRouter.post("/users", adminOnly, validate(createUserSchema), asyncHandler(a
   const { email, displayName, password, role } = req.body;
   const [existing] = await req.db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   if (existing) throw new HttpError(409, "Cet email est déjà utilisé");
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
   const [row] = await req.db.insert(users).values({ email, displayName, passwordHash, role }).returning(publicUser);
   await audit(req.db, req, "CREATE_USER", "user", row.id, { email, role });
   res.status(201).json(row);
@@ -249,15 +260,19 @@ adminRouter.patch("/users/:id", adminOnly, validate(updateUserSchema), asyncHand
   }
   const [row] = await req.db.update(users).set(req.body).where(eq(users.id, id)).returning(publicUser);
   if (!row) throw new HttpError(404, "Utilisateur introuvable");
+  // A deactivation or role change must not be outlived by existing sessions.
+  if (req.body.isActive === false || req.body.role !== undefined) await revokeUserTokens(req.db, id);
   await audit(req.db, req, "UPDATE_USER", "user", id, req.body);
   res.json(row);
 }));
 
 adminRouter.post("/users/:id/password", adminOnly, validate(resetPasswordSchema), asyncHandler(async (req, res) => {
   const id = String(req.params.id);
-  const passwordHash = await bcrypt.hash(req.body.password, 10);
+  const passwordHash = await bcrypt.hash(req.body.password, BCRYPT_COST);
   const [row] = await req.db.update(users).set({ passwordHash }).where(eq(users.id, id)).returning(publicUser);
   if (!row) throw new HttpError(404, "Utilisateur introuvable");
+  // Force re-login after an admin password reset.
+  await revokeUserTokens(req.db, id);
   await audit(req.db, req, "RESET_PASSWORD", "user", id, {});
   res.json(row);
 }));

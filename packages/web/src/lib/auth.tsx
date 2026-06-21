@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import { api, type User, ACCESS_KEY, REFRESH_KEY } from "./api";
+import { api, type User, ACCESS_KEY, REFRESH_KEY, AUTH_EXPIRED_EVENT } from "./api";
 
 function clearTokens() {
   localStorage.removeItem(ACCESS_KEY);
@@ -27,6 +27,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     api.me().then(setUser).catch(clearTokens).finally(() => setLoading(false));
+  }, []);
+
+  // When a token refresh fails mid-session (expired/revoked), the API layer
+  // fires this event. Clear the user so the app routes back to the login form
+  // instead of leaving a stale authenticated UI that 401s on every request.
+  useEffect(() => {
+    const onExpired = () => setUser(null);
+    window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
   }, []);
 
   const login = async (email: string, password: string) => {

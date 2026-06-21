@@ -126,25 +126,27 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
   const activeLots = await db.select({ id: lotEntries.id, batchNumber: lotEntries.batchNumber })
     .from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active")));
 
-  // Close any active lots and open session events in parallel — both are
-  // independent batch updates; events also need durationMinutes computed in SQL.
-  await Promise.all([
-    db.update(lotEntries)
+  const notes = req.body.notes?.trim() || null;
+
+  // Close active lots, finalize open events, and close the session atomically —
+  // a partial close (lots closed but session still active, or vice-versa)
+  // leaves the timeline inconsistent.
+  const session = await db.transaction(async (tx) => {
+    await tx.update(lotEntries)
       .set({ status: "closed", endedAt: now })
-      .where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active"))),
-    db.update(sessionEvents)
+      .where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active")));
+    await tx.update(sessionEvents)
       .set({
         endedAt: now,
         durationMinutes: sql<number>`ROUND(EXTRACT(EPOCH FROM (${now.toISOString()}::timestamptz - ${sessionEvents.startedAt})) / 60)::integer`,
       })
-      .where(and(eq(sessionEvents.sessionId, sessionId), isNull(sessionEvents.endedAt))),
-  ]);
-
-  const notes = req.body.notes?.trim() || null;
-  const [session] = await db.update(sessions)
-    .set({ status: "closed", closedAt: now, ...(notes !== null ? { notes } : {}) })
-    .where(eq(sessions.id, sessionId))
-    .returning();
+      .where(and(eq(sessionEvents.sessionId, sessionId), isNull(sessionEvents.endedAt)));
+    const [session] = await tx.update(sessions)
+      .set({ status: "closed", closedAt: now, ...(notes !== null ? { notes } : {}) })
+      .where(eq(sessions.id, sessionId))
+      .returning();
+    return session;
+  });
 
   if (session) {
     // GMP: emit CLOSE_LOT for each auto-closed lot so lot-level audit trails are complete.

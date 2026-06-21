@@ -16,6 +16,12 @@ const REFRESH_TTL_DAYS = 30;
 // instead of treating it as a stolen-token reuse and revoking the whole family.
 const REUSE_GRACE_MS = 10_000;
 
+// bcrypt work factor (OWASP ≥ 12).
+const BCRYPT_COST = 12;
+// Fixed hash compared against when an account doesn't exist, so login timing
+// doesn't reveal whether an email is registered (user enumeration).
+const DUMMY_HASH = bcrypt.hashSync("user-enumeration-guard", BCRYPT_COST);
+
 function generateRefreshToken(): string {
   return crypto.randomBytes(32).toString("hex");
 }
@@ -36,6 +42,9 @@ authRouter.post("/login", validate(loginSchema), asyncHandler(async (req, res) =
   const { db } = req;
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   if (!user || !user.isActive) {
+    // Compare against a dummy hash to equalize response time with the
+    // valid-user path (constant-time login / anti-enumeration).
+    await bcrypt.compare(password, DUMMY_HASH);
     res.status(401).json({ error: "Identifiants invalides" });
     return;
   }
@@ -160,8 +169,12 @@ authRouter.post("/change-password", authenticate, validate(changePasswordSchema)
   if (!user) { res.status(404).json({ error: "Utilisateur introuvable" }); return; }
   const valid = await bcrypt.compare(oldPassword, user.passwordHash);
   if (!valid) { res.status(401).json({ error: "Mot de passe actuel incorrect" }); return; }
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_COST);
   await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+  // Revoke outstanding refresh tokens so a leaked credential can't keep a
+  // session alive past a password change.
+  await db.update(refreshTokens).set({ revokedAt: new Date() })
+    .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
   await audit(db, req, "CHANGE_PASSWORD", "user", userId, {});
   res.json({ ok: true });
 }));

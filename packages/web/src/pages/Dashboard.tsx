@@ -90,6 +90,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [equipFailed, setEquipFailed] = useState(false);
+  const [equipLoaded, setEquipLoaded] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
@@ -106,7 +107,7 @@ export default function DashboardPage() {
     }).catch((err) => {
       setEquipFailed(true);
       toast.error(err.message || "Chargement des équipements échoué");
-    });
+    }).finally(() => setEquipLoaded(true));
   }, [toast]);
 
   useEffect(() => { loadEquipments(); }, [loadEquipments]);
@@ -349,6 +350,13 @@ export default function DashboardPage() {
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition">
             <RefreshCw className="h-4 w-4" aria-hidden="true" /> Réessayer
           </button>
+        </div>
+      )}
+
+      {equipLoaded && !equipFailed && equipmentsList.length === 0 && (
+        <div className="bg-white rounded-xl border p-8 text-center text-gray-500">
+          <p className="font-medium text-gray-700">Aucun équipement actif configuré.</p>
+          <p className="text-sm mt-1">Ajoutez un équipement dans l'administration pour afficher le tableau de bord.</p>
         </div>
       )}
 

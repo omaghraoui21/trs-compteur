@@ -3,6 +3,10 @@ const BASE = "/api";
 export const ACCESS_KEY = "trs_token";
 export const REFRESH_KEY = "trs_refresh";
 
+// Dispatched on `window` when a token refresh fails (session truly expired or
+// revoked). AuthProvider listens and clears the user so the app shows Login.
+export const AUTH_EXPIRED_EVENT = "trs:auth-expired";
+
 // M2: a single shared refresh promise so concurrent 401s collapse into one
 // rotation call — otherwise the second request would replay an already-rotated
 // token and trip server-side reuse detection, nuking the whole session.
@@ -42,9 +46,12 @@ async function request<T>(path: string, opts?: RequestInit, retried = false): Pr
     }
     const ok = await refreshPromise;
     if (ok) return request<T>(path, opts, true);
-    // Refresh failed (expired/revoked) → drop tokens; callers see the 401 below
+    // Refresh failed (expired/revoked) → drop tokens and notify the app so it
+    // can return the user to the login screen instead of rendering a broken,
+    // perpetually-401ing authenticated UI.
     localStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(REFRESH_KEY);
+    if (typeof window !== "undefined") window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
   }
 
   if (!res.ok) {

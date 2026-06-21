@@ -78673,7 +78673,7 @@ function authenticate(req, res, next) {
     return;
   }
   try {
-    const payload = import_jsonwebtoken.default.verify(header.slice(7), JWT_SECRET);
+    const payload = import_jsonwebtoken.default.verify(header.slice(7), JWT_SECRET, { algorithms: ["HS256"] });
     req.userId = payload.sub;
     req.userRole = payload.role;
     req.userEmail = payload.email;
@@ -78744,6 +78744,10 @@ async function audit(db3, req, action, entityType, entityId, payload) {
       entityId,
       actor: req.userEmail,
       error: err instanceof Error ? err.message : String(err)
+    });
+    captureException(err, {
+      tags: { kind: "audit_write_failure", action, entityType },
+      extra: { entityId, actor: req.userEmail }
     });
   }
 }
@@ -82985,6 +82989,8 @@ var auditLogQuerySchema = external_exports.object({
 var authRouter = (0, import_express4.Router)();
 var REFRESH_TTL_DAYS = 30;
 var REUSE_GRACE_MS = 1e4;
+var BCRYPT_COST = 12;
+var DUMMY_HASH = import_bcryptjs2.default.hashSync("user-enumeration-guard", BCRYPT_COST);
 function generateRefreshToken() {
   return crypto3.randomBytes(32).toString("hex");
 }
@@ -83000,6 +83006,7 @@ authRouter.post("/login", validate(loginSchema), asyncHandler(async (req, res) =
   const { db: db3 } = req;
   const [user] = await db3.select().from(users).where(eq(users.email, email)).limit(1);
   if (!user || !user.isActive) {
+    await import_bcryptjs2.default.compare(password, DUMMY_HASH);
     res.status(401).json({ error: "Identifiants invalides" });
     return;
   }
@@ -83108,8 +83115,9 @@ authRouter.post("/change-password", authenticate, validate(changePasswordSchema)
     res.status(401).json({ error: "Mot de passe actuel incorrect" });
     return;
   }
-  const passwordHash = await import_bcryptjs2.default.hash(newPassword, 10);
+  const passwordHash = await import_bcryptjs2.default.hash(newPassword, BCRYPT_COST);
   await db3.update(users).set({ passwordHash }).where(eq(users.id, userId));
+  await db3.update(refreshTokens).set({ revokedAt: /* @__PURE__ */ new Date() }).where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
   await audit(db3, req, "CHANGE_PASSWORD", "user", userId, {});
   res.json({ ok: true });
 }));
@@ -83585,15 +83593,16 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
   }
   if (sessionRow.status !== "active") throw new HttpError(409, "Session d\xE9j\xE0 ferm\xE9e");
   const activeLots = await db3.select({ id: lotEntries.id, batchNumber: lotEntries.batchNumber }).from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active")));
-  await Promise.all([
-    db3.update(lotEntries).set({ status: "closed", endedAt: now }).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active"))),
-    db3.update(sessionEvents).set({
+  const notes = req.body.notes?.trim() || null;
+  const session = await db3.transaction(async (tx) => {
+    await tx.update(lotEntries).set({ status: "closed", endedAt: now }).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active")));
+    await tx.update(sessionEvents).set({
       endedAt: now,
       durationMinutes: sql`ROUND(EXTRACT(EPOCH FROM (${now.toISOString()}::timestamptz - ${sessionEvents.startedAt})) / 60)::integer`
-    }).where(and(eq(sessionEvents.sessionId, sessionId), isNull(sessionEvents.endedAt)))
-  ]);
-  const notes = req.body.notes?.trim() || null;
-  const [session] = await db3.update(sessions).set({ status: "closed", closedAt: now, ...notes !== null ? { notes } : {} }).where(eq(sessions.id, sessionId)).returning();
+    }).where(and(eq(sessionEvents.sessionId, sessionId), isNull(sessionEvents.endedAt)));
+    const [session2] = await tx.update(sessions).set({ status: "closed", closedAt: now, ...notes !== null ? { notes } : {} }).where(eq(sessions.id, sessionId)).returning();
+    return session2;
+  });
   if (session) {
     await Promise.all([
       audit(db3, req, "CLOSE_SESSION", "session", session.id, { notes, autoClosedLotCount: activeLots.length }),
@@ -83832,24 +83841,27 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
   const lotOrder = (lotCountRow?.n ?? 0) + 1;
   const maxOrder = maxSortRow?.m ?? 0;
   const now = /* @__PURE__ */ new Date();
-  const [lot] = await db3.insert(lotEntries).values({
-    sessionId,
-    productId,
-    batchNumber,
-    lotOrder,
-    cadenceUsed: String(cadenceUsed),
-    cadenceUnit: cadenceUnit2 || "u/h",
-    operatorId: userId,
-    startedAt: now,
-    status: "active"
-  }).returning();
-  await db3.insert(sessionEvents).values({
-    sessionId,
-    eventType: "lot_start",
-    startedAt: now,
-    isPlanned: false,
-    lotEntryId: lot.id,
-    sortOrder: maxOrder + 1
+  const lot = await db3.transaction(async (tx) => {
+    const [lot2] = await tx.insert(lotEntries).values({
+      sessionId,
+      productId,
+      batchNumber,
+      lotOrder,
+      cadenceUsed: String(cadenceUsed),
+      cadenceUnit: cadenceUnit2 || "u/h",
+      operatorId: userId,
+      startedAt: now,
+      status: "active"
+    }).returning();
+    await tx.insert(sessionEvents).values({
+      sessionId,
+      eventType: "lot_start",
+      startedAt: now,
+      isPlanned: false,
+      lotEntryId: lot2.id,
+      sortOrder: maxOrder + 1
+    });
+    return lot2;
   });
   await audit(db3, req, "START_LOT", "lot", lot.id, { batchNumber, sessionId, productId });
   res.status(201).json(lot);
@@ -83868,27 +83880,30 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
   }
   if (existing.status !== "active") throw new HttpError(409, `Impossible de cl\xF4turer un lot en statut \xAB ${existing.status} \xBB`);
   const now = /* @__PURE__ */ new Date();
-  const [lot] = await db3.update(lotEntries).set({
-    quantityProduced: quantityProduced ?? 0,
-    quantityConforming: quantityConforming ?? 0,
-    quantityRejected: quantityRejected ?? 0,
-    endedAt: now,
-    status: "closed"
-  }).where(eq(lotEntries.id, String(req.params.id))).returning();
-  const closed = lot;
-  await audit(db3, req, "CLOSE_LOT", "lot", closed.id, { quantityProduced, quantityConforming, quantityRejected });
-  const [maxSortRow] = await db3.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, closed.sessionId));
-  const maxOrder = maxSortRow?.m ?? 0;
-  await db3.insert(sessionEvents).values({
-    sessionId: closed.sessionId,
-    eventType: "lot_end",
-    startedAt: now,
-    endedAt: now,
-    durationMinutes: 0,
-    isPlanned: false,
-    lotEntryId: closed.id,
-    sortOrder: maxOrder + 1
+  const closed = await db3.transaction(async (tx) => {
+    const [lot] = await tx.update(lotEntries).set({
+      quantityProduced: quantityProduced ?? 0,
+      quantityConforming: quantityConforming ?? 0,
+      quantityRejected: quantityRejected ?? 0,
+      endedAt: now,
+      status: "closed"
+    }).where(eq(lotEntries.id, String(req.params.id))).returning();
+    const closed2 = lot;
+    const [maxSortRow] = await tx.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, closed2.sessionId));
+    const maxOrder = maxSortRow?.m ?? 0;
+    await tx.insert(sessionEvents).values({
+      sessionId: closed2.sessionId,
+      eventType: "lot_end",
+      startedAt: now,
+      endedAt: now,
+      durationMinutes: 0,
+      isPlanned: false,
+      lotEntryId: closed2.id,
+      sortOrder: maxOrder + 1
+    });
+    return closed2;
   });
+  await audit(db3, req, "CLOSE_LOT", "lot", closed.id, { quantityProduced, quantityConforming, quantityRejected });
   res.json(closed);
 }));
 lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res) => {
@@ -83933,17 +83948,18 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
     return;
   }
   const unit = cadenceUnit2 ?? lot.cadenceUnit;
-  const [, [updated]] = await Promise.all([
-    db3.insert(lotCadenceChanges).values({
+  const updated = await db3.transaction(async (tx) => {
+    await tx.insert(lotCadenceChanges).values({
       lotEntryId: lotId,
       oldCadence: String(lot.cadenceUsed),
       newCadence: String(newCadence),
       cadenceUnit: unit,
       reason: reason ?? null,
       changedBy: userId
-    }),
-    db3.update(lotEntries).set({ cadenceUsed: String(newCadence), cadenceUnit: unit }).where(eq(lotEntries.id, lotId)).returning()
-  ]);
+    });
+    const [updated2] = await tx.update(lotEntries).set({ cadenceUsed: String(newCadence), cadenceUnit: unit }).where(eq(lotEntries.id, lotId)).returning();
+    return updated2;
+  });
   await audit(db3, req, "CHANGE_CADENCE", "lot", lotId, { from: lot.cadenceUsed, to: newCadence, unit, reason });
   res.json(updated);
 }));
@@ -84052,13 +84068,16 @@ lotsRouter.post("/:id/correct", requireRole("supervisor", "admin"), validate(cor
   if (mergedConforming > mergedProduced) {
     throw new HttpError(400, "La quantit\xE9 conforme ne peut pas d\xE9passer la quantit\xE9 produite");
   }
-  const [lot] = await db3.update(lotEntries).set(updates).where(eq(lotEntries.id, lotId)).returning();
-  const signature = await recordSignature(db3, req, signer, {
-    entityType: "lot",
-    entityId: lot.id,
-    meaning: "Correction des donn\xE9es du lot",
-    action: "correct",
-    comment: correctionReason
+  const { lot, signature } = await db3.transaction(async (tx) => {
+    const [lot2] = await tx.update(lotEntries).set(updates).where(eq(lotEntries.id, lotId)).returning();
+    const signature2 = await recordSignature(tx, req, signer, {
+      entityType: "lot",
+      entityId: lot2.id,
+      meaning: "Correction des donn\xE9es du lot",
+      action: "correct",
+      comment: correctionReason
+    });
+    return { lot: lot2, signature: signature2 };
   });
   const originalValues = {
     quantityProduced: original.quantityProduced,
@@ -84086,18 +84105,21 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
     const desc2 = existing.status === "validated" ? "d\xE9j\xE0 valid\xE9" : existing.status === "rejected" ? "d\xE9j\xE0 rejet\xE9" : `en statut \xAB ${existing.status} \xBB`;
     throw new HttpError(409, `Ce lot est ${desc2} \u2014 seuls les lots cl\xF4tur\xE9s peuvent \xEAtre valid\xE9s ou rejet\xE9s`);
   }
-  const [lot] = await db3.update(lotEntries).set({
-    status,
-    supervisorId: userId,
-    supervisorComment: comment,
-    validatedAt: /* @__PURE__ */ new Date()
-  }).where(eq(lotEntries.id, lotId)).returning();
-  const signature = await recordSignature(db3, req, signer, {
-    entityType: "lot",
-    entityId: lot.id,
-    meaning: action === "reject" ? "Rejet du lot" : "Validation du lot",
-    action,
-    comment: comment ?? null
+  const { lot, signature } = await db3.transaction(async (tx) => {
+    const [lot2] = await tx.update(lotEntries).set({
+      status,
+      supervisorId: userId,
+      supervisorComment: comment,
+      validatedAt: /* @__PURE__ */ new Date()
+    }).where(eq(lotEntries.id, lotId)).returning();
+    const signature2 = await recordSignature(tx, req, signer, {
+      entityType: "lot",
+      entityId: lot2.id,
+      meaning: action === "reject" ? "Rejet du lot" : "Validation du lot",
+      action,
+      comment: comment ?? null
+    });
+    return { lot: lot2, signature: signature2 };
   });
   await audit(db3, req, action === "reject" ? "REJECT_LOT" : "VALIDATE_LOT", "lot", lot.id, { action, comment, signatureId: signature.id });
   res.json({ lot, signature });
@@ -84549,6 +84571,10 @@ var import_bcryptjs4 = __toESM(require_bcryptjs(), 1);
 var adminRouter = (0, import_express9.Router)();
 adminRouter.use(authenticate);
 adminRouter.use(requireRole("admin", "supervisor"));
+var BCRYPT_COST2 = 12;
+async function revokeUserTokens(db3, userId) {
+  await db3.update(refreshTokens).set({ revokedAt: /* @__PURE__ */ new Date() }).where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
+}
 adminRouter.get("/rooms", asyncHandler(async (req, res) => {
   const data = await req.db.select().from(rooms).orderBy(rooms.name);
   res.json(data);
@@ -84778,7 +84804,7 @@ adminRouter.post("/users", adminOnly, validate(createUserSchema), asyncHandler(a
   const { email, displayName, password, role } = req.body;
   const [existing] = await req.db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   if (existing) throw new HttpError(409, "Cet email est d\xE9j\xE0 utilis\xE9");
-  const passwordHash = await import_bcryptjs4.default.hash(password, 10);
+  const passwordHash = await import_bcryptjs4.default.hash(password, BCRYPT_COST2);
   const [row] = await req.db.insert(users).values({ email, displayName, passwordHash, role }).returning(publicUser2);
   await audit(req.db, req, "CREATE_USER", "user", row.id, { email, role });
   res.status(201).json(row);
@@ -84792,14 +84818,16 @@ adminRouter.patch("/users/:id", adminOnly, validate(updateUserSchema), asyncHand
   }
   const [row] = await req.db.update(users).set(req.body).where(eq(users.id, id)).returning(publicUser2);
   if (!row) throw new HttpError(404, "Utilisateur introuvable");
+  if (req.body.isActive === false || req.body.role !== void 0) await revokeUserTokens(req.db, id);
   await audit(req.db, req, "UPDATE_USER", "user", id, req.body);
   res.json(row);
 }));
 adminRouter.post("/users/:id/password", adminOnly, validate(resetPasswordSchema), asyncHandler(async (req, res) => {
   const id = String(req.params.id);
-  const passwordHash = await import_bcryptjs4.default.hash(req.body.password, 10);
+  const passwordHash = await import_bcryptjs4.default.hash(req.body.password, BCRYPT_COST2);
   const [row] = await req.db.update(users).set({ passwordHash }).where(eq(users.id, id)).returning(publicUser2);
   if (!row) throw new HttpError(404, "Utilisateur introuvable");
+  await revokeUserTokens(req.db, id);
   await audit(req.db, req, "RESET_PASSWORD", "user", id, {});
   res.json(row);
 }));

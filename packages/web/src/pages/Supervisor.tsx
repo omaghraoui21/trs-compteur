@@ -291,7 +291,11 @@ export default function SupervisorPage() {
         {lots.map(lot => {
           const product = productMap.get(lot.productId);
           const isExpanded = expanded === lot.id;
-          const { tq, errors, warnings, dts, totalDowntimeMin, plannedMin, unplannedMin, cadChanges } = lotDerived.get(lot.id)!;
+          const derived = lotDerived.get(lot.id);
+          // Guard against a transient render where `lots` and the derived memo
+          // briefly diverge — destructuring undefined would white-screen the queue.
+          if (!derived) return null;
+          const { tq, errors, warnings, dts, totalDowntimeMin, plannedMin, unplannedMin, cadChanges } = derived;
           const isCorrecting = correcting === lot.id;
           const isPending = lot.status === "closed";
 

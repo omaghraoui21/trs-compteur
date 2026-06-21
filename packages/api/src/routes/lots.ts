@@ -44,26 +44,30 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
 
   const now = new Date();
 
-  // Create lot_start event
-  const [lot] = await db.insert(lotEntries).values({
-    sessionId,
-    productId,
-    batchNumber,
-    lotOrder,
-    cadenceUsed: String(cadenceUsed),
-    cadenceUnit: cadenceUnit || "u/h",
-    operatorId: userId,
-    startedAt: now,
-    status: "active",
-  }).returning();
+  // Insert the lot and its lot_start timeline event atomically, so a lot can
+  // never exist without its opening event.
+  const lot = await db.transaction(async (tx) => {
+    const [lot] = await tx.insert(lotEntries).values({
+      sessionId,
+      productId,
+      batchNumber,
+      lotOrder,
+      cadenceUsed: String(cadenceUsed),
+      cadenceUnit: cadenceUnit || "u/h",
+      operatorId: userId,
+      startedAt: now,
+      status: "active",
+    }).returning();
 
-  await db.insert(sessionEvents).values({
-    sessionId,
-    eventType: "lot_start",
-    startedAt: now,
-    isPlanned: false,
-    lotEntryId: lot.id,
-    sortOrder: maxOrder + 1,
+    await tx.insert(sessionEvents).values({
+      sessionId,
+      eventType: "lot_start",
+      startedAt: now,
+      isPlanned: false,
+      lotEntryId: lot.id,
+      sortOrder: maxOrder + 1,
+    });
+    return lot;
   });
 
   await audit(db, req, "START_LOT", "lot", lot.id, { batchNumber, sessionId, productId });
@@ -86,33 +90,37 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
 
   const now = new Date();
 
-  const [lot] = await db.update(lotEntries).set({
-    quantityProduced: quantityProduced ?? 0,
-    quantityConforming: quantityConforming ?? 0,
-    quantityRejected: quantityRejected ?? 0,
-    endedAt: now,
-    status: "closed",
-  }).where(eq(lotEntries.id, String(req.params.id))).returning();
+  // Close the lot and append its lot_end timeline event atomically.
+  const closed = await db.transaction(async (tx) => {
+    const [lot] = await tx.update(lotEntries).set({
+      quantityProduced: quantityProduced ?? 0,
+      quantityConforming: quantityConforming ?? 0,
+      quantityRejected: quantityRejected ?? 0,
+      endedAt: now,
+      status: "closed",
+    }).where(eq(lotEntries.id, String(req.params.id))).returning();
 
-  // Update is guaranteed to succeed — lot exists and is active (checked above).
-  const closed = lot!;
-  await audit(db, req, "CLOSE_LOT", "lot", closed.id, { quantityProduced, quantityConforming, quantityRejected });
+    // Update is guaranteed to succeed — lot exists and is active (checked above).
+    const closed = lot!;
 
-  // Add lot_end event — use MAX() to avoid loading the full event list.
-  const [maxSortRow] = await db.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, closed.sessionId));
-  const maxOrder = maxSortRow?.m ?? 0;
+    // Add lot_end event — use MAX() to avoid loading the full event list.
+    const [maxSortRow] = await tx.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, closed.sessionId));
+    const maxOrder = maxSortRow?.m ?? 0;
 
-  await db.insert(sessionEvents).values({
-    sessionId: closed.sessionId,
-    eventType: "lot_end",
-    startedAt: now,
-    endedAt: now,
-    durationMinutes: 0,
-    isPlanned: false,
-    lotEntryId: closed.id,
-    sortOrder: maxOrder + 1,
+    await tx.insert(sessionEvents).values({
+      sessionId: closed.sessionId,
+      eventType: "lot_end",
+      startedAt: now,
+      endedAt: now,
+      durationMinutes: 0,
+      isPlanned: false,
+      lotEntryId: closed.id,
+      sortOrder: maxOrder + 1,
+    });
+    return closed;
   });
 
+  await audit(db, req, "CLOSE_LOT", "lot", closed.id, { quantityProduced, quantityConforming, quantityRejected });
   res.json(closed);
 }));
 
@@ -162,20 +170,22 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
 
   const unit = cadenceUnit ?? lot.cadenceUnit;
 
-  // The insert and update are independent — run in parallel.
-  const [, [updated]] = await Promise.all([
-    db.insert(lotCadenceChanges).values({
+  // Append the history row and update the lot's current cadence atomically, so
+  // the audit trail and the lot's live cadence can never diverge.
+  const updated = await db.transaction(async (tx) => {
+    await tx.insert(lotCadenceChanges).values({
       lotEntryId: lotId,
       oldCadence: String(lot.cadenceUsed),
       newCadence: String(newCadence),
       cadenceUnit: unit,
       reason: reason ?? null,
       changedBy: userId,
-    }),
-    db.update(lotEntries)
+    });
+    const [updated] = await tx.update(lotEntries)
       .set({ cadenceUsed: String(newCadence), cadenceUnit: unit })
-      .where(eq(lotEntries.id, lotId)).returning(),
-  ]);
+      .where(eq(lotEntries.id, lotId)).returning();
+    return updated;
+  });
 
   await audit(db, req, "CHANGE_CADENCE", "lot", lotId, { from: lot.cadenceUsed, to: newCadence, unit, reason });
   res.json(updated);
@@ -309,11 +319,14 @@ lotsRouter.post("/:id/correct", requireRole("supervisor", "admin"), validate(cor
     throw new HttpError(400, "La quantité conforme ne peut pas dépasser la quantité produite");
   }
 
-  const [lot] = await db.update(lotEntries).set(updates).where(eq(lotEntries.id, lotId)).returning();
-
-  const signature = await recordSignature(db, req, signer, {
-    entityType: "lot", entityId: lot.id,
-    meaning: "Correction des données du lot", action: "correct", comment: correctionReason,
+  // Correction and its signature must be atomic (21 CFR Part 11).
+  const { lot, signature } = await db.transaction(async (tx) => {
+    const [lot] = await tx.update(lotEntries).set(updates).where(eq(lotEntries.id, lotId)).returning();
+    const signature = await recordSignature(tx, req, signer, {
+      entityType: "lot", entityId: lot.id,
+      meaning: "Correction des données du lot", action: "correct", comment: correctionReason,
+    });
+    return { lot, signature };
   });
 
   const originalValues = {
@@ -347,17 +360,22 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
     throw new HttpError(409, `Ce lot est ${desc} — seuls les lots clôturés peuvent être validés ou rejetés`);
   }
 
-  const [lot] = await db.update(lotEntries).set({
-    status,
-    supervisorId: userId,
-    supervisorComment: comment,
-    validatedAt: new Date(),
-  }).where(eq(lotEntries.id, lotId)).returning();
+  // The lot decision and its electronic signature must be atomic — a validated
+  // lot without a signature (or vice-versa) is a 21 CFR Part 11 violation.
+  const { lot, signature } = await db.transaction(async (tx) => {
+    const [lot] = await tx.update(lotEntries).set({
+      status,
+      supervisorId: userId,
+      supervisorComment: comment,
+      validatedAt: new Date(),
+    }).where(eq(lotEntries.id, lotId)).returning();
 
-  const signature = await recordSignature(db, req, signer, {
-    entityType: "lot", entityId: lot.id,
-    meaning: action === "reject" ? "Rejet du lot" : "Validation du lot",
-    action, comment: comment ?? null,
+    const signature = await recordSignature(tx, req, signer, {
+      entityType: "lot", entityId: lot.id,
+      meaning: action === "reject" ? "Rejet du lot" : "Validation du lot",
+      action, comment: comment ?? null,
+    });
+    return { lot, signature };
   });
 
   await audit(db, req, action === "reject" ? "REJECT_LOT" : "VALIDATE_LOT", "lot", lot.id, { action, comment, signatureId: signature.id });
