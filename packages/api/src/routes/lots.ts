@@ -184,8 +184,11 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
 // History of cadence changes for a lot (audit / supervisor view).
 lotsRouter.get("/:id/cadence", asyncHandler(async (req, res) => {
   const { db } = req;
+  const lotId = String(req.params.id);
+  const [lot] = await db.select({ id: lotEntries.id }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
   const rows = await db.select().from(lotCadenceChanges)
-    .where(eq(lotCadenceChanges.lotEntryId, String(req.params.id)))
+    .where(eq(lotCadenceChanges.lotEntryId, lotId))
     .orderBy(lotCadenceChanges.changedAt);
   res.json(rows);
 }));
@@ -249,17 +252,18 @@ lotsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
 // ─── Delete a downtime from a lot ────────────────────────────
 
 lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
-  const { db } = req;
+  const { db, userId, userRole } = req;
   const lotId = String(req.params.id);
   const dtId = String(req.params.dtId);
 
   // Join with the lot so we can check ownership + lot status in one query.
-  const [row] = await db.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId, lotStatus: lotEntries.status })
+  const [row] = await db.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId, lotStatus: lotEntries.status, createdBy: downtimeEvents.createdBy })
     .from(downtimeEvents)
     .innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id))
     .where(eq(downtimeEvents.id, dtId)).limit(1);
   if (!row) { res.status(404).json({ error: "Arrêt introuvable" }); return; }
   if (row.lotEntryId !== lotId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à ce lot" }); return; }
+  if (userRole === "operator" && row.createdBy !== userId) { res.status(403).json({ error: "Vous ne pouvez supprimer que vos propres arrêts" }); return; }
   if (row.lotStatus !== "active" && row.lotStatus !== "closed") {
     throw new HttpError(409, "Impossible de supprimer un arrêt sur un lot déjà décidé par le superviseur");
   }
@@ -363,8 +367,11 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
 // ─── Electronic signatures for a lot (Part 11 manifestation) ──
 lotsRouter.get("/:id/signatures", asyncHandler(async (req, res) => {
   const { db } = req;
+  const lotId = String(req.params.id);
+  const [lot] = await db.select({ id: lotEntries.id }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
   const rows = await db.select().from(electronicSignatures)
-    .where(and(eq(electronicSignatures.entityType, "lot"), eq(electronicSignatures.entityId, String(req.params.id))))
+    .where(and(eq(electronicSignatures.entityType, "lot"), eq(electronicSignatures.entityId, lotId)))
     .orderBy(desc(electronicSignatures.signedAt));
   res.json(rows);
 }));

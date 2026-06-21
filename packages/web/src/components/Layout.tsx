@@ -175,8 +175,27 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const [confirm, setConfirm] = useState("");
   const [saving, setSaving] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { titleRef.current?.focus(); }, []);
+
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (!el) return;
+    const focusable = Array.from(el.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled])'
+    ));
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last?.focus(); } }
+      else { if (document.activeElement === last) { e.preventDefault(); first?.focus(); } }
+    };
+    el.addEventListener("keydown", trap);
+    first?.focus();
+    return () => el.removeEventListener("keydown", trap);
+  }, []);
 
   const submit = async () => {
     if (newPassword !== confirm) { toast.error("Les mots de passe ne correspondent pas"); return; }
@@ -204,6 +223,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
       role="presentation"
     >
       <div
+        ref={dialogRef}
         className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl"
         role="dialog"
         aria-modal="true"
@@ -214,8 +234,8 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
           <KeyRound className="h-5 w-5 text-blue-600" aria-hidden="true" /> Changer mon mot de passe
         </h3>
         <div className="space-y-3">
-          <input type="password" autoFocus value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} placeholder="Mot de passe actuel" className="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Mot de passe actuel" />
-          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nouveau mot de passe (6 car. min.)" className="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Nouveau mot de passe" />
+          <input type="password" autoFocus autoComplete="current-password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} placeholder="Mot de passe actuel" className="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Mot de passe actuel" />
+          <input type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nouveau mot de passe (6 car. min.)" className="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Nouveau mot de passe" />
           <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !saving && oldPassword && newPassword.length >= 6) submit(); }} placeholder="Confirmer le nouveau mot de passe" className="w-full border rounded-lg px-3 py-2 text-sm" aria-label="Confirmation du nouveau mot de passe" />
         </div>
         <div className="flex gap-2 justify-end mt-4">

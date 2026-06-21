@@ -45676,23 +45676,23 @@ var startLotSchema = external_exports.object({
   sessionId: external_exports.string().uuid("sessionId invalide"),
   productId: external_exports.string().uuid("productId invalide"),
   batchNumber: external_exports.string().min(1, "Num\xE9ro de lot requis"),
-  cadenceUsed: external_exports.number().positive("Cadence doit \xEAtre positive"),
+  cadenceUsed: external_exports.number().positive("Cadence doit \xEAtre positive").finite(),
   cadenceUnit: cadenceUnit.optional()
 });
 var quantityFields = {
-  quantityProduced: external_exports.number().int().min(0, "Quantit\xE9 produite invalide"),
-  quantityConforming: external_exports.number().int().min(0, "Quantit\xE9 conforme invalide"),
-  quantityRejected: external_exports.number().int().min(0, "Quantit\xE9 rejet\xE9e invalide").optional()
+  quantityProduced: external_exports.number().int().min(0, "Quantit\xE9 produite invalide").finite(),
+  quantityConforming: external_exports.number().int().min(0, "Quantit\xE9 conforme invalide").finite(),
+  quantityRejected: external_exports.number().int().min(0, "Quantit\xE9 rejet\xE9e invalide").finite().optional()
 };
 var closeLotSchema = external_exports.object(quantityFields).refine((d) => d.quantityConforming <= d.quantityProduced, {
   message: "La quantit\xE9 conforme ne peut pas d\xE9passer la quantit\xE9 produite",
   path: ["quantityConforming"]
 });
 var updateLotSchema = external_exports.object({
-  quantityProduced: external_exports.number().int().min(0, "Quantit\xE9 produite invalide").optional(),
-  quantityConforming: external_exports.number().int().min(0, "Quantit\xE9 conforme invalide").optional(),
-  quantityRejected: external_exports.number().int().min(0, "Quantit\xE9 rejet\xE9e invalide").optional(),
-  cadenceUsed: external_exports.number().positive("Cadence doit \xEAtre positive").optional(),
+  quantityProduced: external_exports.number().int().min(0, "Quantit\xE9 produite invalide").finite().optional(),
+  quantityConforming: external_exports.number().int().min(0, "Quantit\xE9 conforme invalide").finite().optional(),
+  quantityRejected: external_exports.number().int().min(0, "Quantit\xE9 rejet\xE9e invalide").finite().optional(),
+  cadenceUsed: external_exports.number().positive("Cadence doit \xEAtre positive").finite().optional(),
   cadenceUnit: cadenceUnit.optional()
 }).refine(
   (d) => d.quantityProduced === void 0 || d.quantityConforming === void 0 || d.quantityConforming <= d.quantityProduced,
@@ -45703,12 +45703,12 @@ var updateLotSchema = external_exports.object({
 );
 var addDowntimeSchema = external_exports.object({
   categoryId: external_exports.string().uuid("categoryId invalide"),
-  durationMinutes: external_exports.number().positive("Dur\xE9e doit \xEAtre positive"),
+  durationMinutes: external_exports.number().positive("Dur\xE9e doit \xEAtre positive").finite(),
   isShortStop: external_exports.boolean().optional(),
   comment: external_exports.string().optional()
 });
 var changeCadenceSchema = external_exports.object({
-  newCadence: external_exports.number().positive("Cadence doit \xEAtre positive"),
+  newCadence: external_exports.number().positive("Cadence doit \xEAtre positive").finite(),
   cadenceUnit: external_exports.enum(["u/h", "u/min"]).optional(),
   reason: external_exports.string().optional()
 });
@@ -45722,10 +45722,10 @@ var validateLotSchema = external_exports.object({
   path: ["comment"]
 });
 var correctLotSchema = external_exports.object({
-  quantityProduced: external_exports.number().int().min(0).optional(),
-  quantityConforming: external_exports.number().int().min(0).optional(),
-  quantityRejected: external_exports.number().int().min(0).optional(),
-  cadenceUsed: external_exports.number().positive().optional(),
+  quantityProduced: external_exports.number().int().min(0).finite().optional(),
+  quantityConforming: external_exports.number().int().min(0).finite().optional(),
+  quantityRejected: external_exports.number().int().min(0).finite().optional(),
+  cadenceUsed: external_exports.number().positive().finite().optional(),
   cadenceUnit: cadenceUnit.optional(),
   correctionReason: external_exports.string().min(1, "Raison de la correction obligatoire"),
   password: external_exports.string().min(1, "Mot de passe requis pour signer")
@@ -45780,7 +45780,7 @@ var updateDowntimeCategorySchema = createDowntimeCategorySchema.partial().extend
 var createCadenceSchema = external_exports.object({
   productId: external_exports.string().uuid("productId invalide"),
   equipmentId: external_exports.string().uuid("equipmentId invalide"),
-  cadenceValue: external_exports.number().positive("cadenceValue doit \xEAtre positive"),
+  cadenceValue: external_exports.number().positive("cadenceValue doit \xEAtre positive").finite(),
   cadenceUnit: cadenceUnit.optional(),
   trsObjective: external_exports.number().min(0).max(100).optional()
 });
@@ -46785,7 +46785,13 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
 }));
 lotsRouter.get("/:id/cadence", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
-  const rows = await db2.select().from(lotCadenceChanges).where(eq(lotCadenceChanges.lotEntryId, String(req.params.id))).orderBy(lotCadenceChanges.changedAt);
+  const lotId = String(req.params.id);
+  const [lot] = await db2.select({ id: lotEntries.id }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  if (!lot) {
+    res.status(404).json({ error: "Lot introuvable" });
+    return;
+  }
+  const rows = await db2.select().from(lotCadenceChanges).where(eq(lotCadenceChanges.lotEntryId, lotId)).orderBy(lotCadenceChanges.changedAt);
   res.json(rows);
 }));
 lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
@@ -46834,16 +46840,20 @@ lotsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
   res.json(data);
 }));
 lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
-  const { db: db2 } = req;
+  const { db: db2, userId, userRole: userRole2 } = req;
   const lotId = String(req.params.id);
   const dtId = String(req.params.dtId);
-  const [row] = await db2.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId, lotStatus: lotEntries.status }).from(downtimeEvents).innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).where(eq(downtimeEvents.id, dtId)).limit(1);
+  const [row] = await db2.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId, lotStatus: lotEntries.status, createdBy: downtimeEvents.createdBy }).from(downtimeEvents).innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).where(eq(downtimeEvents.id, dtId)).limit(1);
   if (!row) {
     res.status(404).json({ error: "Arr\xEAt introuvable" });
     return;
   }
   if (row.lotEntryId !== lotId) {
     res.status(403).json({ error: "Cet arr\xEAt n'appartient pas \xE0 ce lot" });
+    return;
+  }
+  if (userRole2 === "operator" && row.createdBy !== userId) {
+    res.status(403).json({ error: "Vous ne pouvez supprimer que vos propres arr\xEAts" });
     return;
   }
   if (row.lotStatus !== "active" && row.lotStatus !== "closed") {
@@ -46930,7 +46940,13 @@ lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(va
 }));
 lotsRouter.get("/:id/signatures", asyncHandler(async (req, res) => {
   const { db: db2 } = req;
-  const rows = await db2.select().from(electronicSignatures).where(and(eq(electronicSignatures.entityType, "lot"), eq(electronicSignatures.entityId, String(req.params.id)))).orderBy(desc(electronicSignatures.signedAt));
+  const lotId = String(req.params.id);
+  const [lot] = await db2.select({ id: lotEntries.id }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  if (!lot) {
+    res.status(404).json({ error: "Lot introuvable" });
+    return;
+  }
+  const rows = await db2.select().from(electronicSignatures).where(and(eq(electronicSignatures.entityType, "lot"), eq(electronicSignatures.entityId, lotId))).orderBy(desc(electronicSignatures.signedAt));
   res.json(rows);
 }));
 
@@ -47341,7 +47357,7 @@ dashboardRouter.get("/downtime-log", validateQuery(dashboardRangeQuerySchema), a
   const log = [...lotRows, ...sessionRows].sort((a, b2) => b2.startedAt.getTime() - a.startedAt.getTime()).map((r) => ({ ...r, startedAt: r.startedAt.toISOString() }));
   res.json({ period: { from, to, equipmentId }, log });
 }));
-dashboardRouter.get("/pending-lots", validateQuery(pendingLotsQuerySchema), asyncHandler(async (req, res) => {
+dashboardRouter.get("/pending-lots", requireRole("supervisor", "admin"), validateQuery(pendingLotsQuerySchema), asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const { status } = req.query;
   const whereClause = status === "all" ? or(eq(lotEntries.status, "closed"), eq(lotEntries.status, "validated"), eq(lotEntries.status, "rejected")) : eq(lotEntries.status, status);
@@ -47357,7 +47373,7 @@ dashboardRouter.get("/pending-lots", validateQuery(pendingLotsQuerySchema), asyn
   }).from(lotEntries).innerJoin(sessions, eq(lotEntries.sessionId, sessions.id)).innerJoin(users, eq(lotEntries.operatorId, users.id)).innerJoin(equipments, eq(sessions.equipmentId, equipments.id)).where(whereClause).orderBy(desc(lotEntries.endedAt));
   res.json(lots);
 }));
-dashboardRouter.get("/pending-lots/count", asyncHandler(async (req, res) => {
+dashboardRouter.get("/pending-lots/count", requireRole("supervisor", "admin"), asyncHandler(async (req, res) => {
   const { db: db2 } = req;
   const [row] = await db2.select({ count: count() }).from(lotEntries).where(eq(lotEntries.status, "closed"));
   res.json({ count: row?.count ?? 0 });

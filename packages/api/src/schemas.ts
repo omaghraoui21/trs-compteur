@@ -51,14 +51,14 @@ export const startLotSchema = z.object({
   sessionId: z.string().uuid("sessionId invalide"),
   productId: z.string().uuid("productId invalide"),
   batchNumber: z.string().min(1, "Numéro de lot requis"),
-  cadenceUsed: z.number().positive("Cadence doit être positive"),
+  cadenceUsed: z.number().positive("Cadence doit être positive").finite(),
   cadenceUnit: cadenceUnit.optional(),
 });
 
 const quantityFields = {
-  quantityProduced: z.number().int().min(0, "Quantité produite invalide"),
-  quantityConforming: z.number().int().min(0, "Quantité conforme invalide"),
-  quantityRejected: z.number().int().min(0, "Quantité rejetée invalide").optional(),
+  quantityProduced: z.number().int().min(0, "Quantité produite invalide").finite(),
+  quantityConforming: z.number().int().min(0, "Quantité conforme invalide").finite(),
+  quantityRejected: z.number().int().min(0, "Quantité rejetée invalide").finite().optional(),
 };
 
 export const closeLotSchema = z
@@ -70,10 +70,10 @@ export const closeLotSchema = z
 
 export const updateLotSchema = z
   .object({
-    quantityProduced: z.number().int().min(0, "Quantité produite invalide").optional(),
-    quantityConforming: z.number().int().min(0, "Quantité conforme invalide").optional(),
-    quantityRejected: z.number().int().min(0, "Quantité rejetée invalide").optional(),
-    cadenceUsed: z.number().positive("Cadence doit être positive").optional(),
+    quantityProduced: z.number().int().min(0, "Quantité produite invalide").finite().optional(),
+    quantityConforming: z.number().int().min(0, "Quantité conforme invalide").finite().optional(),
+    quantityRejected: z.number().int().min(0, "Quantité rejetée invalide").finite().optional(),
+    cadenceUsed: z.number().positive("Cadence doit être positive").finite().optional(),
     cadenceUnit: cadenceUnit.optional(),
   })
   .refine(
@@ -89,13 +89,13 @@ export const updateLotSchema = z
 
 export const addDowntimeSchema = z.object({
   categoryId: z.string().uuid("categoryId invalide"),
-  durationMinutes: z.number().positive("Durée doit être positive"),
+  durationMinutes: z.number().positive("Durée doit être positive").finite(),
   isShortStop: z.boolean().optional(),
   comment: z.string().optional(),
 });
 
 export const changeCadenceSchema = z.object({
-  newCadence: z.number().positive("Cadence doit être positive"),
+  newCadence: z.number().positive("Cadence doit être positive").finite(),
   cadenceUnit: z.enum(["u/h", "u/min"]).optional(),
   reason: z.string().optional(),
 });
@@ -114,10 +114,10 @@ export const validateLotSchema = z
 
 export const correctLotSchema = z
   .object({
-    quantityProduced: z.number().int().min(0).optional(),
-    quantityConforming: z.number().int().min(0).optional(),
-    quantityRejected: z.number().int().min(0).optional(),
-    cadenceUsed: z.number().positive().optional(),
+    quantityProduced: z.number().int().min(0).finite().optional(),
+    quantityConforming: z.number().int().min(0).finite().optional(),
+    quantityRejected: z.number().int().min(0).finite().optional(),
+    cadenceUsed: z.number().positive().finite().optional(),
     cadenceUnit: cadenceUnit.optional(),
     correctionReason: z.string().min(1, "Raison de la correction obligatoire"),
     password: z.string().min(1, "Mot de passe requis pour signer"),
@@ -182,7 +182,7 @@ export const updateDowntimeCategorySchema = createDowntimeCategorySchema.partial
 export const createCadenceSchema = z.object({
   productId: z.string().uuid("productId invalide"),
   equipmentId: z.string().uuid("equipmentId invalide"),
-  cadenceValue: z.number().positive("cadenceValue doit être positive"),
+  cadenceValue: z.number().positive("cadenceValue doit être positive").finite(),
   cadenceUnit: cadenceUnit.optional(),
   trsObjective: z.number().min(0).max(100).optional(),
 });

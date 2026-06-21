@@ -65,7 +65,26 @@ export default function SupervisorPage() {
   const [lotDataFailed, setLotDataFailed] = useState<Record<string, boolean>>({});
 
   const touchStartY = useRef(0);
+  const signDialogRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
+
+  useEffect(() => {
+    if (!pendingSign) return;
+    const el = signDialogRef.current;
+    if (!el) return;
+    const focusable = Array.from(el.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ));
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last?.focus(); } }
+      else { if (document.activeElement === last) { e.preventDefault(); first?.focus(); } }
+    };
+    el.addEventListener("keydown", trap);
+    return () => el.removeEventListener("keydown", trap);
+  }, [pendingSign]);
 
   const loadData = useCallback(async (filter: StatusFilter, showLoader = false) => {
     if (showLoader) setLoading(true);
@@ -632,6 +651,7 @@ export default function SupervisorPage() {
           role="presentation"
         >
           <div
+            ref={signDialogRef}
             className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl"
             role="dialog"
             aria-modal="true"
@@ -653,6 +673,7 @@ export default function SupervisorPage() {
             <input
               type="password"
               autoFocus
+              autoComplete="off"
               aria-label="Mot de passe de signature"
               value={signPassword}
               onChange={(e) => setSignPassword(e.target.value)}

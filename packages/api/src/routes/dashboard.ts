@@ -5,7 +5,7 @@ import type { Db } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, computeZoomTrs, computeProductTrs, computeSixBigLosses, computeMtbfMttr, computeAClasserMin } from "@trs/engine";
 import type { ProductLotInput, LotTrsResult, SessionTrsResult } from "@trs/engine";
 
-import { authenticate } from "../middleware";
+import { authenticate, requireRole } from "../middleware";
 import { asyncHandler, validateQuery } from "../lib/http";
 import { effectiveLotCadence } from "../lib/cadence";
 import { groupBy } from "../lib/group";
@@ -521,7 +521,7 @@ dashboardRouter.get("/downtime-log", validateQuery(dashboardRangeQuerySchema), a
 // Accepts ?status=closed|validated|rejected|all (default: closed).
 // Joins sessions → equipments and users (operator) for context.
 
-dashboardRouter.get("/pending-lots", validateQuery(pendingLotsQuerySchema), asyncHandler(async (req, res) => {
+dashboardRouter.get("/pending-lots", requireRole("supervisor", "admin"), validateQuery(pendingLotsQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
   const { status } = req.query as { status: "closed" | "validated" | "rejected" | "all" };
 
@@ -549,7 +549,7 @@ dashboardRouter.get("/pending-lots", validateQuery(pendingLotsQuerySchema), asyn
 }));
 
 // Lightweight count of closed lots awaiting supervisor validation.
-dashboardRouter.get("/pending-lots/count", asyncHandler(async (req, res) => {
+dashboardRouter.get("/pending-lots/count", requireRole("supervisor", "admin"), asyncHandler(async (req, res) => {
   const { db } = req;
   const [row] = await db.select({ count: count() }).from(lotEntries).where(eq(lotEntries.status, "closed"));
   res.json({ count: row?.count ?? 0 });

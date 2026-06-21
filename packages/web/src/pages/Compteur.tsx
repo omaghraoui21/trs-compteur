@@ -461,7 +461,7 @@ export default function CompteurPage() {
                       disabled={trsRefreshing}
                       aria-label="Actualiser le TRS"
                       title="Actualiser le TRS"
-                      className="ml-0.5 p-0.5 rounded hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400 disabled:opacity-50"
+                      className="ml-0.5 p-2 rounded hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400 disabled:opacity-50"
                     >
                       <RotateCcw className={`h-3 w-3 ${trsRefreshing ? "animate-spin" : ""}`} aria-hidden="true" />
                     </button>
@@ -1542,9 +1542,9 @@ function DeclaredDowntimesList({ title, downtimes, onDelete }: {
               <>
                 <span className="text-sm text-red-700 flex-1">Supprimer ?</span>
                 <button onClick={() => { onDelete(dt.id); setConfirmId(null); }}
-                  className="text-xs px-2.5 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">Oui</button>
+                  className="text-xs px-2.5 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition min-h-[44px]">Oui</button>
                 <button onClick={() => setConfirmId(null)}
-                  className="text-xs px-2.5 py-1 border rounded-lg bg-white hover:bg-gray-50 transition">Annuler</button>
+                  className="text-xs px-2.5 py-1 border rounded-lg bg-white hover:bg-gray-50 transition min-h-[44px]">Annuler</button>
               </>
             ) : (
               <>
@@ -1555,7 +1555,7 @@ function DeclaredDowntimesList({ title, downtimes, onDelete }: {
                 <span className="text-sm font-medium text-gray-700 flex-1 truncate">{dt.reason}</span>
                 <span className="text-sm tabular-nums text-gray-500 shrink-0">{fmtDuration(dt.durationMinutes)}</span>
                 <button onClick={() => setConfirmId(dt.id)} aria-label="Supprimer"
-                  className="p-1 rounded text-gray-400 hover:text-red-500 transition shrink-0">
+                  className="p-2 rounded text-gray-400 hover:text-red-500 transition shrink-0">
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>
               </>
@@ -1822,18 +1822,21 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
                   {suggestedMin}<span className="block text-[9px] leading-tight opacity-80">non classé</span>
                 </button>
               )}
-              {QUICK_DURATIONS.map(d => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDuration(String(d))}
-                  className={`px-3 py-2 rounded-lg border text-sm font-medium transition min-w-[52px] min-h-[52px] ${
-                    duration === String(d) ? "bg-orange-500 text-white border-orange-500" : "bg-white border-gray-200 hover:bg-gray-50"
-                  }`}
-                >
-                  {d}
-                </button>
-              ))}
+              <fieldset>
+                <legend className="sr-only">Durée rapide (minutes)</legend>
+                {QUICK_DURATIONS.map(d => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setDuration(String(d))}
+                    className={`px-3 py-2 rounded-lg border text-sm font-medium transition min-w-[52px] min-h-[52px] ${
+                      duration === String(d) ? "bg-orange-500 text-white border-orange-500" : "bg-white border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </fieldset>
             </div>
             <input id="dt-duration" type="number" value={duration} onChange={e => setDuration(e.target.value)}
               aria-invalid={!!(duration && (Number(duration) < 1 || Number(duration) > 1440))}

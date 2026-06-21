@@ -373,6 +373,11 @@ export default function DashboardPage() {
                 ))}
             </div>
           )}
+          {showComparison && !comparisonLoading && !comparisonData && (
+            <div className="mb-4 p-8 bg-gray-50 rounded-xl border text-center text-sm text-gray-400">
+              Données de comparaison indisponibles — <button onClick={fetchComparison} className="text-blue-600 underline hover:no-underline">Réessayer</button>
+            </div>
+          )}
 
           {/* ─── Headline stat strip ─────────────────────────── */}
           {!showComparison && <StatStrip metrics={data.total} />}
