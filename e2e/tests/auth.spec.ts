@@ -30,22 +30,25 @@ test.beforeEach(async ({ page }) => {
   await page.route(/\/api\/auth\/me/, (r) => r.fulfill({ status: 401, body: "{}" }));
 });
 
-test("redirects unauthenticated users to /login", async ({ page }) => {
+test("shows the login form to unauthenticated users", async ({ page }) => {
+  // The app renders the login form in place when there is no authenticated
+  // user (there is no dedicated /login route), rather than redirecting.
   await page.goto("/");
-  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByRole("heading", { name: "TRS Compteur" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /se connecter/i })).toBeVisible();
 });
 
 test("shows login form with email and password fields", async ({ page }) => {
   await page.goto("/login");
   await expect(page.getByLabel(/email/i)).toBeVisible();
-  await expect(page.getByLabel(/mot de passe/i)).toBeVisible();
+  await expect(page.getByLabel("Mot de passe", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /se connecter/i })).toBeVisible();
 });
 
 test("shows error message on invalid credentials", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel(/email/i).fill("wrong@example.com");
-  await page.getByLabel(/mot de passe/i).fill("badpassword");
+  await page.getByLabel("Mot de passe", { exact: true }).fill("badpassword");
   await page.getByRole("button", { name: /se connecter/i }).click();
   await expect(page.getByText(/identifiants invalides/i)).toBeVisible();
 });
@@ -64,7 +67,7 @@ test("shows spinner while login request is in flight", async ({ page }) => {
 
   await page.goto("/login");
   await page.getByLabel(/email/i).fill("x@x.com");
-  await page.getByLabel(/mot de passe/i).fill("wrong");
+  await page.getByLabel("Mot de passe", { exact: true }).fill("wrong");
   await page.getByRole("button", { name: /se connecter/i }).click();
 
   // Button should be disabled and show loading text while in flight
@@ -85,7 +88,7 @@ test("stores tokens in localStorage after successful login", async ({ page }) =>
 
   await page.goto("/login");
   await page.getByLabel(/email/i).fill("operateur@dpi.local");
-  await page.getByLabel(/mot de passe/i).fill("oper123");
+  await page.getByLabel("Mot de passe", { exact: true }).fill("oper123");
   await page.getByRole("button", { name: /se connecter/i }).click();
 
   // Wait until URL changes (redirect after login)

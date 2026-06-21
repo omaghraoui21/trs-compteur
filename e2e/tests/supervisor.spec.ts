@@ -33,7 +33,9 @@ test.describe("Supervisor — lot validation queue", () => {
 
   test("shows 'Réduire' collapse button inside expanded card", async ({ supervisorPage: page }) => {
     await page.getByText("26013").click();
-    await expect(page.getByRole("button", { name: /réduire/i })).toBeVisible();
+    // Exact match: the card header toggle is "Réduire le lot 26013", we want
+    // the standalone "Réduire" button at the bottom of the expanded detail.
+    await expect(page.getByRole("button", { name: "Réduire", exact: true })).toBeVisible();
   });
 
   test("collapse button closes the expanded card", async ({ supervisorPage: page }) => {
@@ -42,7 +44,7 @@ test.describe("Supervisor — lot validation queue", () => {
     await expect(page.getByRole("button", { name: /valider/i })).toBeVisible();
 
     // Click collapse
-    await page.getByRole("button", { name: /réduire/i }).click();
+    await page.getByRole("button", { name: "Réduire", exact: true }).click();
     // Detail should be hidden
     await expect(page.getByRole("button", { name: /valider/i })).not.toBeVisible();
   });
@@ -56,6 +58,8 @@ test.describe("Supervisor — lot validation queue", () => {
 
   test("clicking 'Rejeter' opens signature modal", async ({ supervisorPage: page }) => {
     await page.getByText("26013").click();
+    // A rejection comment is mandatory; without it the signature modal won't open.
+    await page.getByPlaceholder(/motif de rejet|observations/i).fill("Rebut hors spécification");
     await page.getByRole("button", { name: /rejeter/i }).click();
     await expect(page.getByText(/signature électronique/i)).toBeVisible();
   });

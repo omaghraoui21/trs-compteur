@@ -10,13 +10,13 @@ test.describe("Dashboard", () => {
 
   test("shows dashboard title and filter bar", async ({ supervisorPage: page }) => {
     await expect(page.getByRole("heading", { name: /tableau de bord/i })).toBeVisible();
-    // Equipment select
-    await expect(page.getByRole("combobox")).toBeVisible();
-    // Zoom level buttons
-    await expect(page.getByRole("button", { name: /mois/i })).toBeVisible();
-    // Export buttons
-    await expect(page.getByRole("button", { name: /csv/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /pdf/i })).toBeVisible();
+    // Equipment select (.first(): charts may add their own selects once data loads)
+    await expect(page.getByRole("combobox").first()).toBeVisible();
+    // Zoom level buttons (.first(): the TRS chart has its own "Mois" granularity toggle)
+    await expect(page.getByRole("button", { name: "Mois", exact: true }).first()).toBeVisible();
+    // Export buttons (exact: a secondary "Export CSV" link also exists)
+    await expect(page.getByRole("button", { name: "CSV", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "PDF", exact: true })).toBeVisible();
   });
 
   test("CSV export triggers download and shows success toast", async ({ supervisorPage: page }) => {
@@ -49,8 +49,9 @@ test.describe("Dashboard", () => {
     await expect(page.getByRole("button", { name: /semaine/i })).toHaveClass(/bg-blue/);
   });
 
-  test("custom date range inputs appear when 'Personnalisé' is selected", async ({ supervisorPage: page }) => {
-    await page.getByRole("button", { name: /personnalisé/i }).click();
+  test("custom date range inputs appear when 'Libre' is selected", async ({ supervisorPage: page }) => {
+    // The custom-range zoom level is labelled "Libre".
+    await page.getByRole("button", { name: /libre/i }).click();
     await expect(page.locator("input[type='date']").first()).toBeVisible();
   });
 });

@@ -168,4 +168,12 @@ export const PENDING_LOT = {
   ...LOT_CLOSED,
   supervisorId: null,
   supervisorAction: null,
+  // Joined context the /api/dashboard/pending-lots endpoint returns alongside
+  // the lot columns (operator, session, equipment). Required by the Supervisor
+  // page, which formats sessionDate and renders the operator/equipment labels.
+  operatorName: "Opérateur Test",
+  sessionDate: "2026-06-07",
+  sessionNotes: null,
+  equipmentName: "Blistereuse IMA TR135S",
+  equipmentCode: "BLI-01",
 };

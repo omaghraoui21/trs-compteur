@@ -16,6 +16,9 @@ async function injectTokens(page: Page) {
   await page.addInitScript(() => {
     localStorage.setItem("trs_token", "fake-access-token");
     localStorage.setItem("trs_refresh", "fake-refresh-token");
+    // Suppress the first-run onboarding tour; its overlay would otherwise
+    // intercept pointer events and block every interaction under test.
+    localStorage.setItem("trs_onboarding_done", "1");
   });
 }
 
