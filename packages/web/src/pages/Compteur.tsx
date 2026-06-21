@@ -1308,12 +1308,16 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
   prefillProductId?: string;
   onCreated: () => void; onBack: () => void;
 }) {
-  // U3: Auto-suggest batch number from previous lots
+  // U3: Auto-suggest batch number from previous lots, preserving leading zeros
   const suggestedBatch = useMemo(() => {
     if (previousLots.length === 0) return "";
     const lastBatch = previousLots[previousLots.length - 1]?.batchNumber || "";
     const match = lastBatch.match(/^(\D*)(\d+)$/);
-    if (match) return `${match[1]}${String(Number(match[2]) + 1)}`;
+    if (match) {
+      const digits = match[2];
+      const next = String(Number(digits) + 1).padStart(digits.length, "0");
+      return `${match[1]}${next}`;
+    }
     return "";
   }, [previousLots]);
 
