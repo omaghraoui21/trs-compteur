@@ -30,6 +30,10 @@ export function createDb(url = connectionString) {
     idle_timeout: 20,
     connect_timeout: 15,
     prepare: false,
+    // GxP: enforce TLS in all environments; Railway and Vercel both serve
+    // postgres over SSL. In local dev with a non-SSL postgres (e.g. Docker
+    // without certs), set DB_SSL=false in .env to skip.
+    ssl: process.env.DB_SSL === "false" ? false : "require",
   });
   return drizzle(client, { schema });
 }

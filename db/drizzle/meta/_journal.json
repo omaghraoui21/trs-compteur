@@ -64,6 +64,13 @@
       "when": 1780653600000,
       "tag": "0008_ensure_session_downtime_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1750500000000,
+      "tag": "0009_performance_and_constraints",
+      "breakpoints": true
     }
   ]
 }

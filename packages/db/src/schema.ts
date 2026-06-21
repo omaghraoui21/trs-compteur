@@ -111,6 +111,8 @@ export const refreshTokens = pgTable("refresh_tokens", {
   index("idx_refresh_tokens_hash").on(t.tokenHash),
   index("idx_refresh_tokens_family").on(t.familyId),
   index("idx_refresh_tokens_user").on(t.userId),
+  index("idx_refresh_tokens_expires").on(t.expiresAt),
+  index("idx_refresh_tokens_revoked").on(t.revokedAt),
 ]);
 
 // ─── Downtime Categories ───────────────────────────────
@@ -163,6 +165,8 @@ export const sessions = pgTable("sessions", {
   index("idx_sessions_equipment").on(t.equipmentId),
   index("idx_sessions_equip_date").on(t.equipmentId, t.sessionDate),
   index("idx_sessions_status").on(t.status),
+  index("idx_sessions_operator").on(t.operatorId),
+  index("idx_sessions_operator_status").on(t.operatorId, t.status),
 ]);
 
 // ─── Session Events (Timeline phases) ──────────────────
@@ -220,6 +224,9 @@ export const lotEntries = pgTable("lot_entries", {
   index("idx_lot_entries_product").on(t.productId),
   index("idx_lot_entries_status").on(t.status),
   index("idx_lot_entries_date_batch").on(t.batchNumber),
+  index("idx_lot_entries_operator_id").on(t.operatorId),
+  index("idx_lot_entries_ended_at").on(t.endedAt),
+  index("idx_lot_entries_status_ended_at").on(t.status, t.endedAt),
 ]);
 
 // ─── Downtime Events (within a lot) ────────────────────
@@ -244,6 +251,7 @@ export const downtimeEvents = pgTable("downtime_events", {
   index("idx_downtime_events_lot").on(t.lotEntryId),
   index("idx_downtime_events_session").on(t.sessionId),
   index("idx_downtime_events_category").on(t.categoryId),
+  index("idx_downtime_events_created_by").on(t.createdBy),
 ]);
 
 // ─── Lot Cadence Changes (audit trail of in-lot cadence edits) ─────────
