@@ -3,7 +3,7 @@ import { eq, and, desc, inArray, isNull, max, sql } from "drizzle-orm";
 import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories, lotCadenceChanges } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, computeAClasserMin, computeMtbfMttr } from "@trs/engine";
 import { authenticate } from "../middleware";
-import { asyncHandler, validate, validateQuery, HttpError } from "../lib/http";
+import { asyncHandler, validate, validateQuery, HttpError, isUniqueViolation } from "../lib/http";
 import { audit } from "../lib/audit";
 import { effectiveLotCadence } from "../lib/cadence";
 import { groupBy, splitPlannedUnplanned } from "../lib/group";
@@ -93,14 +93,25 @@ sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (re
   const tz = process.env.APP_TIMEZONE || "Europe/Paris";
   const sessionDate = now.toLocaleDateString("en-CA", { timeZone: tz });
 
-  const [session] = await db.insert(sessions).values({
-    equipmentId,
-    roomId,
-    operatorId: userId,
-    sessionDate,
-    openedAt: now,
-    status: "active",
-  }).returning();
+  let session;
+  try {
+    [session] = await db.insert(sessions).values({
+      equipmentId,
+      roomId,
+      operatorId: userId,
+      sessionDate,
+      openedAt: now,
+      status: "active",
+    }).returning();
+  } catch (e) {
+    // Lost the race against a concurrent open — the partial unique index
+    // (uq_sessions_one_active_per_equip) rejected the second active session.
+    if (isUniqueViolation(e, "uq_sessions_one_active_per_equip")) {
+      res.status(409).json({ error: "Session déjà active pour cet équipement" });
+      return;
+    }
+    throw e;
+  }
 
   await audit(db, req, "OPEN_SESSION", "session", session.id, { equipmentId, roomId });
   res.status(201).json(session);

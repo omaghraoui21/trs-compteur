@@ -170,6 +170,9 @@ export const sessions = pgTable("sessions", {
   index("idx_sessions_status").on(t.status),
   index("idx_sessions_operator").on(t.operatorId),
   index("idx_sessions_operator_status").on(t.operatorId, t.status),
+  // At most one active session per equipment — closes the TOCTOU window where
+  // two concurrent /sessions/open calls both pass the application-level check.
+  uniqueIndex("uq_sessions_one_active_per_equip").on(t.equipmentId).where(sql`status = 'active'`),
 ]);
 
 // ─── Session Events (Timeline phases) ──────────────────
@@ -231,6 +234,9 @@ export const lotEntries = pgTable("lot_entries", {
   index("idx_lot_entries_ended_at").on(t.endedAt),
   index("idx_lot_entries_status_ended_at").on(t.status, t.endedAt),
   uniqueIndex("uq_lot_entries_session_batch").on(t.sessionId, t.batchNumber),
+  // At most one active lot per session — closes the TOCTOU window where two
+  // concurrent /lots calls both pass the application-level active-lot check.
+  uniqueIndex("uq_lot_entries_one_active_per_session").on(t.sessionId).where(sql`status = 'active'`),
   // Validated/rejected lots must always record who decided and when.
   check("chk_lot_validation_complete", sql`
     (status IN ('validated', 'rejected') AND supervisor_id IS NOT NULL AND validated_at IS NOT NULL)

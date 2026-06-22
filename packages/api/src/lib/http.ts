@@ -10,6 +10,20 @@ export class HttpError extends Error {
   }
 }
 
+// Detects a Postgres unique-violation (SQLSTATE 23505), optionally for a
+// specific constraint. Drizzle may wrap the driver error, so we walk the
+// `cause` chain. Used to translate a lost insert race into a friendly 409.
+export function isUniqueViolation(err: unknown, constraint?: string): boolean {
+  let e: any = err;
+  while (e) {
+    if (e.code === "23505") {
+      return constraint ? e.constraint === constraint : true;
+    }
+    e = e.cause;
+  }
+  return false;
+}
+
 type AsyncHandler = (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
 
 // Wraps an async route handler so rejected promises reach the error middleware

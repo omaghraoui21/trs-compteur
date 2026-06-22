@@ -3,7 +3,7 @@ import { eq, and, desc, count, max } from "drizzle-orm";
 import { sessions, lotEntries, downtimeEvents, sessionEvents, downtimeCategories, electronicSignatures, lotCadenceChanges } from "@trs/db";
 import { diffMinutes } from "@trs/engine";
 import { authenticate, requireRole } from "../middleware";
-import { asyncHandler, validate, HttpError } from "../lib/http";
+import { asyncHandler, validate, HttpError, isUniqueViolation } from "../lib/http";
 import { audit } from "../lib/audit";
 import { reauthSigner, recordSignature } from "../lib/sign";
 import { startLotSchema, closeLotSchema, updateLotSchema, addDowntimeSchema, validateLotSchema, changeCadenceSchema, correctLotSchema } from "../schemas";
@@ -51,17 +51,32 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
   const now = new Date();
 
   // Create lot_start event
-  const [lot] = await db.insert(lotEntries).values({
-    sessionId,
-    productId,
-    batchNumber,
-    lotOrder,
-    cadenceUsed: String(cadenceUsed),
-    cadenceUnit: cadenceUnit || "u/h",
-    operatorId: userId,
-    startedAt: now,
-    status: "active",
-  }).returning();
+  let lot;
+  try {
+    [lot] = await db.insert(lotEntries).values({
+      sessionId,
+      productId,
+      batchNumber,
+      lotOrder,
+      cadenceUsed: String(cadenceUsed),
+      cadenceUnit: cadenceUnit || "u/h",
+      operatorId: userId,
+      startedAt: now,
+      status: "active",
+    }).returning();
+  } catch (e) {
+    // Lost a race against a concurrent start — the partial unique indexes
+    // reject either a second active lot or a duplicate batch in this session.
+    if (isUniqueViolation(e, "uq_lot_entries_one_active_per_session")) {
+      res.status(409).json({ error: "Un lot est déjà actif dans cette session" });
+      return;
+    }
+    if (isUniqueViolation(e, "uq_lot_entries_session_batch")) {
+      res.status(409).json({ error: "Ce numéro de lot est déjà enregistré dans cette session" });
+      return;
+    }
+    throw e;
+  }
 
   await db.insert(sessionEvents).values({
     sessionId,
