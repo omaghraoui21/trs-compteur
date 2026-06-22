@@ -83640,11 +83640,11 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
   res.json(session);
 }));
 sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async (req, res) => {
-  const { db: db3 } = req;
+  const { db: db3, userId, userRole: userRole2 } = req;
   const { eventType: eventType2, label, durationMinutes, isPlanned, comment } = req.body;
   const sessionId = String(req.params.id);
   const [[sessionRow], [maxSortRow]] = await Promise.all([
-    db3.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
+    db3.select({ id: sessions.id, status: sessions.status, operatorId: sessions.operatorId }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
     db3.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, sessionId))
   ]);
   if (!sessionRow) {
@@ -83652,6 +83652,9 @@ sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async 
     return;
   }
   if (sessionRow.status !== "active") throw new HttpError(409, "Impossible d'ajouter un \xE9v\xE9nement \xE0 une session ferm\xE9e");
+  if (userRole2 === "operator" && sessionRow.operatorId !== userId) {
+    throw new HttpError(403, "Vous ne pouvez ajouter des \xE9v\xE9nements qu'\xE0 votre propre session");
+  }
   const maxOrder = maxSortRow?.m ?? 0;
   const now = /* @__PURE__ */ new Date();
   const endedAt = durationMinutes ? new Date(now.getTime() + durationMinutes * 6e4) : void 0;
@@ -83670,15 +83673,18 @@ sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async 
   res.status(201).json(event);
 }));
 sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
-  const { db: db3, userId } = req;
+  const { db: db3, userId, userRole: userRole2 } = req;
   const { categoryId, durationMinutes, isShortStop, comment } = req.body;
   const sessionId = String(req.params.id);
-  const [session] = await db3.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  const [session] = await db3.select({ id: sessions.id, status: sessions.status, operatorId: sessions.operatorId }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
   if (!session) {
     res.status(404).json({ error: "Session introuvable" });
     return;
   }
   if (session.status !== "active") throw new HttpError(409, "Impossible d'ajouter un arr\xEAt \xE0 une session ferm\xE9e");
+  if (userRole2 === "operator" && session.operatorId !== userId) {
+    throw new HttpError(403, "Vous ne pouvez ajouter des arr\xEAts qu'\xE0 votre propre session");
+  }
   const now = /* @__PURE__ */ new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 6e4);
   const [dt2] = await db3.insert(downtimeEvents).values({
@@ -83715,14 +83721,15 @@ sessionsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
   res.json(data);
 }));
 sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
-  const { db: db3 } = req;
+  const { db: db3, userId, userRole: userRole2 } = req;
   const sessionId = String(req.params.id);
   const dtId = String(req.params.dtId);
   const [dt2] = await db3.select({
     id: downtimeEvents.id,
     sessionId: downtimeEvents.sessionId,
     lotEntryId: downtimeEvents.lotEntryId,
-    sessionStatus: sessions.status
+    sessionStatus: sessions.status,
+    createdBy: downtimeEvents.createdBy
   }).from(downtimeEvents).leftJoin(sessions, eq(downtimeEvents.sessionId, sessions.id)).where(eq(downtimeEvents.id, dtId)).limit(1);
   if (!dt2) {
     res.status(404).json({ error: "Arr\xEAt introuvable" });
@@ -83737,6 +83744,9 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     return;
   }
   if (dt2.sessionStatus !== "active") throw new HttpError(409, "Impossible de supprimer un arr\xEAt d'une session d\xE9j\xE0 ferm\xE9e");
+  if (userRole2 === "operator" && dt2.createdBy !== userId) {
+    throw new HttpError(403, "Vous ne pouvez supprimer que vos propres arr\xEAts");
+  }
   await db3.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
   await audit(db3, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });
   res.status(204).send();
