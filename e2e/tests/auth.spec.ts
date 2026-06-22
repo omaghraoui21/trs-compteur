@@ -26,26 +26,31 @@ test.beforeEach(async ({ page }) => {
     }
   });
 
-  // /api/auth/me will 401 because no token is set — app redirects to /login
+  // /api/auth/me will 401 because no token is set — the app renders the login form
   await page.route(/\/api\/auth\/me/, (r) => r.fulfill({ status: 401, body: "{}" }));
 });
 
-test("redirects unauthenticated users to /login", async ({ page }) => {
+// The app renders the login form in place (no dedicated /login route) whenever
+// there is no authenticated user, so these tests assert on the form itself.
+const password = (page: import("@playwright/test").Page) =>
+  page.getByLabel("Mot de passe", { exact: true });
+
+test("shows the login form to unauthenticated users", async ({ page }) => {
   await page.goto("/");
-  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByRole("button", { name: /se connecter/i })).toBeVisible();
 });
 
 test("shows login form with email and password fields", async ({ page }) => {
-  await page.goto("/login");
+  await page.goto("/");
   await expect(page.getByLabel(/email/i)).toBeVisible();
-  await expect(page.getByLabel(/mot de passe/i)).toBeVisible();
+  await expect(password(page)).toBeVisible();
   await expect(page.getByRole("button", { name: /se connecter/i })).toBeVisible();
 });
 
 test("shows error message on invalid credentials", async ({ page }) => {
-  await page.goto("/login");
+  await page.goto("/");
   await page.getByLabel(/email/i).fill("wrong@example.com");
-  await page.getByLabel(/mot de passe/i).fill("badpassword");
+  await password(page).fill("badpassword");
   await page.getByRole("button", { name: /se connecter/i }).click();
   await expect(page.getByText(/identifiants invalides/i)).toBeVisible();
 });
@@ -62,9 +67,9 @@ test("shows spinner while login request is in flight", async ({ page }) => {
     });
   });
 
-  await page.goto("/login");
+  await page.goto("/");
   await page.getByLabel(/email/i).fill("x@x.com");
-  await page.getByLabel(/mot de passe/i).fill("wrong");
+  await password(page).fill("wrong");
   await page.getByRole("button", { name: /se connecter/i }).click();
 
   // Button should be disabled and show loading text while in flight
@@ -83,14 +88,13 @@ test("stores tokens in localStorage after successful login", async ({ page }) =>
     }),
   );
 
-  await page.goto("/login");
+  await page.goto("/");
   await page.getByLabel(/email/i).fill("operateur@dpi.local");
-  await page.getByLabel(/mot de passe/i).fill("oper123");
+  await password(page).fill("oper123");
   await page.getByRole("button", { name: /se connecter/i }).click();
 
-  // Wait until URL changes (redirect after login)
-  await expect(page).not.toHaveURL(/\/login/);
-
+  // Login stores the tokens, then the app swaps the form for the authenticated UI.
+  await page.waitForFunction(() => localStorage.getItem("trs_token") === "valid-access-token");
   const token = await page.evaluate(() => localStorage.getItem("trs_token"));
   expect(token).toBe("valid-access-token");
 });

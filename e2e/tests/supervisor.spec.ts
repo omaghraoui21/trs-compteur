@@ -33,7 +33,9 @@ test.describe("Supervisor — lot validation queue", () => {
 
   test("shows 'Réduire' collapse button inside expanded card", async ({ supervisorPage: page }) => {
     await page.getByText("26013").click();
-    await expect(page.getByRole("button", { name: /réduire/i })).toBeVisible();
+    // The card header toggle is also labelled "Réduire le lot …", so target the
+    // dedicated footer collapse button by its exact name.
+    await expect(page.getByRole("button", { name: "Réduire", exact: true })).toBeVisible();
   });
 
   test("collapse button closes the expanded card", async ({ supervisorPage: page }) => {
@@ -42,7 +44,7 @@ test.describe("Supervisor — lot validation queue", () => {
     await expect(page.getByRole("button", { name: /valider/i })).toBeVisible();
 
     // Click collapse
-    await page.getByRole("button", { name: /réduire/i }).click();
+    await page.getByRole("button", { name: "Réduire", exact: true }).click();
     // Detail should be hidden
     await expect(page.getByRole("button", { name: /valider/i })).not.toBeVisible();
   });
@@ -56,6 +58,9 @@ test.describe("Supervisor — lot validation queue", () => {
 
   test("clicking 'Rejeter' opens signature modal", async ({ supervisorPage: page }) => {
     await page.getByText("26013").click();
+    // A rejection motive is mandatory (GMP), so the comment must be filled
+    // before the reject signature modal will open.
+    await page.getByPlaceholder(/motif de rejet/i).fill("Écart qualité hors tolérance");
     await page.getByRole("button", { name: /rejeter/i }).click();
     await expect(page.getByText(/signature électronique/i)).toBeVisible();
   });

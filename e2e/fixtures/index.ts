@@ -16,6 +16,9 @@ async function injectTokens(page: Page) {
   await page.addInitScript(() => {
     localStorage.setItem("trs_token", "fake-access-token");
     localStorage.setItem("trs_refresh", "fake-refresh-token");
+    // Mark the first-run onboarding tour as already seen, otherwise its modal
+    // overlays the operator view and intercepts every click.
+    localStorage.setItem("trs_onboarding_done", "1");
   });
 }
 
