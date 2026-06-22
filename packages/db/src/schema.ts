@@ -10,6 +10,7 @@ import {
   pgEnum,
   index,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // ─── Enums ─────────────────────────────────────────────
@@ -227,6 +228,7 @@ export const lotEntries = pgTable("lot_entries", {
   index("idx_lot_entries_operator_id").on(t.operatorId),
   index("idx_lot_entries_ended_at").on(t.endedAt),
   index("idx_lot_entries_status_ended_at").on(t.status, t.endedAt),
+  uniqueIndex("uq_lot_entries_session_batch").on(t.sessionId, t.batchNumber),
 ]);
 
 // ─── Downtime Events (within a lot) ────────────────────
