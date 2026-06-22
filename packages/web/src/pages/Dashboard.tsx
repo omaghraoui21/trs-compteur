@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from "react";
 import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ParetoItem, type ComparisonResponse, type TrsMetrics, type DailyTrs, type LotTrs, type ByProductResponse, type SixLossesResponse, type HeatmapResponse, type DowntimeLogEntry, type DowntimeLogResponse } from "@/lib/api";
 import { fmtPct, fmtDuration, fmtNumber, trsColor, familleToNorme, computeOeeBenchmark } from "@trs/engine";
 import type { BenchmarkRating } from "@trs/engine";
@@ -116,21 +116,32 @@ export default function DashboardPage() {
     return getPresetDates(zoom === "custom" ? "month" : zoom);
   }, [zoom, customFrom, customTo]);
 
+  // Monotonic request guards: when the user switches equipment/period while a
+  // request is in flight, a slower earlier response must not overwrite the data
+  // for the newer selection. Each call captures its sequence number and only
+  // commits state if it is still the latest in-flight request.
+  const dataSeqRef = useRef(0);
+  const compSeqRef = useRef(0);
+
   const fetchComparison = useCallback(async () => {
     if (!from || !to) return;
+    const seq = ++compSeqRef.current;
     setComparisonLoading(true);
     try {
       const compRes = await api.dashboardComparison(from, to);
+      if (seq !== compSeqRef.current) return;
       setComparisonData(compRes);
     } catch {
+      if (seq !== compSeqRef.current) return;
       setComparisonData(null);
     } finally {
-      setComparisonLoading(false);
+      if (seq === compSeqRef.current) setComparisonLoading(false);
     }
   }, [from, to]);
 
   const fetchData = useCallback(async () => {
     if (!selectedEquipment || !from || !to) return;
+    const seq = ++dataSeqRef.current;
     setLoading(true);
     setLoadFailed(false);
     try {
@@ -144,6 +155,7 @@ export default function DashboardPage() {
         api.dashboardDowntimeLog(selectedEquipment, from, to).catch(() => null),
         api.dashboardTrs(selectedEquipment, prev.from, prev.to).catch(() => null),
       ]);
+      if (seq !== dataSeqRef.current) return;
       setData(trsRes);
       setParetoData(paretoRes);
       setByProductData(prodRes);
@@ -152,6 +164,7 @@ export default function DashboardPage() {
       setDowntimeLog(logRes);
       setPrevData(prevRes);
     } catch (err: any) {
+      if (seq !== dataSeqRef.current) return;
       toast.error(err.message || "Chargement du tableau de bord échoué");
       setLoadFailed(true);
       setData(null);
@@ -162,7 +175,7 @@ export default function DashboardPage() {
       setDowntimeLog(null);
       setPrevData(null);
     } finally {
-      setLoading(false);
+      if (seq === dataSeqRef.current) setLoading(false);
     }
   }, [selectedEquipment, from, to, zoom]);
 
