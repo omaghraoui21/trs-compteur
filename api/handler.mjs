@@ -83370,8 +83370,9 @@ function computeSixBigLosses(sessionTrs, downtimeDetails, microStopThresholdMin 
     }
   }
   const speedLossMin = Math.max(0, ecartCadenceMin);
-  const startupRejectMin = Math.max(0, Math.round(nonQualiteMin * 0.1));
-  const productionRejectMin = Math.max(0, Math.round(nonQualiteMin * 0.9));
+  const nonQualiteRounded = Math.max(0, Math.round(nonQualiteMin));
+  const startupRejectMin = Math.round(nonQualiteRounded * 0.1);
+  const productionRejectMin = nonQualiteRounded - startupRejectMin;
   const totalLossMin = fermeture + tAP + breakdownMin + microStopMin + setupMin + speedLossMin + startupRejectMin + productionRejectMin;
   const losses = [
     { category: "breakdown", label: "Pannes", oeeComponent: "availability", minutes: breakdownMin, pctOfTotal: tT > 0 ? breakdownMin / tT * 100 : 0 },
@@ -83933,10 +83934,11 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
     return;
   }
   const unit = cadenceUnit2 ?? lot.cadenceUnit;
+  const oldCadenceInUnit = unit === lot.cadenceUnit ? Number(lot.cadenceUsed) : lot.cadenceUnit === "u/h" ? Number(lot.cadenceUsed) / 60 : Number(lot.cadenceUsed) * 60;
   const [, [updated]] = await Promise.all([
     db3.insert(lotCadenceChanges).values({
       lotEntryId: lotId,
-      oldCadence: String(lot.cadenceUsed),
+      oldCadence: String(oldCadenceInUnit),
       newCadence: String(newCadence),
       cadenceUnit: unit,
       reason: reason ?? null,

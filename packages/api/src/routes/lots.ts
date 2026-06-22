@@ -162,11 +162,25 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
 
   const unit = cadenceUnit ?? lot.cadenceUnit;
 
+  // A change row carries a single `cadenceUnit` that must describe BOTH its
+  // oldCadence and newCadence, because effectiveLotCadence reconstructs the
+  // lot's starting cadence from (oldCadence, cadenceUnit). When this change
+  // also switches the unit, express the old cadence in the new unit so the row
+  // stays internally consistent — otherwise the lot's initial cadence would be
+  // read under the wrong unit (a 60× error in TP). No-op when the unit is
+  // unchanged, which is the only case the operator UI produces.
+  const oldCadenceInUnit =
+    unit === lot.cadenceUnit
+      ? Number(lot.cadenceUsed)
+      : lot.cadenceUnit === "u/h"
+        ? Number(lot.cadenceUsed) / 60   // u/h → u/min
+        : Number(lot.cadenceUsed) * 60;  // u/min → u/h
+
   // The insert and update are independent — run in parallel.
   const [, [updated]] = await Promise.all([
     db.insert(lotCadenceChanges).values({
       lotEntryId: lotId,
-      oldCadence: String(lot.cadenceUsed),
+      oldCadence: String(oldCadenceInUnit),
       newCadence: String(newCadence),
       cadenceUnit: unit,
       reason: reason ?? null,
