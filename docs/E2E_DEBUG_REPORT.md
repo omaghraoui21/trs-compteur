@@ -47,7 +47,17 @@ picker). **Fix:** `injectTokens` now also sets `trs_onboarding_done`.
 `equipmentCode`, `sessionNotes`; the shared fixture omitted them, triggering bug
 #1 in tests. **Fix:** completed the fixture object.
 
-### 4–8. E2E specs — selectors drifted from the current UI
+### 4. App bug — operator action buttons clipped on narrow phones
+The 3-button action bar ("Déclarer un arrêt" / "Nouveau lot" / "Fermer") used
+`flex-1` buttons whose default `min-width:auto` refused to shrink below their
+content width, so the row overflowed the viewport and **clipped the "Fermer"
+button** on phones. Evidence: `artifacts/after/mobile/13-operator-session-open.png`
+(clipped) vs `artifacts/verify/mobile/13-operator-session-open.png` (fixed).
+**Fix** (`packages/web/src/pages/Compteur.tsx`): added `min-w-0` to the shared
+`BTN_PRIMARY` (lets flex buttons shrink to equal thirds; text wraps inside) and
+`shrink-0` to `BTN_ICON` (keeps icons crisp). Touch-only screen, so this matters.
+
+### 5–9. E2E specs — selectors drifted from the current UI
 | Spec | Stale assumption | Reality | Fix |
 |---|---|---|---|
 | `auth` | redirect to `/login` | login renders in place at `/` | assert the login form is shown |

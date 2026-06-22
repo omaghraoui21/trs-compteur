@@ -12,8 +12,11 @@ import BackButton from "@/components/BackButton";
 type View = "pick-room" | "pick-equip" | "timeline" | "new-lot" | "add-downtime";
 
 // ─── Touch-friendly class constants (U2) ─────────────────
-const BTN_PRIMARY = "min-h-[60px] text-base font-semibold rounded-xl px-4 py-3 flex items-center justify-center gap-2 transition active:scale-95";
-const BTN_ICON = "h-6 w-6";
+// min-w-0 lets these shrink inside flex rows (e.g. the 3-button action bar)
+// instead of overflowing the viewport on narrow phones and clipping the last
+// button. text wraps within each button; the icon never shrinks (shrink-0).
+const BTN_PRIMARY = "min-w-0 min-h-[60px] text-base font-semibold rounded-xl px-4 py-3 flex items-center justify-center gap-2 transition active:scale-95";
+const BTN_ICON = "h-6 w-6 shrink-0";
 
 // Unified accent palette — one consistent visual language for every machine
 // (Blistereuse, Géluleuse, …). The machine is identified by its NAME/badge text,
