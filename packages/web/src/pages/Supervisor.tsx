@@ -15,9 +15,13 @@ function fmtLotDuration(start: string, end: string | null): string {
   return end ? fmtMinutes(diffMinutes(start, end)) : "En cours";
 }
 
-// YYYY-MM-DD → DD/MM/YYYY without UTC-midnight shift
-function fmtSessionDate(iso: string): string {
+// YYYY-MM-DD → DD/MM/YYYY without UTC-midnight shift.
+// Guard against a missing/malformed date so one bad record never crashes the
+// whole validation queue (the page is wrapped in an ErrorBoundary).
+function fmtSessionDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
   const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return iso;
   return `${d}/${m}/${y}`;
 }
 

@@ -8,3 +8,9 @@ dist
 .vercel
 .env*
 *.tsbuildinfo
+
+# E2E / Playwright run artifacts
+test-results
+playwright-report
+e2e/tour/artifacts
+artifacts

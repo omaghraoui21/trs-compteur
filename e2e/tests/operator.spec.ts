@@ -21,7 +21,7 @@ test.describe("Operator — session lifecycle", () => {
     await page.goto("/compteur");
     await page.getByText("Salle de Production").click();
     await page.getByText("Blistereuse IMA TR135S").click();
-    await expect(page.getByRole("button", { name: /ouvrir un compteur/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /ouvrir le compteur/i })).toBeVisible();
   });
 
   test("opens a session → shows timeline view", async ({ operatorPage: page }) => {
@@ -33,7 +33,7 @@ test.describe("Operator — session lifecycle", () => {
     await page.goto("/compteur");
     await page.getByText("Salle de Production").click();
     await page.getByText("Blistereuse IMA TR135S").click();
-    await page.getByRole("button", { name: /ouvrir un compteur/i }).click();
+    await page.getByRole("button", { name: /ouvrir le compteur/i }).click();
 
     // Should now see the session timeline
     await expect(page.getByRole("button", { name: /nouveau lot/i })).toBeVisible();
@@ -49,11 +49,14 @@ test.describe("Operator — session lifecycle", () => {
     await page.goto("/compteur");
     await page.getByText("Salle de Production").click();
     await page.getByText("Blistereuse IMA TR135S").click();
-    await page.getByRole("button", { name: /ouvrir un compteur/i }).click();
+    await page.getByRole("button", { name: /ouvrir le compteur/i }).click();
     await page.getByRole("button", { name: /nouveau lot/i }).click();
 
-    await expect(page.getByText(/numéro de lot/i)).toBeVisible();
-    await expect(page.getByText(/cadence/i)).toBeVisible();
+    // The new-lot form uses a "Produit" select, an "N° de lot" field and a
+    // "Cadence" field, submitted via "Démarrer le lot".
+    await expect(page.getByRole("heading", { name: /nouveau lot/i })).toBeVisible();
+    await expect(page.getByLabel("N° de lot")).toBeVisible();
+    await expect(page.getByLabel("Cadence")).toBeVisible();
   });
 
   test("submits new-lot form → lot appears in timeline", async ({ operatorPage: page }) => {
@@ -70,18 +73,15 @@ test.describe("Operator — session lifecycle", () => {
     await page.goto("/compteur");
     await page.getByText("Salle de Production").click();
     await page.getByText("Blistereuse IMA TR135S").click();
-    await page.getByRole("button", { name: /ouvrir un compteur/i }).click();
+    await page.getByRole("button", { name: /ouvrir le compteur/i }).click();
     await page.getByRole("button", { name: /nouveau lot/i }).click();
 
-    // Select product
-    await page.getByText("Aeronide 200µg").click();
+    // Select product (the form uses a native <select> combobox)
+    await page.getByLabel("Produit").selectOption({ label: "Aeronide 200µg" });
     // Fill batch number
     await page.getByPlaceholder(/26\d{3}|numéro.*lot|batch/i).fill("26013");
-    // Submit (first lot triggers confirmation step)
-    await page.getByRole("button", { name: /démarrer|confirmer|suivant/i }).first().click();
-    // If there's a confirm step, click "Démarrer"
-    const startBtn = page.getByRole("button", { name: /démarrer/i });
-    if (await startBtn.isVisible()) await startBtn.click();
+    // Submit
+    await page.getByRole("button", { name: /démarrer le lot/i }).click();
 
     // Lot number or batch should appear in the timeline
     await expect(page.getByText("26013")).toBeVisible();
@@ -97,7 +97,7 @@ test.describe("Operator — session lifecycle", () => {
     await page.goto("/compteur");
     await page.getByText("Salle de Production").click();
     await page.getByText("Blistereuse IMA TR135S").click();
-    await page.getByRole("button", { name: /ouvrir un compteur/i }).click();
+    await page.getByRole("button", { name: /ouvrir le compteur/i }).click();
     await page.getByRole("button", { name: /déclarer un arrêt/i }).click();
 
     await expect(page.getByText("Panne machine")).toBeVisible();
@@ -111,8 +111,8 @@ test.describe("Operator — session lifecycle", () => {
     await page.goto("/compteur");
     await page.getByText("Salle de Production").click();
     await page.getByText("Blistereuse IMA TR135S").click();
-    await page.getByRole("button", { name: /ouvrir un compteur/i }).click();
-    await page.getByRole("button", { name: /^fermer$/i }).click();
+    await page.getByRole("button", { name: /ouvrir le compteur/i }).click();
+    await page.getByRole("button", { name: /fermer la session/i }).click();
 
     await expect(page.getByText(/fermer le compteur/i)).toBeVisible();
     await expect(page.getByText(/annuler/i)).toBeVisible();
@@ -126,8 +126,8 @@ test.describe("Operator — session lifecycle", () => {
     await page.goto("/compteur");
     await page.getByText("Salle de Production").click();
     await page.getByText("Blistereuse IMA TR135S").click();
-    await page.getByRole("button", { name: /ouvrir un compteur/i }).click();
-    await page.getByRole("button", { name: /^fermer$/i }).click();
+    await page.getByRole("button", { name: /ouvrir le compteur/i }).click();
+    await page.getByRole("button", { name: /fermer la session/i }).click();
 
     // Checklist should show "tous les lots sont clôturés"
     await expect(page.getByText(/tous les lots sont clôturés/i)).toBeVisible();
@@ -143,8 +143,8 @@ test.describe("Operator — session lifecycle", () => {
     await page.goto("/compteur");
     await page.getByText("Salle de Production").click();
     await page.getByText("Blistereuse IMA TR135S").click();
-    await page.getByRole("button", { name: /ouvrir un compteur/i }).click();
-    await page.getByRole("button", { name: /^fermer$/i }).click();
+    await page.getByRole("button", { name: /ouvrir le compteur/i }).click();
+    await page.getByRole("button", { name: /fermer la session/i }).click();
 
     // Confirm close in modal
     await page.getByRole("button", { name: /^fermer$/i }).last().click();
@@ -170,7 +170,7 @@ test.describe("Unclassified time banner", () => {
     await page.goto("/compteur");
     await page.getByText("Salle de Production").click();
     await page.getByText("Blistereuse IMA TR135S").click();
-    await page.getByRole("button", { name: /ouvrir un compteur/i }).click();
+    await page.getByRole("button", { name: /ouvrir le compteur/i }).click();
 
     await expect(page.getByText(/de temps non classé/i)).toBeVisible();
   });
@@ -188,8 +188,8 @@ test.describe("Unclassified time banner", () => {
     await page.goto("/compteur");
     await page.getByText("Salle de Production").click();
     await page.getByText("Blistereuse IMA TR135S").click();
-    await page.getByRole("button", { name: /ouvrir un compteur/i }).click();
-    await page.getByRole("button", { name: /^fermer$/i }).click();
+    await page.getByRole("button", { name: /ouvrir le compteur/i }).click();
+    await page.getByRole("button", { name: /fermer la session/i }).click();
 
     // The close button inside the modal should be disabled
     const confirmBtn = page.getByRole("button", { name: /^fermer$/i }).last();
@@ -208,7 +208,7 @@ test.describe("Session badge", () => {
     await page.goto("/compteur");
     await page.getByText("Salle de Production").click();
     await page.getByText("Blistereuse IMA TR135S").click();
-    await page.getByRole("button", { name: /ouvrir un compteur/i }).click();
+    await page.getByRole("button", { name: /ouvrir le compteur/i }).click();
 
     // Badge showing equipment name should appear in the header
     await expect(page.getByText(/blistereuse ima tr135s/i).first()).toBeVisible();

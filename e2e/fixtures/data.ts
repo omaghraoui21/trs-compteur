@@ -163,9 +163,16 @@ export const TRS_WITH_LOT = {
   aClasserMin: 0,
 };
 
-// Pending lots for supervisor
+// Pending lots for supervisor.
+// PendingLot extends LotEntry with session/equipment context fields that the
+// supervisor card renders (sessionDate is split() for display — must be present).
 export const PENDING_LOT = {
   ...LOT_CLOSED,
   supervisorId: null,
   supervisorAction: null,
+  operatorName: "Opérateur Test",
+  sessionDate: "2026-06-07",
+  sessionNotes: null,
+  equipmentName: "Blistereuse IMA TR135S",
+  equipmentCode: "BLI-01",
 };

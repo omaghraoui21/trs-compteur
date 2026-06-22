@@ -12,11 +12,12 @@ test.describe("Dashboard", () => {
     await expect(page.getByRole("heading", { name: /tableau de bord/i })).toBeVisible();
     // Equipment select
     await expect(page.getByRole("combobox")).toBeVisible();
-    // Zoom level buttons
-    await expect(page.getByRole("button", { name: /mois/i })).toBeVisible();
-    // Export buttons
-    await expect(page.getByRole("button", { name: /csv/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /pdf/i })).toBeVisible();
+    // Zoom level button ("Mois" also appears in the Evolution chart, so scope
+    // to the first match in the filter bar).
+    await expect(page.getByRole("button", { name: "Mois" }).first()).toBeVisible();
+    // Export buttons — "CSV" must be exact to avoid matching "Export CSV".
+    await expect(page.getByRole("button", { name: "CSV", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "PDF", exact: true })).toBeVisible();
   });
 
   test("CSV export triggers download and shows success toast", async ({ supervisorPage: page }) => {
@@ -49,8 +50,9 @@ test.describe("Dashboard", () => {
     await expect(page.getByRole("button", { name: /semaine/i })).toHaveClass(/bg-blue/);
   });
 
-  test("custom date range inputs appear when 'Personnalisé' is selected", async ({ supervisorPage: page }) => {
-    await page.getByRole("button", { name: /personnalisé/i }).click();
+  test("custom date range inputs appear when 'Libre' is selected", async ({ supervisorPage: page }) => {
+    // The custom-range zoom level is labelled "Libre".
+    await page.getByRole("button", { name: "Libre" }).click();
     await expect(page.locator("input[type='date']").first()).toBeVisible();
   });
 });
