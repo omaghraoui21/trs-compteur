@@ -77881,6 +77881,9 @@ var Index = class {
 function index(name) {
   return new IndexBuilderOn(false, name);
 }
+function uniqueIndex(name) {
+  return new IndexBuilderOn(true, name);
+}
 
 // node_modules/.pnpm/drizzle-orm@0.38.4_@opentelemetry+api@1.9.1_@types+react@19.2.15_postgres@3.4.9_react@19.2.6/node_modules/drizzle-orm/pg-core/session.js
 var PgPreparedQuery = class {
@@ -78368,7 +78371,8 @@ var lotEntries = pgTable("lot_entries", {
   index("idx_lot_entries_date_batch").on(t2.batchNumber),
   index("idx_lot_entries_operator_id").on(t2.operatorId),
   index("idx_lot_entries_ended_at").on(t2.endedAt),
-  index("idx_lot_entries_status_ended_at").on(t2.status, t2.endedAt)
+  index("idx_lot_entries_status_ended_at").on(t2.status, t2.endedAt),
+  uniqueIndex("uq_lot_entries_session_batch").on(t2.sessionId, t2.batchNumber)
 ]);
 var downtimeEvents = pgTable("downtime_events", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -83813,9 +83817,10 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
     res.status(401).json({ error: "Non authentifi\xE9" });
     return;
   }
-  const [[sessionRow], [activeLot]] = await Promise.all([
+  const [[sessionRow], [activeLot], [dupBatch]] = await Promise.all([
     db3.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
-    db3.select({ id: lotEntries.id }).from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active"))).limit(1)
+    db3.select({ id: lotEntries.id }).from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active"))).limit(1),
+    db3.select({ id: lotEntries.id }).from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.batchNumber, batchNumber))).limit(1)
   ]);
   if (!sessionRow) {
     res.status(404).json({ error: "Session introuvable" });
@@ -83825,6 +83830,9 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
   if (activeLot) {
     res.status(409).json({ error: "Un lot est d\xE9j\xE0 actif dans cette session", lotId: activeLot.id });
     return;
+  }
+  if (dupBatch) {
+    throw new HttpError(409, "Ce num\xE9ro de lot est d\xE9j\xE0 enregistr\xE9 dans cette session");
   }
   const [[lotCountRow], [maxSortRow]] = await Promise.all([
     db3.select({ n: count() }).from(lotEntries).where(eq(lotEntries.sessionId, sessionId)),
@@ -83961,16 +83969,19 @@ lotsRouter.get("/:id/cadence", asyncHandler(async (req, res) => {
   res.json(rows);
 }));
 lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
-  const { db: db3, userId } = req;
+  const { db: db3, userId, userRole: userRole2 } = req;
   const { categoryId, durationMinutes, isShortStop, comment } = req.body;
   const lotId = String(req.params.id);
-  const [lot] = await db3.select({ id: lotEntries.id, status: lotEntries.status }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  const [lot] = await db3.select({ id: lotEntries.id, status: lotEntries.status, operatorId: lotEntries.operatorId }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
   if (!lot) {
     res.status(404).json({ error: "Lot introuvable" });
     return;
   }
   if (lot.status !== "active" && lot.status !== "closed") {
     throw new HttpError(409, "Impossible d'ajouter un arr\xEAt sur un lot d\xE9j\xE0 d\xE9cid\xE9 par le superviseur");
+  }
+  if (userRole2 === "operator" && lot.operatorId !== userId) {
+    throw new HttpError(403, "Vous ne pouvez ajouter des arr\xEAts que sur vos propres lots");
   }
   const now = /* @__PURE__ */ new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 6e4);

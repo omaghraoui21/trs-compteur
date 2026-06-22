@@ -19,12 +19,15 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
 
   if (!userId) { res.status(401).json({ error: "Non authentifié" }); return; }
 
-  // Verify session exists + is active, and check for an existing active lot — both
-  // reads are against indexed columns; run them in parallel.
-  const [[sessionRow], [activeLot]] = await Promise.all([
+  // Verify session exists + is active, check for an active lot, and check for
+  // a duplicate batch number in the same session — all reads against indexed columns.
+  const [[sessionRow], [activeLot], [dupBatch]] = await Promise.all([
     db.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
     db.select({ id: lotEntries.id }).from(lotEntries)
       .where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active")))
+      .limit(1),
+    db.select({ id: lotEntries.id }).from(lotEntries)
+      .where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.batchNumber, batchNumber)))
       .limit(1),
   ]);
   if (!sessionRow) { res.status(404).json({ error: "Session introuvable" }); return; }
@@ -32,6 +35,9 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
   if (activeLot) {
     res.status(409).json({ error: "Un lot est déjà actif dans cette session", lotId: activeLot.id });
     return;
+  }
+  if (dupBatch) {
+    throw new HttpError(409, "Ce numéro de lot est déjà enregistré dans cette session");
   }
 
   // Use aggregates to avoid loading full row sets just for ordering values.
@@ -210,14 +216,17 @@ lotsRouter.get("/:id/cadence", asyncHandler(async (req, res) => {
 // ─── Add downtime to a lot ────────────────────────────────────
 
 lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
-  const { db, userId } = req;
+  const { db, userId, userRole } = req;
   const { categoryId, durationMinutes, isShortStop, comment } = req.body;
   const lotId = String(req.params.id);
 
-  const [lot] = await db.select({ id: lotEntries.id, status: lotEntries.status }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  const [lot] = await db.select({ id: lotEntries.id, status: lotEntries.status, operatorId: lotEntries.operatorId }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
   if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
   if (lot.status !== "active" && lot.status !== "closed") {
     throw new HttpError(409, "Impossible d'ajouter un arrêt sur un lot déjà décidé par le superviseur");
+  }
+  if (userRole === "operator" && lot.operatorId !== userId) {
+    throw new HttpError(403, "Vous ne pouvez ajouter des arrêts que sur vos propres lots");
   }
 
   const now = new Date();
