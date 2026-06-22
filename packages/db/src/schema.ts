@@ -11,7 +11,9 @@ import {
   index,
   unique,
   uniqueIndex,
+  check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // ─── Enums ─────────────────────────────────────────────
 
@@ -229,6 +231,11 @@ export const lotEntries = pgTable("lot_entries", {
   index("idx_lot_entries_ended_at").on(t.endedAt),
   index("idx_lot_entries_status_ended_at").on(t.status, t.endedAt),
   uniqueIndex("uq_lot_entries_session_batch").on(t.sessionId, t.batchNumber),
+  // Validated/rejected lots must always record who decided and when.
+  check("chk_lot_validation_complete", sql`
+    (status IN ('validated', 'rejected') AND supervisor_id IS NOT NULL AND validated_at IS NOT NULL)
+    OR status NOT IN ('validated', 'rejected')
+  `),
 ]);
 
 // ─── Downtime Events (within a lot) ────────────────────
