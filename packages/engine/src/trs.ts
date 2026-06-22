@@ -487,9 +487,13 @@ export function computeSixBigLosses(
   // Speed loss = écart cadence (already computed by engine)
   const speedLossMin = Math.max(0, ecartCadenceMin);
 
-  // Quality losses: split into startup rejects (first 10% of tF) and production rejects
-  const startupRejectMin = Math.max(0, Math.round(nonQualiteMin * 0.1));
-  const productionRejectMin = Math.max(0, Math.round(nonQualiteMin * 0.9));
+  // Quality losses: split into startup rejects (first 10%) and production rejects.
+  // Round the total once and derive the production half by subtraction so the two
+  // parts always reconcile to round(nonQualiteMin) (independent rounding could
+  // sum to ±1 min off, e.g. 5 → 1 + 5 = 6).
+  const nonQualiteRounded = Math.max(0, Math.round(nonQualiteMin));
+  const startupRejectMin = Math.round(nonQualiteRounded * 0.1);
+  const productionRejectMin = nonQualiteRounded - startupRejectMin;
 
   const totalLossMin = fermeture + tAP + breakdownMin + microStopMin + setupMin + speedLossMin + startupRejectMin + productionRejectMin;
 
