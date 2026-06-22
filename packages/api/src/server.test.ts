@@ -763,6 +763,79 @@ describe("delete downtime endpoints", () => {
   });
 });
 
+describe("lot/session integrity + ownership (race + authz)", () => {
+  const op1 = { Authorization: `Bearer ${""}` };
+  const op2 = { Authorization: `Bearer ${""}` };
+  let equipmentId: string;
+  let roomId: string;
+  let productId: string;
+  let categoryId: string;
+  let sessionId: string;
+  let lotId: string;
+  let op2Token: string;
+
+  it("sets up two operators, a session and an active lot", async () => {
+    op1.Authorization = `Bearer ${opToken}`;
+    const eqs = await request(app).get("/api/ref/equipments").set(op1);
+    const rooms = await request(app).get("/api/ref/rooms").set(op1);
+    const products = await request(app).get("/api/ref/products").set(op1);
+    const cats = await request(app).get("/api/ref/downtime-categories").set(op1);
+    equipmentId = (eqs.body.equipments ?? eqs.body)[0].id;
+    roomId = (rooms.body.rooms ?? rooms.body)[0].id;
+    productId = (products.body.products ?? products.body)[0].id;
+    categoryId = (cats.body.categories ?? cats.body).find((c: any) => !c.isPlanned).id;
+
+    // A second operator, used to prove cross-operator mutations are blocked.
+    const created = await request(app).post("/api/admin/users")
+      .set({ Authorization: `Bearer ${admToken}` })
+      .send({ email: "operateur2@dpi.local", displayName: "Opérateur 2", password: "oper234", role: "operator" });
+    expect([201, 409]).toContain(created.status); // 409 if a prior run already created it
+    op2Token = await login("operateur2@dpi.local", "oper234");
+    op2.Authorization = `Bearer ${op2Token}`;
+
+    const ses = await request(app).post("/api/sessions/open").set(op1).send({ equipmentId, roomId });
+    expect(ses.status).toBe(201);
+    sessionId = ses.body.id ?? ses.body.session?.id;
+
+    const lot = await request(app).post("/api/lots").set(op1)
+      .send({ sessionId, productId, batchNumber: "RACE-LOT-1", cadenceUsed: 100, cadenceUnit: "u/min" });
+    expect(lot.status).toBe(201);
+    lotId = lot.body.id ?? lot.body.lot?.id;
+  });
+
+  it("rejects a second active lot in the same session (409)", async () => {
+    const res = await request(app).post("/api/lots").set(op1)
+      .send({ sessionId, productId, batchNumber: "RACE-LOT-2", cadenceUsed: 100, cadenceUnit: "u/min" });
+    expect(res.status).toBe(409);
+  });
+
+  it("forbids another operator from adding a downtime to a lot they don't own (403)", async () => {
+    const res = await request(app).post(`/api/lots/${lotId}/downtimes`).set(op2)
+      .send({ categoryId, durationMinutes: 5 });
+    expect(res.status).toBe(403);
+  });
+
+  it("forbids another operator from adding an event to a session they don't own (403)", async () => {
+    const res = await request(app).post(`/api/sessions/${sessionId}/events`).set(op2)
+      .send({ eventType: "nettoyage", durationMinutes: 10, isPlanned: true });
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects a duplicate batch number within the same session (409)", async () => {
+    // Close the active lot, then re-use its batch number — must still be blocked.
+    const close = await request(app).post(`/api/lots/${lotId}/close`).set(op1)
+      .send({ quantityProduced: 1000, quantityConforming: 1000 });
+    expect(close.status).toBe(200);
+    const res = await request(app).post("/api/lots").set(op1)
+      .send({ sessionId, productId, batchNumber: "RACE-LOT-1", cadenceUsed: 100, cadenceUnit: "u/min" });
+    expect(res.status).toBe(409);
+  });
+
+  afterAll(async () => {
+    if (sessionId) await request(app).post(`/api/sessions/${sessionId}/close`).set(op1).send({});
+  });
+});
+
 describe("dashboard pending-lots status filter", () => {
   it("rejects an unknown status value (400 — Zod query)", async () => {
     const res = await request(app)

@@ -8,3 +8,7 @@ dist
 .vercel
 .env*
 *.tsbuildinfo
+
+# Screenshot QA artifacts
+qa-screenshots/
+test-results/

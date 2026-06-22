@@ -487,9 +487,13 @@ export function computeSixBigLosses(
   // Speed loss = écart cadence (already computed by engine)
   const speedLossMin = Math.max(0, ecartCadenceMin);
 
-  // Quality losses: split into startup rejects (first 10% of tF) and production rejects
-  const startupRejectMin = Math.max(0, Math.round(nonQualiteMin * 0.1));
-  const productionRejectMin = Math.max(0, Math.round(nonQualiteMin * 0.9));
+  // Quality losses: split into startup rejects (first 10%) and production rejects.
+  // Round the total once and derive the production half by subtraction so the two
+  // parts always reconcile to round(nonQualiteMin) (independent rounding could
+  // sum to ±1 min off, e.g. 5 → 1 + 5 = 6).
+  const nonQualiteRounded = Math.max(0, Math.round(nonQualiteMin));
+  const startupRejectMin = Math.round(nonQualiteRounded * 0.1);
+  const productionRejectMin = nonQualiteRounded - startupRejectMin;
 
   const totalLossMin = fermeture + tAP + breakdownMin + microStopMin + setupMin + speedLossMin + startupRejectMin + productionRejectMin;
 
@@ -588,7 +592,7 @@ export interface PeriodBucket extends SessionTrsResult {
 
 /** ISO-8601 week key (Monday-based), e.g. "2026-W22". */
 export function isoWeekKey(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00Z");
+  const d = new Date(dateStr.slice(0, 10) + "T00:00:00Z");
   const day = (d.getUTCDay() + 6) % 7; // Monday = 0
   // Shift to the Thursday of this week (ISO weeks belong to the year of their Thursday)
   d.setUTCDate(d.getUTCDate() - day + 3);

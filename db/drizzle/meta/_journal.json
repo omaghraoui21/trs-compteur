@@ -85,6 +85,13 @@
       "when": 1750672800000,
       "tag": "0011_gxp_session_events_immutability",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1782161618980,
+      "tag": "0012_race_condition_constraints",
+      "breakpoints": true
     }
   ]
 }

@@ -68,24 +68,24 @@ export default function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-blue-700 text-white px-4 py-3 flex items-center justify-between shadow-md">
-        <div className="flex items-center gap-3">
-          <Timer className="h-6 w-6" aria-hidden="true" />
-          <h1 className="text-lg font-bold">TRS Compteur</h1>
+      <header className="bg-blue-700 text-white px-4 py-3 flex items-center justify-between gap-2 shadow-md">
+        <div className="flex items-center gap-3 shrink-0">
+          <Timer className="h-6 w-6 shrink-0" aria-hidden="true" />
+          <h1 className="text-lg font-bold whitespace-nowrap">TRS Compteur</h1>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           {equipmentName ? (
-            <span className="text-sm font-medium bg-green-500/20 text-green-100 px-2.5 py-1 rounded-full flex items-center gap-1.5 max-w-[180px] sm:max-w-none truncate">
+            <span className="text-sm font-medium bg-green-500/20 text-green-100 px-2.5 py-1 rounded-full flex items-center gap-1.5 min-w-0 max-w-[150px] sm:max-w-none">
               <span className="h-2 w-2 rounded-full bg-green-400 motion-safe:animate-pulse shrink-0" />
               <span className="truncate">{equipmentName}{elapsed ? ` • ${elapsed}` : ""}</span>
             </span>
           ) : (
             <span className="hidden sm:inline text-sm opacity-80">{user?.displayName}</span>
           )}
-          <button onClick={() => setPwOpen(true)} className={HEADER_ICON_BTN} aria-label="Changer mon mot de passe">
+          <button onClick={() => setPwOpen(true)} className={`${HEADER_ICON_BTN} shrink-0`} aria-label="Changer mon mot de passe">
             <KeyRound className="h-4 w-4" aria-hidden="true" />
           </button>
-          <button onClick={logout} className={HEADER_ICON_BTN} aria-label="Déconnexion">
+          <button onClick={logout} className={`${HEADER_ICON_BTN} shrink-0`} aria-label="Déconnexion">
             <LogOut className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>

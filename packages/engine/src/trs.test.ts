@@ -1015,6 +1015,30 @@ describe("computeSixBigLosses (X)", () => {
   });
 });
 
+// ─── Six-losses quality rounding regression ─────────────────
+
+describe("computeSixBigLosses — quality loss rounding", () => {
+  // nonQualiteMin = 5: with independent rounding, round(5×0.1)=1 + round(5×0.9)=5 = 6 (off by 1).
+  // The fix rounds the total once and derives productionReject by subtraction.
+  it("startup + production reject sum exactly equals round(nonQualiteMin)", () => {
+    const mk = (nonQualiteMin: number) => ({
+      tT: 1440, tO: 480, fermeture: 960, tAP: 0, tR: 480, tF: 480,
+      tN: 480, tU: 480 - nonQualiteMin, nonQualiteMin, ecartCadenceMin: 0, totalUnplannedMin: 0,
+      DO: 1, TP: 1, TQ: (480 - nonQualiteMin) / 480, TRS: (480 - nonQualiteMin) / 480, TRG: 0,
+      lotCount: 1, totalProduced: 480, totalConforming: 480 - nonQualiteMin, totalRebut: nonQualiteMin,
+      downtimeByFamille: {}, downtimeByNorme: {}, warnings: [],
+      audit: { tF_norme: 480, tF_lots: 480, tF_delta: 0, formula: "" },
+    });
+
+    for (const nq of [1, 3, 5, 7, 11, 15, 21]) {
+      const result = computeSixBigLosses(mk(nq), []);
+      const startup = result.losses.find(l => l.category === "startup_reject")!;
+      const production = result.losses.find(l => l.category === "production_reject")!;
+      expect(startup.minutes + production.minutes).toBe(Math.round(nq));
+    }
+  });
+});
+
 // ─── Period grouping (day / week / month) ───────────────────
 
 describe("isoWeekKey / periodKey", () => {

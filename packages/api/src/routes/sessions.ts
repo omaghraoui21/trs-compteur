@@ -3,7 +3,7 @@ import { eq, and, desc, inArray, isNull, max, sql } from "drizzle-orm";
 import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories, lotCadenceChanges } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, computeAClasserMin, computeMtbfMttr } from "@trs/engine";
 import { authenticate } from "../middleware";
-import { asyncHandler, validate, validateQuery, HttpError } from "../lib/http";
+import { asyncHandler, validate, validateQuery, HttpError, isUniqueViolation } from "../lib/http";
 import { audit } from "../lib/audit";
 import { effectiveLotCadence } from "../lib/cadence";
 import { groupBy, splitPlannedUnplanned } from "../lib/group";
@@ -93,14 +93,25 @@ sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (re
   const tz = process.env.APP_TIMEZONE || "Europe/Paris";
   const sessionDate = now.toLocaleDateString("en-CA", { timeZone: tz });
 
-  const [session] = await db.insert(sessions).values({
-    equipmentId,
-    roomId,
-    operatorId: userId,
-    sessionDate,
-    openedAt: now,
-    status: "active",
-  }).returning();
+  let session;
+  try {
+    [session] = await db.insert(sessions).values({
+      equipmentId,
+      roomId,
+      operatorId: userId,
+      sessionDate,
+      openedAt: now,
+      status: "active",
+    }).returning();
+  } catch (e) {
+    // Lost the race against a concurrent open — the partial unique index
+    // (uq_sessions_one_active_per_equip) rejected the second active session.
+    if (isUniqueViolation(e, "uq_sessions_one_active_per_equip")) {
+      res.status(409).json({ error: "Session déjà active pour cet équipement" });
+      return;
+    }
+    throw e;
+  }
 
   await audit(db, req, "OPEN_SESSION", "session", session.id, { equipmentId, roomId });
   res.status(201).json(session);
@@ -159,17 +170,20 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
 // ─── Add session event (phase) ────────────────────────────────
 
 sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async (req, res) => {
-  const { db } = req;
+  const { db, userId, userRole } = req;
   const { eventType, label, durationMinutes, isPlanned, comment } = req.body;
   const sessionId = String(req.params.id);
 
   // Session status check + sort-order aggregate run in parallel.
   const [[sessionRow], [maxSortRow]] = await Promise.all([
-    db.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
+    db.select({ id: sessions.id, status: sessions.status, operatorId: sessions.operatorId }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
     db.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, sessionId)),
   ]);
   if (!sessionRow) { res.status(404).json({ error: "Session introuvable" }); return; }
   if (sessionRow.status !== "active") throw new HttpError(409, "Impossible d'ajouter un événement à une session fermée");
+  if (userRole === "operator" && sessionRow.operatorId !== userId) {
+    throw new HttpError(403, "Vous ne pouvez ajouter des événements qu'à votre propre session");
+  }
 
   const maxOrder = maxSortRow?.m ?? 0;
 
@@ -198,13 +212,16 @@ sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async 
 // lot-level one, but it attaches to the session instead of a lot.
 
 sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
-  const { db, userId } = req;
+  const { db, userId, userRole } = req;
   const { categoryId, durationMinutes, isShortStop, comment } = req.body;
   const sessionId = String(req.params.id);
 
-  const [session] = await db.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  const [session] = await db.select({ id: sessions.id, status: sessions.status, operatorId: sessions.operatorId }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
   if (!session) { res.status(404).json({ error: "Session introuvable" }); return; }
   if (session.status !== "active") throw new HttpError(409, "Impossible d'ajouter un arrêt à une session fermée");
+  if (userRole === "operator" && session.operatorId !== userId) {
+    throw new HttpError(403, "Vous ne pouvez ajouter des arrêts qu'à votre propre session");
+  }
 
   const now = new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 60_000);
@@ -254,7 +271,7 @@ sessionsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
 // ─── Delete a session-level downtime ──────────────────────────
 
 sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
-  const { db } = req;
+  const { db, userId, userRole } = req;
   const sessionId = String(req.params.id);
   const dtId = String(req.params.dtId);
 
@@ -262,7 +279,7 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   // found — they must yield a helpful 400 below, not a misleading 404.
   const [dt] = await db.select({
     id: downtimeEvents.id, sessionId: downtimeEvents.sessionId, lotEntryId: downtimeEvents.lotEntryId,
-    sessionStatus: sessions.status,
+    sessionStatus: sessions.status, createdBy: downtimeEvents.createdBy,
   })
     .from(downtimeEvents)
     .leftJoin(sessions, eq(downtimeEvents.sessionId, sessions.id))
@@ -273,6 +290,9 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   if (dt.lotEntryId !== null) { res.status(400).json({ error: "Cet arrêt est rattaché à un lot — utilisez DELETE /lots/:id/downtimes/:dtId" }); return; }
   if (dt.sessionId !== sessionId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à cette session" }); return; }
   if (dt.sessionStatus !== "active") throw new HttpError(409, "Impossible de supprimer un arrêt d'une session déjà fermée");
+  if (userRole === "operator" && dt.createdBy !== userId) {
+    throw new HttpError(403, "Vous ne pouvez supprimer que vos propres arrêts");
+  }
 
   await db.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
   await audit(db, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });
