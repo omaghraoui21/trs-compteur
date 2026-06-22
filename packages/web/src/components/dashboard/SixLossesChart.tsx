@@ -74,10 +74,10 @@ export default function SixLossesChart({ data }: Props) {
         ))}
       </div>
 
-      <ResponsiveContainer width="100%" height={260}>
-        <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 60 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-          <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} />
+          <XAxis dataKey="name" tick={{ fontSize: 10, angle: -35, textAnchor: "end" }} interval={0} height={80} />
           <YAxis tick={{ fontSize: 11 }} tickFormatter={v => fmtDuration(v)} />
           <Tooltip
             formatter={(value, name) => {
