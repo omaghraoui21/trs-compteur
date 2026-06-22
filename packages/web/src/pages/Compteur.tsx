@@ -1619,6 +1619,7 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startTimer = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
     setTimerStart(Date.now());
     setTimerRunning(true);
     setTimerElapsed(0);
