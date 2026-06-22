@@ -592,7 +592,7 @@ export interface PeriodBucket extends SessionTrsResult {
 
 /** ISO-8601 week key (Monday-based), e.g. "2026-W22". */
 export function isoWeekKey(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00Z");
+  const d = new Date(dateStr.slice(0, 10) + "T00:00:00Z");
   const day = (d.getUTCDay() + 6) % 7; // Monday = 0
   // Shift to the Thursday of this week (ISO weeks belong to the year of their Thursday)
   d.setUTCDate(d.getUTCDate() - day + 3);
