@@ -78345,7 +78345,10 @@ var sessions = pgTable("sessions", {
   index("idx_sessions_equip_date").on(t2.equipmentId, t2.sessionDate),
   index("idx_sessions_status").on(t2.status),
   index("idx_sessions_operator").on(t2.operatorId),
-  index("idx_sessions_operator_status").on(t2.operatorId, t2.status)
+  index("idx_sessions_operator_status").on(t2.operatorId, t2.status),
+  // At most one active session per equipment — closes the TOCTOU window where
+  // two concurrent /sessions/open calls both pass the application-level check.
+  uniqueIndex("uq_sessions_one_active_per_equip").on(t2.equipmentId).where(sql`status = 'active'`)
 ]);
 var sessionEvents = pgTable("session_events", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -78400,6 +78403,9 @@ var lotEntries = pgTable("lot_entries", {
   index("idx_lot_entries_ended_at").on(t2.endedAt),
   index("idx_lot_entries_status_ended_at").on(t2.status, t2.endedAt),
   uniqueIndex("uq_lot_entries_session_batch").on(t2.sessionId, t2.batchNumber),
+  // At most one active lot per session — closes the TOCTOU window where two
+  // concurrent /lots calls both pass the application-level active-lot check.
+  uniqueIndex("uq_lot_entries_one_active_per_session").on(t2.sessionId).where(sql`status = 'active'`),
   // Validated/rejected lots must always record who decided and when.
   check("chk_lot_validation_complete", sql`
     (status IN ('validated', 'rejected') AND supervisor_id IS NOT NULL AND validated_at IS NOT NULL)
@@ -78741,6 +78747,16 @@ var HttpError = class extends Error {
     this.name = "HttpError";
   }
 };
+function isUniqueViolation(err, constraint) {
+  let e2 = err;
+  while (e2) {
+    if (e2.code === "23505") {
+      return constraint ? e2.constraint === constraint : true;
+    }
+    e2 = e2.cause;
+  }
+  return false;
+}
 function asyncHandler(fn2) {
   return (req, res, next) => {
     fn2(req, res, next).catch(next);
@@ -83596,14 +83612,23 @@ sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (re
   const now = /* @__PURE__ */ new Date();
   const tz = process.env.APP_TIMEZONE || "Europe/Paris";
   const sessionDate = now.toLocaleDateString("en-CA", { timeZone: tz });
-  const [session] = await db3.insert(sessions).values({
-    equipmentId,
-    roomId,
-    operatorId: userId,
-    sessionDate,
-    openedAt: now,
-    status: "active"
-  }).returning();
+  let session;
+  try {
+    [session] = await db3.insert(sessions).values({
+      equipmentId,
+      roomId,
+      operatorId: userId,
+      sessionDate,
+      openedAt: now,
+      status: "active"
+    }).returning();
+  } catch (e2) {
+    if (isUniqueViolation(e2, "uq_sessions_one_active_per_equip")) {
+      res.status(409).json({ error: "Session d\xE9j\xE0 active pour cet \xE9quipement" });
+      return;
+    }
+    throw e2;
+  }
   await audit(db3, req, "OPEN_SESSION", "session", session.id, { equipmentId, roomId });
   res.status(201).json(session);
 }));
@@ -83883,17 +83908,30 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
   const lotOrder = (lotCountRow?.n ?? 0) + 1;
   const maxOrder = maxSortRow?.m ?? 0;
   const now = /* @__PURE__ */ new Date();
-  const [lot] = await db3.insert(lotEntries).values({
-    sessionId,
-    productId,
-    batchNumber,
-    lotOrder,
-    cadenceUsed: String(cadenceUsed),
-    cadenceUnit: cadenceUnit2 || "u/h",
-    operatorId: userId,
-    startedAt: now,
-    status: "active"
-  }).returning();
+  let lot;
+  try {
+    [lot] = await db3.insert(lotEntries).values({
+      sessionId,
+      productId,
+      batchNumber,
+      lotOrder,
+      cadenceUsed: String(cadenceUsed),
+      cadenceUnit: cadenceUnit2 || "u/h",
+      operatorId: userId,
+      startedAt: now,
+      status: "active"
+    }).returning();
+  } catch (e2) {
+    if (isUniqueViolation(e2, "uq_lot_entries_one_active_per_session")) {
+      res.status(409).json({ error: "Un lot est d\xE9j\xE0 actif dans cette session" });
+      return;
+    }
+    if (isUniqueViolation(e2, "uq_lot_entries_session_batch")) {
+      res.status(409).json({ error: "Ce num\xE9ro de lot est d\xE9j\xE0 enregistr\xE9 dans cette session" });
+      return;
+    }
+    throw e2;
+  }
   await db3.insert(sessionEvents).values({
     sessionId,
     eventType: "lot_start",
