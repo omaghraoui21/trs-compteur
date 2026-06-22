@@ -30,6 +30,15 @@ export function createDb(url = connectionString) {
     idle_timeout: 20,
     connect_timeout: 15,
     prepare: false,
+    // Idempotent boot migrations (CREATE TABLE IF NOT EXISTS, DROP ... IF EXISTS)
+    // emit dozens of severity-NOTICE messages on every cold start. The postgres
+    // driver prints them all by default, drowning out real errors in the logs.
+    // Drop routine NOTICEs; still surface anything more severe (WARNING+).
+    onnotice: (notice) => {
+      if (notice.severity && notice.severity !== "NOTICE") {
+        console.warn(`[pg ${notice.severity}] ${notice.message}`);
+      }
+    },
     // GxP: enforce TLS in all environments; Railway and Vercel both serve
     // postgres over SSL. In local dev with a non-SSL postgres (e.g. Docker
     // without certs), set DB_SSL=false in .env to skip.
