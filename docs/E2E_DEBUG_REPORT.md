@@ -74,9 +74,14 @@ Login, Dashboard (desktop + mobile, charts stack cleanly), and Admin (responsive
 tabs, empty states) all render well across both viewports — no layout defects
 found. The only genuine defect surfaced visually was the Supervision crash (#1).
 
-## Tooling note
-`@playwright/test` was not a project dependency, so `pnpm test:e2e` could not even
-load its config. Added it as a workspace dev dependency.
+## Tooling / CI
+- `@playwright/test` was not a project dependency, so `pnpm test:e2e` could not
+  even load its config. Added it as a workspace dev dependency.
+- **The E2E suite never ran in CI** (`.github/workflows/ci.yml` had only the
+  engine/API jobs) — which is exactly why it silently rotted to 6/32. Added a
+  dedicated `e2e` CI job (mocked API → no DB/API service needed; installs
+  chromium, runs `pnpm test:e2e`, uploads the Playwright report on failure) so
+  this regression can't recur unnoticed.
 
 ## What changed
 - `packages/web/src/pages/Supervisor.tsx` — null-safe `fmtSessionDate` (app fix).
