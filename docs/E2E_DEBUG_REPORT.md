@@ -11,7 +11,7 @@ land in `artifacts/<phase>/<viewport>/` (git-ignored).
 
 | | Before | After |
 |---|---|---|
-| `pnpm test:e2e` (32 tests) | **6 passed / 26 failed**, 4.6 min | **32 passed**, ~21 s |
+| `pnpm test:e2e` | **6 passed / 26 failed** (32 tests), 4.6 min | **38 passed** (+6 new Admin tests), ~25 s |
 | Supervision page | **Full-page crash** (ErrorBoundary) | Renders the validation queue |
 | Operator journey | **Blocked** at room picker | Completes through new-lot form |
 | `pnpm typecheck` | clean | clean |
@@ -82,6 +82,13 @@ found. The only genuine defect surfaced visually was the Supervision crash (#1).
   dedicated `e2e` CI job (mocked API → no DB/API service needed; installs
   chromium, runs `pnpm test:e2e`, uploads the Playwright report on failure) so
   this regression can't recur unnoticed.
+
+## Coverage added
+The **Admin / Configuration** page was the only major page with no E2E coverage
+(protected by `typecheck` alone — exactly the gap that let the Supervision crash
+ship). Added `e2e/tests/admin.spec.ts` (6 smoke tests: page render, tab
+navigation across Locaux/Équipements/Produits/Utilisateurs, and the empty
+state) plus an `adminPage` fixture and `mockAdminRoutes` helper.
 
 ## What changed
 - `packages/web/src/pages/Supervisor.tsx` — null-safe `fmtSessionDate` (app fix).
