@@ -164,7 +164,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedEquipment, from, to, zoom]);
+  }, [selectedEquipment, from, to, zoom, toast]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

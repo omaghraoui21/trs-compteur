@@ -1108,7 +1108,7 @@ function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs:
 
 // ─── Active Lot Card (U2 touch, U4 real-time validation) ─
 
-function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDowntime }: {
+function ActiveLotCard({ lot, products, onUpdate, onAddDowntime }: {
   lot: LotEntry; products: Product[]; categories: DowntimeCategory[]; sessionId: string;
   onUpdate: () => void; onAddDowntime: () => void;
 }) {

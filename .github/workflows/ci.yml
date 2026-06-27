@@ -54,6 +54,9 @@ jobs:
       - name: Typecheck (all packages)
         run: pnpm typecheck
 
+      - name: Lint
+        run: pnpm lint
+
       - name: Run tests (engine unit + API integration)
         run: pnpm test
 

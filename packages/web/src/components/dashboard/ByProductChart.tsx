@@ -1,5 +1,5 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from "recharts";
-import { fmtPct, fmtDuration, fmtNumber } from "@trs/engine";
+import { fmtPct, fmtNumber } from "@trs/engine";
 import type { ProductTrs } from "@/lib/api";
 import { Package } from "lucide-react";
 

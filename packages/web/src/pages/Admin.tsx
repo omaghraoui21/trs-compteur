@@ -553,7 +553,6 @@ function ProductsPanel() {
 // ─── Cadences Panel (Product × Equipment) ────────────────
 
 function CadencesPanel() {
-  const toast = useToast();
   const [cadences, setCadences] = useState<ProductEquipmentCadence[]>([]);
   const [productsList, setProductsList] = useState<AdminProduct[]>([]);
   const [equipmentsList, setEquipmentsList] = useState<AdminEquipment[]>([]);
@@ -594,7 +593,6 @@ function CadencesPanel() {
   const productNameMap = useMemo(() => new Map(productsList.map(p => [p.id, p.name] as const)), [productsList]);
   const equipmentNameMap = useMemo(() => new Map(equipmentsList.map(e => [e.id, e.name] as const)), [equipmentsList]);
   const productName = (id: string) => productNameMap.get(id) ?? id;
-  const equipmentName = (id: string) => equipmentNameMap.get(id) ?? id;
 
   const filteredCadences = useMemo(() => {
     const q = cadenceSearch.toLowerCase();
@@ -910,7 +908,11 @@ function DowntimeTree({ categories }: { categories: AdminDowntimeCategory[] }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const toggle = (key: string) =>
-    setCollapsed(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
 
   // All famille node keys across both branches — used by collapse-all.
   const allKeys = useMemo(() => {
