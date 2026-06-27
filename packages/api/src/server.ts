@@ -159,6 +159,13 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     res.status(err.status).json({ error: err.message });
     return;
   }
+  // A malformed path param (e.g. a non-UUID :id) makes Postgres raise
+  // 22P02 "invalid_text_representation". That's a client error, not a server
+  // fault — return 400 instead of logging a 500 and spamming Sentry.
+  if (typeof err === "object" && err !== null && (err as { code?: string }).code === "22P02") {
+    res.status(400).json({ error: "Identifiant invalide" });
+    return;
+  }
   console.error("Unhandled error:", err);
   if (process.env.SENTRY_DSN) {
     Sentry.captureException(err);

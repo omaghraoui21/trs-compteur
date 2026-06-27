@@ -919,3 +919,22 @@ describe("GET /admin/audit-log", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("malformed path params", () => {
+  it("returns 400 (not 500) when a :id path param is not a valid UUID", async () => {
+    const token = await login("operateur@dpi.local", "oper123");
+    const res = await request(app)
+      .get("/api/sessions/NOT-A-UUID")
+      .set({ Authorization: `Bearer ${token}` });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Identifiant invalide");
+  });
+
+  it("returns 404 for a well-formed but non-existent UUID", async () => {
+    const token = await login("operateur@dpi.local", "oper123");
+    const res = await request(app)
+      .get("/api/sessions/00000000-0000-0000-0000-000000000000")
+      .set({ Authorization: `Bearer ${token}` });
+    expect(res.status).toBe(404);
+  });
+});

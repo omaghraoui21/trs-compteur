@@ -84944,6 +84944,10 @@ app.use((err, _req, res, _next) => {
     res.status(err.status).json({ error: err.message });
     return;
   }
+  if (typeof err === "object" && err !== null && err.code === "22P02") {
+    res.status(400).json({ error: "Identifiant invalide" });
+    return;
+  }
   console.error("Unhandled error:", err);
   if (process.env.SENTRY_DSN) {
     captureException(err);
