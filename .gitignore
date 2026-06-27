@@ -9,8 +9,8 @@ dist
 .env*
 *.tsbuildinfo
 
-# E2E / Playwright run artifacts
-test-results
-playwright-report
-e2e/tour/artifacts
-artifacts
+# E2E / Playwright run artifacts (anchored to the repo root)
+/test-results
+/playwright-report
+/artifacts
+/e2e/tour/artifacts

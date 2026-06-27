@@ -21,7 +21,7 @@ function fmtLotDuration(start: string, end: string | null): string {
 function fmtSessionDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   const [y, m, d] = iso.split("-");
-  if (!y || !m || !d) return iso;
+  if (!y || !m || !d) return "—";
   return `${d}/${m}/${y}`;
 }
 
