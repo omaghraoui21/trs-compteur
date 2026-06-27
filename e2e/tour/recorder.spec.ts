@@ -1,7 +1,8 @@
 import { test as base, expect, type Page } from "@playwright/test";
 import {
-  OPERATOR_USER, SUPERVISOR_USER,
+  OPERATOR_USER, SUPERVISOR_USER, ADMIN_USER,
   mockAuthRoutes, mockRefRoutes, mockSessionRoutes, mockLotRoutes, mockDashboardRoutes,
+  mockAdminRoutes,
   SESSION, SESSION_DETAIL_EMPTY, TRS_EMPTY,
 } from "../fixtures/index";
 
@@ -18,8 +19,6 @@ async function injectTokens(page: Page) {
     localStorage.setItem("trs_onboarding_done", "1");
   });
 }
-
-const ADMIN_USER = { id: "user-ad-1", email: "admin@dpi.local", displayName: "Admin Test", role: "admin" };
 
 // Collect console errors per page so the tour doubles as a smoke test.
 function watchErrors(page: Page, sink: string[]) {
@@ -179,19 +178,18 @@ test.describe("tour", () => {
     await mockSessionRoutes(page);
     await mockLotRoutes(page);
     await mockDashboardRoutes(page);
-    // admin users endpoints
-    await page.route(/\/api\/admin\/users/, (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([OPERATOR_USER, SUPERVISOR_USER, ADMIN_USER]) }));
+    await mockAdminRoutes(page);
 
     await page.goto("/admin");
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${d}/40-admin.png`, fullPage: true });
 
-    // click through tabs
-    const tabs = page.getByRole("button");
+    // click through the Configuration tabs
+    const tabs = page.getByRole("tab");
     const count = await tabs.count();
-    for (let i = 0; i < Math.min(count, 12); i++) {
+    for (let i = 0; i < count; i++) {
       const label = (await tabs.nth(i).innerText().catch(() => "")).trim();
-      if (/produit|équipement|equipement|salle|cadence|arrêt|arret|utilisateur/i.test(label)) {
+      if (/produit|équipement|equipement|local|locaux|cadence|arrêt|arret|utilisateur|audit/i.test(label)) {
         await tabs.nth(i).click().catch(() => {});
         await page.waitForTimeout(350);
         await page.screenshot({ path: `${d}/41-admin-${label.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.png`, fullPage: true });
