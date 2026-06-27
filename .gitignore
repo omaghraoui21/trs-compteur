@@ -8,3 +8,6 @@ dist
 .vercel
 .env*
 *.tsbuildinfo
+
+# DB backups produced by scripts/fresh-production-launch.sh
+backups/
