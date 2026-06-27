@@ -172,6 +172,12 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     res.status(409).json({ error: "Cette valeur existe déjà (doublon)" });
     return;
   }
+  // 23503 foreign_key_violation: a reference to a missing row (bad create) or
+  // an attempt to delete a row that other records still reference.
+  if (pgCode === "23503") {
+    res.status(409).json({ error: "Opération impossible : référence liée manquante ou encore utilisée" });
+    return;
+  }
   console.error("Unhandled error:", err);
   if (process.env.SENTRY_DSN) {
     Sentry.captureException(err);

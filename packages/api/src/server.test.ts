@@ -954,4 +954,17 @@ describe("malformed path params", () => {
     expect(dup.status).toBe(409);
     expect(dup.body.error).toMatch(/existe déjà/i);
   });
+
+  it("returns 409 (not 500) on a foreign-key violation", async () => {
+    const token = await login("admin@dpi.local", "admin123");
+    const eqs = await request(app).get("/api/ref/equipments").set({ Authorization: `Bearer ${token}` });
+    const equipmentId = eqs.body[0].id;
+    const res = await request(app)
+      .post("/api/admin/cadences")
+      .set({ Authorization: `Bearer ${token}` })
+      // valid-format productId that references no existing row
+      .send({ productId: "11111111-1111-1111-1111-111111111111", equipmentId, cadenceValue: 100 });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/référence/i);
+  });
 });

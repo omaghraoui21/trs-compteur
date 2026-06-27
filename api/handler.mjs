@@ -84953,6 +84953,10 @@ app.use((err, _req, res, _next) => {
     res.status(409).json({ error: "Cette valeur existe d\xE9j\xE0 (doublon)" });
     return;
   }
+  if (pgCode === "23503") {
+    res.status(409).json({ error: "Op\xE9ration impossible : r\xE9f\xE9rence li\xE9e manquante ou encore utilis\xE9e" });
+    return;
+  }
   console.error("Unhandled error:", err);
   if (process.env.SENTRY_DSN) {
     captureException(err);
