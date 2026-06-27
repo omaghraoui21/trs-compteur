@@ -159,11 +159,17 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     res.status(err.status).json({ error: err.message });
     return;
   }
-  // A malformed path param (e.g. a non-UUID :id) makes Postgres raise
-  // 22P02 "invalid_text_representation". That's a client error, not a server
-  // fault — return 400 instead of logging a 500 and spamming Sentry.
-  if (typeof err === "object" && err !== null && (err as { code?: string }).code === "22P02") {
+  // Some Postgres errors are really client errors, not server faults — map
+  // them to 4xx so they don't log a 500 and spam Sentry.
+  const pgCode = typeof err === "object" && err !== null ? (err as { code?: string }).code : undefined;
+  // 22P02 invalid_text_representation: a malformed path param (e.g. a non-UUID :id).
+  if (pgCode === "22P02") {
     res.status(400).json({ error: "Identifiant invalide" });
+    return;
+  }
+  // 23505 unique_violation: a duplicate code/email on an admin create/update.
+  if (pgCode === "23505") {
+    res.status(409).json({ error: "Cette valeur existe déjà (doublon)" });
     return;
   }
   console.error("Unhandled error:", err);

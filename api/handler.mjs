@@ -84944,8 +84944,13 @@ app.use((err, _req, res, _next) => {
     res.status(err.status).json({ error: err.message });
     return;
   }
-  if (typeof err === "object" && err !== null && err.code === "22P02") {
+  const pgCode = typeof err === "object" && err !== null ? err.code : void 0;
+  if (pgCode === "22P02") {
     res.status(400).json({ error: "Identifiant invalide" });
+    return;
+  }
+  if (pgCode === "23505") {
+    res.status(409).json({ error: "Cette valeur existe d\xE9j\xE0 (doublon)" });
     return;
   }
   console.error("Unhandled error:", err);

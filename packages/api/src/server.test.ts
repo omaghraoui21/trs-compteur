@@ -937,4 +937,21 @@ describe("malformed path params", () => {
       .set({ Authorization: `Bearer ${token}` });
     expect(res.status).toBe(404);
   });
+
+  it("returns 409 (not 500) on a duplicate unique key", async () => {
+    const token = await login("admin@dpi.local", "admin123");
+    const code = `DUP-${Date.now()}`;
+    const first = await request(app)
+      .post("/api/admin/rooms")
+      .set({ Authorization: `Bearer ${token}` })
+      .send({ code, name: "First" });
+    expect(first.status).toBe(201);
+
+    const dup = await request(app)
+      .post("/api/admin/rooms")
+      .set({ Authorization: `Bearer ${token}` })
+      .send({ code, name: "Duplicate" });
+    expect(dup.status).toBe(409);
+    expect(dup.body.error).toMatch(/existe déjà/i);
+  });
 });
