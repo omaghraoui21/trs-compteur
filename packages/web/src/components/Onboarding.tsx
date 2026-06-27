@@ -67,7 +67,7 @@ export function Onboarding() {
               />
             ))}
           </div>
-          <button onClick={dismiss} aria-label="Fermer la présentation" className="p-1 text-gray-400 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
+          <button onClick={dismiss} aria-label="Fermer la présentation" className="p-1 text-gray-500 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>

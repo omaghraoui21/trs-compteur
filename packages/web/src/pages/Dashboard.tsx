@@ -304,7 +304,7 @@ export default function DashboardPage() {
             <div className="flex flex-wrap items-center gap-2">
               <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
                 aria-label="Date de début" className="border rounded-lg px-2 py-2 text-sm" />
-              <span className="text-gray-400" aria-hidden="true">→</span>
+              <span className="text-gray-500" aria-hidden="true">→</span>
               <input type="date" value={customTo}
                 onChange={e => setCustomTo(e.target.value)}
                 min={customFrom || undefined}
@@ -388,7 +388,7 @@ export default function DashboardPage() {
             </div>
           )}
           {showComparison && !comparisonLoading && !comparisonData && (
-            <div className="mb-4 p-8 bg-gray-50 rounded-xl border text-center text-sm text-gray-400">
+            <div className="mb-4 p-8 bg-gray-50 rounded-xl border text-center text-sm text-gray-500">
               Données de comparaison indisponibles — <button onClick={fetchComparison} className="text-blue-600 underline hover:no-underline">Réessayer</button>
             </div>
           )}
@@ -402,7 +402,7 @@ export default function DashboardPage() {
               {prevData && prevData.total.lotCount > 0 && (() => {
                 const prev = getPreviousPeriod(from, to, zoom);
                 return (
-                  <p className="text-xs text-gray-400 mb-2 text-right">
+                  <p className="text-xs text-gray-500 mb-2 text-right">
                     ↑↓ vs période précédente : {prev.from} → {prev.to}
                   </p>
                 );
@@ -532,7 +532,7 @@ function LinePerformanceBand({ daily }: { daily: DailyTrs[] }) {
           );
         })}
       </div>
-      <div className="flex justify-between mt-1 text-[10px] text-gray-400">
+      <div className="flex justify-between mt-1 text-[10px] text-gray-500">
         <span>{daily[0]?.date}</span>
         {daily.length > 1 && <span>{daily[daily.length - 1]?.date}</span>}
       </div>
@@ -595,13 +595,13 @@ function ClassificationQualityCard({ total }: { total: TrsMetrics & { aClasserMi
               <div key={t.min} className="absolute top-0 h-full w-px bg-black/20" style={{ left: `${t.min}%` }} />
             ))}
           </div>
-          <div className="relative text-[9px] text-gray-400 mt-0.5 h-3">
+          <div className="relative text-[9px] text-gray-500 mt-0.5 h-3">
             {CLASS_THRESHOLDS.filter(t => t.min > 0).map(t => (
               <span key={t.min} className="absolute" style={{ left: `${t.min}%`, transform: "translateX(-50%)" }}>{t.min}%</span>
             ))}
           </div>
         </div>
-        <div className="text-xs text-gray-400 max-w-[160px] text-right shrink-0">{statusLabel}</div>
+        <div className="text-xs text-gray-500 max-w-[160px] text-right shrink-0">{statusLabel}</div>
       </div>
     </div>
   );
@@ -639,9 +639,9 @@ function ParetoDrillModal({ code, pareto, log, onClose }: {
         <div className="flex items-center justify-between p-4 border-b">
           <div>
             <h3 id="pareto-drill-title" className="font-semibold">{cause?.label ?? code}</h3>
-            {cause && <p className="text-xs text-gray-400 mt-0.5">{cause.famille} · {fmtDuration(cause.totalMin)} · {cause.count} occurrence{cause.count > 1 ? "s" : ""}</p>}
+            {cause && <p className="text-xs text-gray-500 mt-0.5">{cause.famille} · {fmtDuration(cause.totalMin)} · {cause.count} occurrence{cause.count > 1 ? "s" : ""}</p>}
           </div>
-          <button onClick={onClose} aria-label="Fermer" className="text-gray-400 hover:text-gray-600 text-xl leading-none p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400">✕</button>
+          <button onClick={onClose} aria-label="Fermer" className="text-gray-500 hover:text-gray-600 text-xl leading-none p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400">✕</button>
         </div>
 
         <div className="overflow-y-auto flex-1 p-4">
@@ -683,15 +683,15 @@ function DowntimeLog({ log }: { log: DowntimeLogEntry[] }) {
       <div className="flex items-center gap-2 px-4 py-3 border-b">
         <AlertTriangle className="h-5 w-5 text-red-500" aria-hidden="true" />
         <h3 className="font-semibold">Journal des arrêts</h3>
-        <span className="ml-auto text-xs text-gray-400">{log.length} arrêt{log.length > 1 ? "s" : ""}</span>
+        <span className="ml-auto text-xs text-gray-500">{log.length} arrêt{log.length > 1 ? "s" : ""}</span>
       </div>
       {log.length === 0 ? (
-        <div className="px-4 py-8 text-center text-gray-400 text-sm">Aucun arrêt sur la période</div>
+        <div className="px-4 py-8 text-center text-gray-500 text-sm">Aucun arrêt sur la période</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm" aria-label="Journal des arrêts">
             <thead>
-              <tr className="text-[11px] uppercase tracking-wide text-gray-400 text-left border-b">
+              <tr className="text-[11px] uppercase tracking-wide text-gray-500 text-left border-b">
                 <th className="px-4 py-2 font-medium" scope="col">Date</th>
                 <th className="px-4 py-2 font-medium text-right" scope="col">Durée</th>
                 <th className="px-4 py-2 font-medium" scope="col">Type</th>
@@ -732,7 +732,7 @@ function DowntimeLog({ log }: { log: DowntimeLogEntry[] }) {
 // .catch(() => null) so one failing chart never blanks the whole dashboard).
 function ChartUnavailable({ label, onRetry }: { label: string; onRetry?: () => void }) {
   return (
-    <div className="bg-white rounded-xl border p-6 flex flex-col items-center justify-center text-center text-gray-400 min-h-[200px]">
+    <div className="bg-white rounded-xl border p-6 flex flex-col items-center justify-center text-center text-gray-500 min-h-[200px]">
       <BarChart3 className="h-7 w-7 mb-2 text-gray-300" aria-hidden="true" />
       <p className="text-sm font-medium text-gray-500">{label}</p>
       <p className="text-xs mt-1">Données indisponibles pour cette période.</p>
@@ -764,9 +764,9 @@ function StatStrip({ metrics }: { metrics: TrsMetrics }) {
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4" role="region" aria-label="Résumé de production">
       {cards.map(c => (
         <div key={c.label} className="bg-white rounded-xl border shadow-sm p-4 text-center">
-          <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">{c.label}</div>
+          <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">{c.label}</div>
           <div className="text-2xl font-bold tabular-nums" style={c.color ? { color: c.color } : undefined}>{c.value}</div>
-          {c.sub && <div className="text-[11px] text-gray-400 mt-0.5">{c.sub}</div>}
+          {c.sub && <div className="text-[11px] text-gray-500 mt-0.5">{c.sub}</div>}
         </div>
       ))}
     </div>
@@ -804,10 +804,10 @@ function KpiCard({ metrics, title, subtitle, rank, objective, prevMetrics }: { m
           <Gauge className="h-5 w-5 text-blue-600" aria-hidden="true" />
           <div>
             <h3 className="font-semibold leading-tight">TRS Consolidé — {title}</h3>
-            {subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}
+            {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
           </div>
         </div>
-        <div className="text-center text-gray-400 py-8">
+        <div className="text-center text-gray-500 py-8">
           <BarChart3 className="h-10 w-10 mx-auto mb-3 text-gray-300" aria-hidden="true" />
           <p className="font-medium text-gray-500">Aucune donnée pour cette période</p>
           <p className="text-sm mt-1">Ajustez les filtres ou sélectionnez une autre plage.</p>
@@ -827,7 +827,7 @@ function KpiCard({ metrics, title, subtitle, rank, objective, prevMetrics }: { m
           <Gauge className="h-5 w-5 text-blue-600" aria-hidden="true" />
           <div>
             <h3 className="font-semibold leading-tight">TRS Consolidé — {title}</h3>
-            {subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}
+            {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
           </div>
         </div>
         <BenchmarkBadge rating={bench.ratings.TRS} />
@@ -873,7 +873,7 @@ function KpiCard({ metrics, title, subtitle, rank, objective, prevMetrics }: { m
           <div className={`text-lg font-bold ${metrics.totalProduced > 0 && metrics.totalRebut / metrics.totalProduced > 0.05 ? "text-red-600" : ""}`}>
             {metrics.totalProduced > 0 ? `${((metrics.totalRebut / metrics.totalProduced) * 100).toFixed(1)} %` : "—"}
           </div>
-          {metrics.totalRebut > 0 && <div className="text-[10px] text-gray-400 mt-0.5">{fmtNumber(metrics.totalRebut)} unités</div>}
+          {metrics.totalRebut > 0 && <div className="text-[10px] text-gray-500 mt-0.5">{fmtNumber(metrics.totalRebut)} unités</div>}
         </div>
       </div>
 
@@ -892,21 +892,21 @@ function KpiCard({ metrics, title, subtitle, rank, objective, prevMetrics }: { m
           {(metrics.utilisation ?? 0) > 1 ? (
             <div className="text-[10px] text-amber-600 mt-0.5 flex items-center gap-0.5"><AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />&gt;100% — vérifier les données</div>
           ) : (
-            <div className="text-[10px] text-gray-400 mt-0.5">tO / 24h</div>
+            <div className="text-[10px] text-gray-500 mt-0.5">tO / 24h</div>
           )}
         </div>
         {rel && rel.mtbf != null && (
           <div className="bg-gray-50 rounded-xl p-3">
             <div className="text-xs text-gray-500 mb-1">MTBF</div>
             <div className="text-xl font-bold">{Math.round(rel.mtbf)} min</div>
-            <div className="text-[10px] text-gray-400 mt-0.5">{rel.breakdownCount} panne{rel.breakdownCount > 1 ? "s" : ""}</div>
+            <div className="text-[10px] text-gray-500 mt-0.5">{rel.breakdownCount} panne{rel.breakdownCount > 1 ? "s" : ""}</div>
           </div>
         )}
         {rel && rel.mttr != null && (
           <div className="bg-gray-50 rounded-xl p-3">
             <div className="text-xs text-gray-500 mb-1">MTTR</div>
             <div className="text-xl font-bold">{Math.round(rel.mttr)} min</div>
-            <div className="text-[10px] text-gray-400 mt-0.5">durée moy. panne</div>
+            <div className="text-[10px] text-gray-500 mt-0.5">durée moy. panne</div>
           </div>
         )}
       </div>
@@ -919,7 +919,7 @@ function KpiCard({ metrics, title, subtitle, rank, objective, prevMetrics }: { m
       )}
 
       {/* Benchmark reference */}
-      <div className="mt-3 text-[11px] text-gray-400 border-t pt-2">
+      <div className="mt-3 text-[11px] text-gray-500 border-t pt-2">
         Référence pharma : TRS ≥ {(bench.thresholds.trs.worldClass * 100).toFixed(0)}% (classe mondiale) · DO ≥ {(bench.thresholds.DO.worldClass * 100).toFixed(0)}% · TP ≥ {(bench.thresholds.TP.worldClass * 100).toFixed(0)}% · TQ ≥ {(bench.thresholds.TQ.worldClass * 100).toFixed(1)}%
       </div>
 
@@ -968,7 +968,7 @@ function TimeBuckets({ metrics }: { metrics: TrsMetrics }) {
   const buckets = [
     { label: "tT (24h)", value: fmtDuration(metrics.tT), color: "text-gray-600" },
     { label: "tO", value: fmtDuration(metrics.tO), color: "text-blue-600" },
-    { label: "Fermeture", value: fmtDuration(metrics.fermeture), color: "text-gray-400" },
+    { label: "Fermeture", value: fmtDuration(metrics.fermeture), color: "text-gray-500" },
     { label: "tAP", value: fmtDuration(metrics.tAP), color: "text-yellow-600" },
     { label: "tR", value: fmtDuration(metrics.tR), color: "text-blue-700" },
     { label: "Arrêts NP", value: fmtDuration(metrics.totalUnplannedMin), color: "text-orange-600" },
@@ -1027,7 +1027,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
     <div className="bg-white rounded-xl border shadow-sm" role="region" aria-label="Détail par jour">
       <div className="px-4 py-3 border-b flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-gray-400" aria-hidden="true" />
+          <Calendar className="h-4 w-4 text-gray-500" aria-hidden="true" />
           <h3 className="font-semibold text-sm">Détail par jour</h3>
         </div>
         <button onClick={exportCsv}
@@ -1068,7 +1068,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                         onClick={e => { e.stopPropagation(); onToggleDay(d.date); }}
                         className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded"
                       >
-                        {expandedDay === d.date ? <ChevronUp className="h-3 w-3 text-gray-400" aria-hidden="true" /> : <ChevronDown className="h-3 w-3 text-gray-400" aria-hidden="true" />}
+                        {expandedDay === d.date ? <ChevronUp className="h-3 w-3 text-gray-500" aria-hidden="true" /> : <ChevronDown className="h-3 w-3 text-gray-500" aria-hidden="true" />}
                       </button>
                     )}
                   </td>
@@ -1087,7 +1087,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                       )}
                     </div>
                     {d.notes && (
-                      <div className="text-[10px] text-gray-400 mt-0.5 truncate max-w-[14rem]" title={d.notes}>
+                      <div className="text-[10px] text-gray-500 mt-0.5 truncate max-w-[14rem]" title={d.notes}>
                         📝 {d.notes}
                       </div>
                     )}
@@ -1111,11 +1111,11 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                     <td className="px-3 py-1.5"></td>
                     <td className="px-3 py-1.5 text-gray-600 pl-6">
                       <div className="flex items-center gap-1">
-                        <span className="text-gray-400">└</span>
+                        <span className="text-gray-500">└</span>
                         <span className="font-medium">{lot.productName}</span>
-                        <span className="text-gray-400">({lot.batchNumber})</span>
+                        <span className="text-gray-500">({lot.batchNumber})</span>
                       </div>
-                      <div className="text-[10px] text-gray-400 mt-0.5">
+                      <div className="text-[10px] text-gray-500 mt-0.5">
                         Cadence: {lot.cadencePerMin ? `${lot.cadencePerMin.toFixed(0)} u/min` : "—"}
                         {(lot.unplannedMin ?? 0) > 0 && <span className="ml-2 text-red-500">Arrêts NP: {fmtDuration(lot.unplannedMin ?? 0)}</span>}
                         {lot.ecartCadence != null && lot.ecartCadence > 5 && (
@@ -1123,10 +1123,10 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-1.5 text-right text-gray-400">{fmtDuration(lot.lotDurationMin ?? 0)}</td>
-                    <td className="px-3 py-1.5 text-right text-gray-400">{fmtDuration(lot.plannedMin || 0)}</td>
-                    <td className="px-3 py-1.5 text-right text-gray-400">—</td>
-                    <td className="px-3 py-1.5 text-right text-gray-400">{fmtDuration(Math.round(lot.tF))}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-500">{fmtDuration(lot.lotDurationMin ?? 0)}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-500">{fmtDuration(lot.plannedMin || 0)}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-500">—</td>
+                    <td className="px-3 py-1.5 text-right text-gray-500">{fmtDuration(Math.round(lot.tF))}</td>
                     <td className="px-3 py-1.5 text-right">1</td>
                     <td className="px-3 py-1.5 text-right">{lot.quantityProduced?.toLocaleString("fr-FR")}</td>
                     <td className="px-3 py-1.5 text-right text-red-500">{fmtNumber(lot.rebut ?? 0)}</td>
@@ -1161,7 +1161,7 @@ function DailyTable({ daily, total, expandedDay, onToggleDay, exportCsv }: {
         {/* Fade hint on mobile to indicate horizontal scroll */}
         <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent lg:hidden" />
       </div>
-      <p className="lg:hidden text-[11px] text-gray-400 text-center py-1.5 border-t">← Glissez pour voir les métriques →</p>
+      <p className="lg:hidden text-[11px] text-gray-500 text-center py-1.5 border-t">← Glissez pour voir les métriques →</p>
     </div>
   );
 }

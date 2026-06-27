@@ -167,7 +167,7 @@ export const DOWNTIME_EVENT = {
 
 export const TRS_EMPTY = {
   session: {
-    tO: 540, tR: 0, tF: 0, tN: 0, tU: 0,
+    tT: 1440, tO: 540, tR: 0, tF: 0, tN: 0, tU: 0,
     DO: 0, TP: 0, TQ: 0, TRS: 0, TRG: 0,
     lotCount: 0, totalProduced: 0, totalConforming: 0, totalRebut: 0,
     tAP: 0, fermeture: 0, ecartCadenceMin: 0, nonQualiteMin: 0,

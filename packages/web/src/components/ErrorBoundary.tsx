@@ -29,7 +29,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             </svg>
           </div>
           <p className="text-gray-700 font-semibold mb-1">{this.props.label ?? "Une erreur inattendue s'est produite"}</p>
-          <p className="text-xs text-gray-400 mb-4 font-mono">{this.state.error.message}</p>
+          <p className="text-xs text-gray-500 mb-4 font-mono">{this.state.error.message}</p>
           <button
             onClick={() => { this.setState({ error: null }); window.location.reload(); }}
             className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"

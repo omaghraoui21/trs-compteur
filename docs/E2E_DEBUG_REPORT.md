@@ -69,6 +69,22 @@ button** on phones. Evidence: `artifacts/after/mobile/13-operator-session-open.p
 | `supervisor` | "Rejeter" opens modal directly | a rejection **comment is mandatory** (GMP) first | fill the comment, then reject |
 | `dashboard` | one "Mois"/"CSV" button; custom = "Personnalisé" | duplicate zoom buttons; "Export CSV"; custom = "Libre" | scope/`exact` selectors; use "Libre" |
 
+## Accessibility audit (axe-core, WCAG 2.1 A/AA)
+Added `e2e/tests/a11y.spec.ts` — runs `@axe-core/playwright` against login,
+operator, supervisor (expanded), dashboard and admin.
+
+- **Structural a11y is clean and now gated:** zero serious/critical findings for
+  missing labels, button names, roles or ARIA across all five flows.
+- **Color contrast (advisory):** the audit flagged muted neutral text
+  (`text-gray-400`, #9ca3af → 2.53:1, below the 4.5:1 AA threshold) used 98× for
+  secondary/empty-state copy. **Fixed** by darkening it to `text-gray-500`
+  (~4.8:1 on white/gray-50) across 14 files — a monotonic, non-semantic
+  readability win that matters on bright shop-floor screens. The ~7 remaining
+  contrast findings per page are the app's *semantic* TRS palette
+  (green/amber/red from the engine's `trsColor()`); recolouring those is a
+  design decision, so the gate excludes `color-contrast` (run the spec without
+  `.disableRules` to see the advisory report).
+
 ## UX/UI review (screenshots)
 Login, Dashboard (desktop + mobile, charts stack cleanly), and Admin (responsive
 tabs, empty states) all render well across both viewports — no layout defects
