@@ -148,6 +148,21 @@ while the alert was shown.
 
 Suite is now **51 tests**.
 
+## Loop 5 — Supervisor correction coherence gap (real bug)
+The inline "Corriger les données" form gated its coherence checks on the *edited*
+field (`qConf !== ""` / `qRej !== ""`), so **lowering "Qté produite" below the
+untouched conforming/rebut slipped through** — the effective values became
+incoherent (conforming > produced, violating `closeLotSchema`) yet no error
+showed and "Signer la correction" stayed enabled. Probe confirmed produced=100
+with conforming=14256 was submittable.
+
+- **Fix** (`Supervisor.tsx`): compute `confErr`/`rejErr` from the *effective*
+  values (corrected-or-existing) regardless of which field was edited.
+- **Coverage** (`supervisor.spec.ts`): lowering produced below conforming is
+  flagged + disables signing; a coherent correction enables it.
+
+Suite is now **53 tests**.
+
 ## Coverage added
 The **Admin / Configuration** page was the only major page with no E2E coverage
 (protected by `typecheck` alone — exactly the gap that let the Supervision crash

@@ -101,3 +101,31 @@ test.describe("Supervisor — lot validation queue", () => {
     await expect(page.getByText(/aucun lot/i)).toBeVisible({ timeout: 5000 });
   });
 });
+
+test.describe("Supervisor — correction coherence", () => {
+  test.beforeEach(async ({ supervisorPage: page }) => {
+    await page.route(/\/api\/dashboard\/pending-lots/, (r) =>
+      r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([PENDING_LOT]) }));
+    await page.route(/\/api\/lots\/lot-1\/(downtimes|cadence|signatures)/, (r) =>
+      r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await page.goto("/supervisor");
+    await page.getByText("26013").click();
+    await page.getByRole("button", { name: /corriger les données/i }).click();
+  });
+
+  test("lowering produced below the untouched conforming is flagged", async ({ supervisorPage: page }) => {
+    // PENDING_LOT: produced 14400, conforming 14256. Lower produced under it.
+    await page.locator("#corr-qProd-lot-1").fill("100");
+    await page.locator("#corr-reason-lot-1").fill("erreur de saisie");
+    await expect(page.getByText(/ne peut pas dépasser/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /signer la correction/i })).toBeDisabled();
+  });
+
+  test("a coherent correction enables signing", async ({ supervisorPage: page }) => {
+    await page.locator("#corr-qProd-lot-1").fill("14400");
+    await page.locator("#corr-qConf-lot-1").fill("14000");
+    await page.locator("#corr-reason-lot-1").fill("recomptage qualité");
+    await expect(page.getByText(/ne peut pas dépasser/i)).not.toBeVisible();
+    await expect(page.getByRole("button", { name: /signer la correction/i })).toBeEnabled();
+  });
+});

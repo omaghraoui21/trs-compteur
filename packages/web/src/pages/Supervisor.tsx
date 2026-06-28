@@ -492,8 +492,11 @@ export default function SupervisorPage() {
                         const effProd = correctionData.qProd !== "" ? Number(correctionData.qProd) : lot.quantityProduced;
                         const effConf = correctionData.qConf !== "" ? Number(correctionData.qConf) : lot.quantityConforming;
                         const effRej  = correctionData.qRej  !== "" ? Number(correctionData.qRej)  : lot.quantityRejected;
-                        const confErr = correctionData.qConf !== "" && effConf > effProd;
-                        const rejErr  = correctionData.qRej  !== "" && effRej  > effProd;
+                        // Check the *effective* values (corrected or existing), not just
+                        // the edited field — otherwise lowering "Qté produite" below the
+                        // untouched conforming/rebut slips through (conforming > produced).
+                        const confErr = effConf > effProd;
+                        const rejErr  = effRej  > effProd;
                         const hasFormErr = confErr || rejErr;
                         return (
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
