@@ -3,7 +3,7 @@ import { eq, and, desc, count, max } from "drizzle-orm";
 import { sessions, lotEntries, downtimeEvents, sessionEvents, downtimeCategories, electronicSignatures, lotCadenceChanges } from "@trs/db";
 import { diffMinutes } from "@trs/engine";
 import { authenticate, requireRole } from "../middleware";
-import { asyncHandler, validate, HttpError } from "../lib/http";
+import { asyncHandler, validate, HttpError, assertOperatorOwns } from "../lib/http";
 import { audit } from "../lib/audit";
 import { reauthSigner, recordSignature } from "../lib/sign";
 import { startLotSchema, closeLotSchema, updateLotSchema, addDowntimeSchema, validateLotSchema, changeCadenceSchema, correctLotSchema } from "../schemas";
@@ -86,7 +86,7 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
     .from(lotEntries).where(eq(lotEntries.id, String(req.params.id))).limit(1);
   if (!existing) { res.status(404).json({ error: "Lot introuvable" }); return; }
   // H2: Operators may only close their own lots
-  if (userRole === "operator" && existing.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
+  assertOperatorOwns(userRole, userId, existing.operatorId);
   // Protect already-finalized lots — closing a validated/rejected lot would overwrite the supervisor's decision.
   if (existing.status !== "active") throw new HttpError(409, `Impossible de clôturer un lot en statut « ${existing.status} »`);
 
@@ -132,7 +132,7 @@ lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res
     .from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
   if (!existing) { res.status(404).json({ error: "Lot introuvable" }); return; }
   if (existing.status !== "active") throw new HttpError(409, "Seuls les lots actifs peuvent être mis à jour via PATCH — utilisez POST /:id/correct pour les lots clôturés");
-  if (userRole === "operator" && existing.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
+  assertOperatorOwns(userRole, userId, existing.operatorId);
 
   const updates: Partial<{ quantityProduced: number; quantityConforming: number; quantityRejected: number; cadenceUsed: string; cadenceUnit: string }> = {};
   if (req.body.quantityProduced !== undefined) updates.quantityProduced = req.body.quantityProduced;
@@ -164,7 +164,7 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
   const [lot] = await db.select().from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
   if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
   if (lot.status !== "active") throw new HttpError(409, "La cadence ne peut être modifiée que sur un lot en cours");
-  if (userRole === "operator" && lot.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
+  assertOperatorOwns(userRole, userId, lot.operatorId);
 
   const unit = cadenceUnit ?? lot.cadenceUnit;
 
@@ -225,9 +225,7 @@ lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(asyn
   if (lot.status !== "active" && lot.status !== "closed") {
     throw new HttpError(409, "Impossible d'ajouter un arrêt sur un lot déjà décidé par le superviseur");
   }
-  if (userRole === "operator" && lot.operatorId !== userId) {
-    throw new HttpError(403, "Vous ne pouvez ajouter des arrêts que sur vos propres lots");
-  }
+  assertOperatorOwns(userRole, userId, lot.operatorId, "Vous ne pouvez ajouter des arrêts que sur vos propres lots");
 
   const now = new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 60_000);
@@ -286,7 +284,7 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     .where(eq(downtimeEvents.id, dtId)).limit(1);
   if (!row) { res.status(404).json({ error: "Arrêt introuvable" }); return; }
   if (row.lotEntryId !== lotId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à ce lot" }); return; }
-  if (userRole === "operator" && row.createdBy !== userId) { res.status(403).json({ error: "Vous ne pouvez supprimer que vos propres arrêts" }); return; }
+  assertOperatorOwns(userRole, userId, row.createdBy, "Vous ne pouvez supprimer que vos propres arrêts");
   if (row.lotStatus !== "active" && row.lotStatus !== "closed") {
     throw new HttpError(409, "Impossible de supprimer un arrêt sur un lot déjà décidé par le superviseur");
   }

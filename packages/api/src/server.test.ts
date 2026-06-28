@@ -766,6 +766,22 @@ describe("delete downtime endpoints", () => {
     expect(res.status).toBe(404);
   });
 
+  it("lets an operator delete a legacy session stop with NULL created_by (not 403)", async () => {
+    const cats = await request(app).get("/api/ref/downtime-categories").set(auth);
+    const categoryId = (cats.body.categories ?? cats.body)[0].id;
+    const sd = await request(app)
+      .post(`/api/sessions/${sessionId}/downtimes`)
+      .set(auth).send({ categoryId, durationMinutes: 7 });
+    expect(sd.status).toBe(201);
+    // Simulate a pre-attribution row: clear created_by, then the owning operator
+    // must still be able to delete it (assertOperatorOwns skips when ownerId is null).
+    await sql`UPDATE downtime_events SET created_by = NULL WHERE id = ${sd.body.id}`;
+    const del = await request(app)
+      .delete(`/api/sessions/${sessionId}/downtimes/${sd.body.id}`)
+      .set(auth);
+    expect(del.status).toBe(204);
+  });
+
   closeSessionAfterAll(() => sessionId, () => auth);
 });
 

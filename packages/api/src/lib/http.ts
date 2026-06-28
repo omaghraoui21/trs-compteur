@@ -10,6 +10,22 @@ export class HttpError extends Error {
   }
 }
 
+// Operators may only act on records they own; supervisors and admins are
+// unrestricted. `ownerId == null` means the record has no recorded owner
+// (e.g. legacy rows created before ownership was tracked) — those are not
+// blocked, so an operator can still manage their own un-attributed records.
+// Throws 403 otherwise. Centralizes the ownership guard used across routes.
+export function assertOperatorOwns(
+  userRole: string | undefined,
+  userId: string | undefined,
+  ownerId: string | null | undefined,
+  message = "Accès interdit",
+): void {
+  if (userRole === "operator" && ownerId != null && ownerId !== userId) {
+    throw new HttpError(403, message);
+  }
+}
+
 type AsyncHandler = (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
 
 // Wraps an async route handler so rejected promises reach the error middleware

@@ -3,7 +3,7 @@ import { eq, and, desc, inArray, isNull, max, sql } from "drizzle-orm";
 import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories, lotCadenceChanges } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, computeAClasserMin, computeMtbfMttr } from "@trs/engine";
 import { authenticate } from "../middleware";
-import { asyncHandler, validate, validateQuery, HttpError } from "../lib/http";
+import { asyncHandler, validate, validateQuery, HttpError, assertOperatorOwns } from "../lib/http";
 import { audit } from "../lib/audit";
 import { effectiveLotCadence } from "../lib/cadence";
 import { groupBy, splitPlannedUnplanned } from "../lib/group";
@@ -118,7 +118,7 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
     .from(sessions).where(eq(sessions.id, sessionId)).limit(1);
   if (!sessionRow) { res.status(404).json({ error: "Session introuvable" }); return; }
   // H1: Operators may only close their own sessions
-  if (userRole === "operator" && sessionRow.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
+  assertOperatorOwns(userRole, userId, sessionRow.operatorId);
   // GMP: prevent duplicate CLOSE_SESSION audit entries from re-closing.
   if (sessionRow.status !== "active") throw new HttpError(409, "Session déjà fermée");
 
@@ -170,9 +170,7 @@ sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async 
   ]);
   if (!sessionRow) { res.status(404).json({ error: "Session introuvable" }); return; }
   if (sessionRow.status !== "active") throw new HttpError(409, "Impossible d'ajouter un événement à une session fermée");
-  if (userRole === "operator" && sessionRow.operatorId !== userId) {
-    throw new HttpError(403, "Vous ne pouvez ajouter des événements qu'à votre propre session");
-  }
+  assertOperatorOwns(userRole, userId, sessionRow.operatorId, "Vous ne pouvez ajouter des événements qu'à votre propre session");
 
   const maxOrder = maxSortRow?.m ?? 0;
 
@@ -208,9 +206,7 @@ sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(
   const [session] = await db.select({ id: sessions.id, status: sessions.status, operatorId: sessions.operatorId }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
   if (!session) { res.status(404).json({ error: "Session introuvable" }); return; }
   if (session.status !== "active") throw new HttpError(409, "Impossible d'ajouter un arrêt à une session fermée");
-  if (userRole === "operator" && session.operatorId !== userId) {
-    throw new HttpError(403, "Vous ne pouvez ajouter des arrêts qu'à votre propre session");
-  }
+  assertOperatorOwns(userRole, userId, session.operatorId, "Vous ne pouvez ajouter des arrêts qu'à votre propre session");
 
   const now = new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 60_000);
@@ -279,9 +275,7 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   if (dt.lotEntryId !== null) { res.status(400).json({ error: "Cet arrêt est rattaché à un lot — utilisez DELETE /lots/:id/downtimes/:dtId" }); return; }
   if (dt.sessionId !== sessionId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à cette session" }); return; }
   if (dt.sessionStatus !== "active") throw new HttpError(409, "Impossible de supprimer un arrêt d'une session déjà fermée");
-  if (userRole === "operator" && dt.createdBy !== userId) {
-    throw new HttpError(403, "Vous ne pouvez supprimer que vos propres arrêts");
-  }
+  assertOperatorOwns(userRole, userId, dt.createdBy, "Vous ne pouvez supprimer que vos propres arrêts");
 
   await db.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
   await audit(db, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });

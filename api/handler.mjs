@@ -78705,6 +78705,11 @@ var HttpError = class extends Error {
     this.name = "HttpError";
   }
 };
+function assertOperatorOwns(userRole2, userId, ownerId, message = "Acc\xE8s interdit") {
+  if (userRole2 === "operator" && ownerId != null && ownerId !== userId) {
+    throw new HttpError(403, message);
+  }
+}
 function asyncHandler(fn2) {
   return (req, res, next) => {
     fn2(req, res, next).catch(next);
@@ -83580,10 +83585,7 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
     res.status(404).json({ error: "Session introuvable" });
     return;
   }
-  if (userRole2 === "operator" && sessionRow.operatorId !== userId) {
-    res.status(403).json({ error: "Acc\xE8s interdit" });
-    return;
-  }
+  assertOperatorOwns(userRole2, userId, sessionRow.operatorId);
   if (sessionRow.status !== "active") throw new HttpError(409, "Session d\xE9j\xE0 ferm\xE9e");
   const activeLots = await db3.select({ id: lotEntries.id, batchNumber: lotEntries.batchNumber }).from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active")));
   await Promise.all([
@@ -83616,9 +83618,7 @@ sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async 
     return;
   }
   if (sessionRow.status !== "active") throw new HttpError(409, "Impossible d'ajouter un \xE9v\xE9nement \xE0 une session ferm\xE9e");
-  if (userRole2 === "operator" && sessionRow.operatorId !== userId) {
-    throw new HttpError(403, "Vous ne pouvez ajouter des \xE9v\xE9nements qu'\xE0 votre propre session");
-  }
+  assertOperatorOwns(userRole2, userId, sessionRow.operatorId, "Vous ne pouvez ajouter des \xE9v\xE9nements qu'\xE0 votre propre session");
   const maxOrder = maxSortRow?.m ?? 0;
   const now = /* @__PURE__ */ new Date();
   const endedAt = durationMinutes ? new Date(now.getTime() + durationMinutes * 6e4) : void 0;
@@ -83646,9 +83646,7 @@ sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(
     return;
   }
   if (session.status !== "active") throw new HttpError(409, "Impossible d'ajouter un arr\xEAt \xE0 une session ferm\xE9e");
-  if (userRole2 === "operator" && session.operatorId !== userId) {
-    throw new HttpError(403, "Vous ne pouvez ajouter des arr\xEAts qu'\xE0 votre propre session");
-  }
+  assertOperatorOwns(userRole2, userId, session.operatorId, "Vous ne pouvez ajouter des arr\xEAts qu'\xE0 votre propre session");
   const now = /* @__PURE__ */ new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 6e4);
   const [dt2] = await db3.insert(downtimeEvents).values({
@@ -83708,9 +83706,7 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     return;
   }
   if (dt2.sessionStatus !== "active") throw new HttpError(409, "Impossible de supprimer un arr\xEAt d'une session d\xE9j\xE0 ferm\xE9e");
-  if (userRole2 === "operator" && dt2.createdBy !== userId) {
-    throw new HttpError(403, "Vous ne pouvez supprimer que vos propres arr\xEAts");
-  }
+  assertOperatorOwns(userRole2, userId, dt2.createdBy, "Vous ne pouvez supprimer que vos propres arr\xEAts");
   await db3.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
   await audit(db3, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });
   res.status(204).send();
@@ -83877,10 +83873,7 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
     res.status(404).json({ error: "Lot introuvable" });
     return;
   }
-  if (userRole2 === "operator" && existing.operatorId !== userId) {
-    res.status(403).json({ error: "Acc\xE8s interdit" });
-    return;
-  }
+  assertOperatorOwns(userRole2, userId, existing.operatorId);
   if (existing.status !== "active") throw new HttpError(409, `Impossible de cl\xF4turer un lot en statut \xAB ${existing.status} \xBB`);
   const now = /* @__PURE__ */ new Date();
   const [lot] = await db3.update(lotEntries).set({
@@ -83915,10 +83908,7 @@ lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res
     return;
   }
   if (existing.status !== "active") throw new HttpError(409, "Seuls les lots actifs peuvent \xEAtre mis \xE0 jour via PATCH \u2014 utilisez POST /:id/correct pour les lots cl\xF4tur\xE9s");
-  if (userRole2 === "operator" && existing.operatorId !== userId) {
-    res.status(403).json({ error: "Acc\xE8s interdit" });
-    return;
-  }
+  assertOperatorOwns(userRole2, userId, existing.operatorId);
   const updates = {};
   if (req.body.quantityProduced !== void 0) updates.quantityProduced = req.body.quantityProduced;
   if (req.body.quantityConforming !== void 0) updates.quantityConforming = req.body.quantityConforming;
@@ -83943,10 +83933,7 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
     return;
   }
   if (lot.status !== "active") throw new HttpError(409, "La cadence ne peut \xEAtre modifi\xE9e que sur un lot en cours");
-  if (userRole2 === "operator" && lot.operatorId !== userId) {
-    res.status(403).json({ error: "Acc\xE8s interdit" });
-    return;
-  }
+  assertOperatorOwns(userRole2, userId, lot.operatorId);
   const unit = cadenceUnit2 ?? lot.cadenceUnit;
   const oldCadenceInUnit = unit === lot.cadenceUnit ? Number(lot.cadenceUsed) : lot.cadenceUnit === "u/h" ? Number(lot.cadenceUsed) / 60 : Number(lot.cadenceUsed) * 60;
   const [, [updated]] = await Promise.all([
@@ -83986,9 +83973,7 @@ lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(asyn
   if (lot.status !== "active" && lot.status !== "closed") {
     throw new HttpError(409, "Impossible d'ajouter un arr\xEAt sur un lot d\xE9j\xE0 d\xE9cid\xE9 par le superviseur");
   }
-  if (userRole2 === "operator" && lot.operatorId !== userId) {
-    throw new HttpError(403, "Vous ne pouvez ajouter des arr\xEAts que sur vos propres lots");
-  }
+  assertOperatorOwns(userRole2, userId, lot.operatorId, "Vous ne pouvez ajouter des arr\xEAts que sur vos propres lots");
   const now = /* @__PURE__ */ new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 6e4);
   const [dt2] = await db3.insert(downtimeEvents).values({
@@ -84035,10 +84020,7 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     res.status(403).json({ error: "Cet arr\xEAt n'appartient pas \xE0 ce lot" });
     return;
   }
-  if (userRole2 === "operator" && row.createdBy !== userId) {
-    res.status(403).json({ error: "Vous ne pouvez supprimer que vos propres arr\xEAts" });
-    return;
-  }
+  assertOperatorOwns(userRole2, userId, row.createdBy, "Vous ne pouvez supprimer que vos propres arr\xEAts");
   if (row.lotStatus !== "active" && row.lotStatus !== "closed") {
     throw new HttpError(409, "Impossible de supprimer un arr\xEAt sur un lot d\xE9j\xE0 d\xE9cid\xE9 par le superviseur");
   }
