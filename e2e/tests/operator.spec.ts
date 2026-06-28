@@ -83,10 +83,11 @@ test.describe("Operator — session lifecycle", () => {
     // Submit
     await page.getByRole("button", { name: /démarrer le lot/i }).click();
 
-    // Lot number or batch should appear in the timeline table.
-    // The batch number also renders in the active-lot card title/heading,
-    // so scope the assertion to the timeline cell to avoid a strict-mode clash.
-    await expect(page.getByRole("cell", { name: "26013" })).toBeVisible();
+    // The freshly-started lot's batch number appears in the timeline once the
+    // mocked session detail reloads with the active lot. getByText (substring)
+    // matches the single rendered occurrence in this view — getByRole("cell")
+    // finds nothing here because the lot is not rendered as a real table cell.
+    await expect(page.getByText("26013")).toBeVisible();
   });
 
   test("declare downtime form shows categories", async ({ operatorPage: page }) => {
