@@ -3,8 +3,9 @@ import { eq, and, desc, count, max } from "drizzle-orm";
 import { sessions, lotEntries, downtimeEvents, sessionEvents, downtimeCategories, electronicSignatures, lotCadenceChanges } from "@trs/db";
 import { diffMinutes } from "@trs/engine";
 import { authenticate, requireRole } from "../middleware";
-import { asyncHandler, validate, HttpError } from "../lib/http";
+import { asyncHandler, validate, HttpError, assertOperatorOwns } from "../lib/http";
 import { audit } from "../lib/audit";
+import { convertCadence } from "../lib/cadence";
 import { reauthSigner, recordSignature } from "../lib/sign";
 import { startLotSchema, closeLotSchema, updateLotSchema, addDowntimeSchema, validateLotSchema, changeCadenceSchema, correctLotSchema } from "../schemas";
 
@@ -19,12 +20,17 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
 
   if (!userId) { res.status(401).json({ error: "Non authentifié" }); return; }
 
-  // Verify session exists + is active, and check for an existing active lot — both
-  // reads are against indexed columns; run them in parallel.
-  const [[sessionRow], [activeLot]] = await Promise.all([
+  // Verify session exists + is active, check for an active lot, and check for
+  // a duplicate batch number in the same session — all reads against indexed columns.
+  // NB: the dup-batch check is app-level only (TOCTOU-racy) until the deferred
+  // unique index uq_lot_entries_session_batch lands; see migration 0012 follow-up.
+  const [[sessionRow], [activeLot], [dupBatch]] = await Promise.all([
     db.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
     db.select({ id: lotEntries.id }).from(lotEntries)
       .where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active")))
+      .limit(1),
+    db.select({ id: lotEntries.id }).from(lotEntries)
+      .where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.batchNumber, batchNumber)))
       .limit(1),
   ]);
   if (!sessionRow) { res.status(404).json({ error: "Session introuvable" }); return; }
@@ -32,6 +38,9 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
   if (activeLot) {
     res.status(409).json({ error: "Un lot est déjà actif dans cette session", lotId: activeLot.id });
     return;
+  }
+  if (dupBatch) {
+    throw new HttpError(409, "Ce numéro de lot est déjà enregistré dans cette session");
   }
 
   // Use aggregates to avoid loading full row sets just for ordering values.
@@ -80,7 +89,7 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
     .from(lotEntries).where(eq(lotEntries.id, String(req.params.id))).limit(1);
   if (!existing) { res.status(404).json({ error: "Lot introuvable" }); return; }
   // H2: Operators may only close their own lots
-  if (userRole === "operator" && existing.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
+  assertOperatorOwns(userRole, userId, existing.operatorId);
   // Protect already-finalized lots — closing a validated/rejected lot would overwrite the supervisor's decision.
   if (existing.status !== "active") throw new HttpError(409, `Impossible de clôturer un lot en statut « ${existing.status} »`);
 
@@ -125,8 +134,8 @@ lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res
   const [existing] = await db.select({ status: lotEntries.status, operatorId: lotEntries.operatorId })
     .from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
   if (!existing) { res.status(404).json({ error: "Lot introuvable" }); return; }
+  assertOperatorOwns(userRole, userId, existing.operatorId);
   if (existing.status !== "active") throw new HttpError(409, "Seuls les lots actifs peuvent être mis à jour via PATCH — utilisez POST /:id/correct pour les lots clôturés");
-  if (userRole === "operator" && existing.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
 
   const updates: Partial<{ quantityProduced: number; quantityConforming: number; quantityRejected: number; cadenceUsed: string; cadenceUnit: string }> = {};
   if (req.body.quantityProduced !== undefined) updates.quantityProduced = req.body.quantityProduced;
@@ -157,16 +166,24 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
 
   const [lot] = await db.select().from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
   if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
+  assertOperatorOwns(userRole, userId, lot.operatorId);
   if (lot.status !== "active") throw new HttpError(409, "La cadence ne peut être modifiée que sur un lot en cours");
-  if (userRole === "operator" && lot.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
 
   const unit = cadenceUnit ?? lot.cadenceUnit;
+
+  // A change row carries a single `cadenceUnit` that must describe BOTH its
+  // oldCadence and newCadence, because effectiveLotCadence reconstructs the
+  // lot's starting cadence from (oldCadence, cadenceUnit). When this change
+  // also switches the unit, express the old cadence in the new unit so the row
+  // stays internally consistent — otherwise the lot's initial cadence would be
+  // read under the wrong unit (a 60× error in TP).
+  const oldCadenceInUnit = convertCadence(Number(lot.cadenceUsed), lot.cadenceUnit, unit);
 
   // The insert and update are independent — run in parallel.
   const [, [updated]] = await Promise.all([
     db.insert(lotCadenceChanges).values({
       lotEntryId: lotId,
-      oldCadence: String(lot.cadenceUsed),
+      oldCadence: String(oldCadenceInUnit),
       newCadence: String(newCadence),
       cadenceUnit: unit,
       reason: reason ?? null,
@@ -196,12 +213,13 @@ lotsRouter.get("/:id/cadence", asyncHandler(async (req, res) => {
 // ─── Add downtime to a lot ────────────────────────────────────
 
 lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
-  const { db, userId } = req;
+  const { db, userId, userRole } = req;
   const { categoryId, durationMinutes, isShortStop, comment } = req.body;
   const lotId = String(req.params.id);
 
-  const [lot] = await db.select({ id: lotEntries.id, status: lotEntries.status }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  const [lot] = await db.select({ id: lotEntries.id, status: lotEntries.status, operatorId: lotEntries.operatorId }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
   if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
+  assertOperatorOwns(userRole, userId, lot.operatorId, "Vous ne pouvez ajouter des arrêts que sur vos propres lots");
   if (lot.status !== "active" && lot.status !== "closed") {
     throw new HttpError(409, "Impossible d'ajouter un arrêt sur un lot déjà décidé par le superviseur");
   }
@@ -257,13 +275,14 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   const dtId = String(req.params.dtId);
 
   // Join with the lot so we can check ownership + lot status in one query.
-  const [row] = await db.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId, lotStatus: lotEntries.status, createdBy: downtimeEvents.createdBy })
+  const [row] = await db.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId, lotStatus: lotEntries.status, createdBy: downtimeEvents.createdBy, operatorId: lotEntries.operatorId })
     .from(downtimeEvents)
     .innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id))
     .where(eq(downtimeEvents.id, dtId)).limit(1);
   if (!row) { res.status(404).json({ error: "Arrêt introuvable" }); return; }
   if (row.lotEntryId !== lotId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à ce lot" }); return; }
-  if (userRole === "operator" && row.createdBy !== userId) { res.status(403).json({ error: "Vous ne pouvez supprimer que vos propres arrêts" }); return; }
+  // Fall back to lot ownership for legacy stops with no recorded creator.
+  assertOperatorOwns(userRole, userId, row.createdBy ?? row.operatorId, "Vous ne pouvez supprimer que vos propres arrêts");
   if (row.lotStatus !== "active" && row.lotStatus !== "closed") {
     throw new HttpError(409, "Impossible de supprimer un arrêt sur un lot déjà décidé par le superviseur");
   }

@@ -766,6 +766,68 @@ describe("delete downtime endpoints", () => {
     expect(res.status).toBe(404);
   });
 
+  it("restricts deletion of a legacy NULL-created_by stop to the session's own operator", async () => {
+    const cats = await request(app).get("/api/ref/downtime-categories").set(auth);
+    const categoryId = (cats.body.categories ?? cats.body)[0].id;
+    const sd = await request(app)
+      .post(`/api/sessions/${sessionId}/downtimes`)
+      .set(auth).send({ categoryId, durationMinutes: 7 });
+    expect(sd.status).toBe(201);
+    // Simulate a pre-attribution row (created_by IS NULL).
+    await sql`UPDATE downtime_events SET created_by = NULL WHERE id = ${sd.body.id}`;
+
+    // A *different* operator must NOT be able to delete it — with created_by
+    // unknown, ownership falls back to the session's operator, not "any operator".
+    await request(app).post("/api/admin/users").set({ Authorization: `Bearer ${admToken}` }).send({
+      email: "other-op@dpi.local", displayName: "Autre Opérateur", password: "secret123", role: "operator",
+    });
+    const otherTok = (await request(app).post("/api/auth/login")
+      .send({ email: "other-op@dpi.local", password: "secret123" })).body.token;
+    const forbidden = await request(app)
+      .delete(`/api/sessions/${sessionId}/downtimes/${sd.body.id}`)
+      .set({ Authorization: `Bearer ${otherTok}` });
+    expect(forbidden.status).toBe(403);
+
+    // The session's own operator still can.
+    const del = await request(app)
+      .delete(`/api/sessions/${sessionId}/downtimes/${sd.body.id}`)
+      .set(auth);
+    expect(del.status).toBe(204);
+  });
+
+  closeSessionAfterAll(() => sessionId, () => auth);
+});
+
+describe("duplicate batch number rejection", () => {
+  const auth = { Authorization: `Bearer ${""}` };
+  let sessionId: string;
+
+  it("rejects a second lot reusing a batch number already in the session (409)", async () => {
+    auth.Authorization = `Bearer ${opToken}`;
+    const eqs = await request(app).get("/api/ref/equipments").set(auth);
+    const rooms = await request(app).get("/api/ref/rooms").set(auth);
+    const products = await request(app).get("/api/ref/products").set(auth);
+    const equipmentId = (eqs.body.equipments ?? eqs.body)[0].id;
+    const roomId = (rooms.body.rooms ?? rooms.body)[0].id;
+    const productId = (products.body.products ?? products.body)[0].id;
+
+    const ses = await request(app).post("/api/sessions/open").set(auth).send({ equipmentId, roomId });
+    expect(ses.status).toBe(201);
+    sessionId = ses.body.id ?? ses.body.session?.id;
+
+    const first = await request(app).post("/api/lots").set(auth)
+      .send({ sessionId, productId, batchNumber: "DUP-BATCH-1", cadenceUsed: 100, cadenceUnit: "u/min" });
+    expect(first.status).toBe(201);
+    const firstId = first.body.id ?? first.body.lot?.id;
+    // Close it so the active-lot guard doesn't mask the duplicate-batch guard.
+    await request(app).post(`/api/lots/${firstId}/close`).set(auth)
+      .send({ quantityProduced: 10, quantityConforming: 10 });
+
+    const dup = await request(app).post("/api/lots").set(auth)
+      .send({ sessionId, productId, batchNumber: "DUP-BATCH-1", cadenceUsed: 100, cadenceUnit: "u/min" });
+    expect(dup.status).toBe(409);
+  });
+
   closeSessionAfterAll(() => sessionId, () => auth);
 });
 

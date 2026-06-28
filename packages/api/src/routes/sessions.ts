@@ -3,7 +3,7 @@ import { eq, and, desc, inArray, isNull, max, sql } from "drizzle-orm";
 import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories, lotCadenceChanges } from "@trs/db";
 import { computeLotTrs, computeSessionTrs, computeAClasserMin, computeMtbfMttr } from "@trs/engine";
 import { authenticate } from "../middleware";
-import { asyncHandler, validate, validateQuery, HttpError } from "../lib/http";
+import { asyncHandler, validate, validateQuery, HttpError, assertOperatorOwns } from "../lib/http";
 import { audit } from "../lib/audit";
 import { effectiveLotCadence } from "../lib/cadence";
 import { groupBy, splitPlannedUnplanned } from "../lib/group";
@@ -118,7 +118,7 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
     .from(sessions).where(eq(sessions.id, sessionId)).limit(1);
   if (!sessionRow) { res.status(404).json({ error: "Session introuvable" }); return; }
   // H1: Operators may only close their own sessions
-  if (userRole === "operator" && sessionRow.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
+  assertOperatorOwns(userRole, userId, sessionRow.operatorId);
   // GMP: prevent duplicate CLOSE_SESSION audit entries from re-closing.
   if (sessionRow.status !== "active") throw new HttpError(409, "Session déjà fermée");
 
@@ -159,16 +159,18 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
 // ─── Add session event (phase) ────────────────────────────────
 
 sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async (req, res) => {
-  const { db } = req;
+  const { db, userId, userRole } = req;
   const { eventType, label, durationMinutes, isPlanned, comment } = req.body;
   const sessionId = String(req.params.id);
 
   // Session status check + sort-order aggregate run in parallel.
   const [[sessionRow], [maxSortRow]] = await Promise.all([
-    db.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
+    db.select({ id: sessions.id, status: sessions.status, operatorId: sessions.operatorId }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
     db.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, sessionId)),
   ]);
   if (!sessionRow) { res.status(404).json({ error: "Session introuvable" }); return; }
+  // Ownership before status so a non-owner can't probe a session's state.
+  assertOperatorOwns(userRole, userId, sessionRow.operatorId, "Vous ne pouvez ajouter des événements qu'à votre propre session");
   if (sessionRow.status !== "active") throw new HttpError(409, "Impossible d'ajouter un événement à une session fermée");
 
   const maxOrder = maxSortRow?.m ?? 0;
@@ -198,12 +200,14 @@ sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async 
 // lot-level one, but it attaches to the session instead of a lot.
 
 sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
-  const { db, userId } = req;
+  const { db, userId, userRole } = req;
   const { categoryId, durationMinutes, isShortStop, comment } = req.body;
   const sessionId = String(req.params.id);
 
-  const [session] = await db.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  const [session] = await db.select({ id: sessions.id, status: sessions.status, operatorId: sessions.operatorId }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
   if (!session) { res.status(404).json({ error: "Session introuvable" }); return; }
+  // Ownership before status so a non-owner can't probe a session's state.
+  assertOperatorOwns(userRole, userId, session.operatorId, "Vous ne pouvez ajouter des arrêts qu'à votre propre session");
   if (session.status !== "active") throw new HttpError(409, "Impossible d'ajouter un arrêt à une session fermée");
 
   const now = new Date();
@@ -254,7 +258,7 @@ sessionsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
 // ─── Delete a session-level downtime ──────────────────────────
 
 sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
-  const { db } = req;
+  const { db, userId, userRole } = req;
   const sessionId = String(req.params.id);
   const dtId = String(req.params.dtId);
 
@@ -262,7 +266,8 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   // found — they must yield a helpful 400 below, not a misleading 404.
   const [dt] = await db.select({
     id: downtimeEvents.id, sessionId: downtimeEvents.sessionId, lotEntryId: downtimeEvents.lotEntryId,
-    sessionStatus: sessions.status,
+    sessionStatus: sessions.status, createdBy: downtimeEvents.createdBy,
+    sessionOperatorId: sessions.operatorId,
   })
     .from(downtimeEvents)
     .leftJoin(sessions, eq(downtimeEvents.sessionId, sessions.id))
@@ -272,6 +277,11 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   // the ownership check so the caller gets 400 (wrong endpoint), not 403/404.
   if (dt.lotEntryId !== null) { res.status(400).json({ error: "Cet arrêt est rattaché à un lot — utilisez DELETE /lots/:id/downtimes/:dtId" }); return; }
   if (dt.sessionId !== sessionId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à cette session" }); return; }
+  // Ownership before status so a non-owner can't probe a session's state.
+  // Fall back to session ownership for legacy stops with no recorded creator,
+  // so an un-attributed stop can still only be removed by the session's own
+  // operator (not any operator).
+  assertOperatorOwns(userRole, userId, dt.createdBy ?? dt.sessionOperatorId, "Vous ne pouvez supprimer que vos propres arrêts");
   if (dt.sessionStatus !== "active") throw new HttpError(409, "Impossible de supprimer un arrêt d'une session déjà fermée");
 
   await db.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));

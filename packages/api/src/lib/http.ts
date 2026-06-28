@@ -10,6 +10,21 @@ export class HttpError extends Error {
   }
 }
 
+// Ownership guard shared across routes: operators may act only on records they
+// own; supervisors and admins are unrestricted. A null `ownerId` (no recorded
+// owner) bypasses the check. Throws HttpError(403) otherwise. Call sites that
+// pass a fallback owner (e.g. `createdBy ?? operatorId`) document why there.
+export function assertOperatorOwns(
+  userRole: string | undefined,
+  userId: string | undefined,
+  ownerId: string | null | undefined,
+  message = "Accès interdit",
+): void {
+  if (userRole === "operator" && ownerId != null && ownerId !== userId) {
+    throw new HttpError(403, message);
+  }
+}
+
 type AsyncHandler = (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
 
 // Wraps an async route handler so rejected promises reach the error middleware

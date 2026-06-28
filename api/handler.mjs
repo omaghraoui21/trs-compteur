@@ -78705,6 +78705,11 @@ var HttpError = class extends Error {
     this.name = "HttpError";
   }
 };
+function assertOperatorOwns(userRole2, userId, ownerId, message = "Acc\xE8s interdit") {
+  if (userRole2 === "operator" && ownerId != null && ownerId !== userId) {
+    throw new HttpError(403, message);
+  }
+}
 function asyncHandler(fn2) {
   return (req, res, next) => {
     fn2(req, res, next).catch(next);
@@ -83370,8 +83375,9 @@ function computeSixBigLosses(sessionTrs, downtimeDetails, microStopThresholdMin 
     }
   }
   const speedLossMin = Math.max(0, ecartCadenceMin);
-  const startupRejectMin = Math.max(0, Math.round(nonQualiteMin * 0.1));
-  const productionRejectMin = Math.max(0, Math.round(nonQualiteMin * 0.9));
+  const nonQualiteRounded = Math.max(0, Math.round(nonQualiteMin));
+  const startupRejectMin = Math.round(nonQualiteRounded * 0.1);
+  const productionRejectMin = nonQualiteRounded - startupRejectMin;
   const totalLossMin = fermeture + tAP + breakdownMin + microStopMin + setupMin + speedLossMin + startupRejectMin + productionRejectMin;
   const losses = [
     { category: "breakdown", label: "Pannes", oeeComponent: "availability", minutes: breakdownMin, pctOfTotal: tT > 0 ? breakdownMin / tT * 100 : 0 },
@@ -83458,7 +83464,11 @@ function computeAClasserMin(tO, lotsDurationMin, plannedStopsMin, unplannedStops
 }
 
 // packages/api/src/lib/cadence.ts
-var perMin = (v2, unit) => unit === "u/min" ? v2 : v2 / 60;
+function convertCadence(value, from, to2) {
+  if (from === to2) return value;
+  return from === "u/h" ? value / 60 : value * 60;
+}
+var perMin = (v2, unit) => convertCadence(v2, unit, "u/min");
 function effectiveLotCadence(lot, changes) {
   if (!changes || changes.length === 0) {
     return {
@@ -83579,10 +83589,7 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
     res.status(404).json({ error: "Session introuvable" });
     return;
   }
-  if (userRole2 === "operator" && sessionRow.operatorId !== userId) {
-    res.status(403).json({ error: "Acc\xE8s interdit" });
-    return;
-  }
+  assertOperatorOwns(userRole2, userId, sessionRow.operatorId);
   if (sessionRow.status !== "active") throw new HttpError(409, "Session d\xE9j\xE0 ferm\xE9e");
   const activeLots = await db3.select({ id: lotEntries.id, batchNumber: lotEntries.batchNumber }).from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active")));
   await Promise.all([
@@ -83603,17 +83610,18 @@ sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(asy
   res.json(session);
 }));
 sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async (req, res) => {
-  const { db: db3 } = req;
+  const { db: db3, userId, userRole: userRole2 } = req;
   const { eventType: eventType2, label, durationMinutes, isPlanned, comment } = req.body;
   const sessionId = String(req.params.id);
   const [[sessionRow], [maxSortRow]] = await Promise.all([
-    db3.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
+    db3.select({ id: sessions.id, status: sessions.status, operatorId: sessions.operatorId }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
     db3.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, sessionId))
   ]);
   if (!sessionRow) {
     res.status(404).json({ error: "Session introuvable" });
     return;
   }
+  assertOperatorOwns(userRole2, userId, sessionRow.operatorId, "Vous ne pouvez ajouter des \xE9v\xE9nements qu'\xE0 votre propre session");
   if (sessionRow.status !== "active") throw new HttpError(409, "Impossible d'ajouter un \xE9v\xE9nement \xE0 une session ferm\xE9e");
   const maxOrder = maxSortRow?.m ?? 0;
   const now = /* @__PURE__ */ new Date();
@@ -83633,14 +83641,15 @@ sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async 
   res.status(201).json(event);
 }));
 sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
-  const { db: db3, userId } = req;
+  const { db: db3, userId, userRole: userRole2 } = req;
   const { categoryId, durationMinutes, isShortStop, comment } = req.body;
   const sessionId = String(req.params.id);
-  const [session] = await db3.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  const [session] = await db3.select({ id: sessions.id, status: sessions.status, operatorId: sessions.operatorId }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
   if (!session) {
     res.status(404).json({ error: "Session introuvable" });
     return;
   }
+  assertOperatorOwns(userRole2, userId, session.operatorId, "Vous ne pouvez ajouter des arr\xEAts qu'\xE0 votre propre session");
   if (session.status !== "active") throw new HttpError(409, "Impossible d'ajouter un arr\xEAt \xE0 une session ferm\xE9e");
   const now = /* @__PURE__ */ new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 6e4);
@@ -83678,14 +83687,16 @@ sessionsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
   res.json(data);
 }));
 sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
-  const { db: db3 } = req;
+  const { db: db3, userId, userRole: userRole2 } = req;
   const sessionId = String(req.params.id);
   const dtId = String(req.params.dtId);
   const [dt2] = await db3.select({
     id: downtimeEvents.id,
     sessionId: downtimeEvents.sessionId,
     lotEntryId: downtimeEvents.lotEntryId,
-    sessionStatus: sessions.status
+    sessionStatus: sessions.status,
+    createdBy: downtimeEvents.createdBy,
+    sessionOperatorId: sessions.operatorId
   }).from(downtimeEvents).leftJoin(sessions, eq(downtimeEvents.sessionId, sessions.id)).where(eq(downtimeEvents.id, dtId)).limit(1);
   if (!dt2) {
     res.status(404).json({ error: "Arr\xEAt introuvable" });
@@ -83699,6 +83710,7 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     res.status(403).json({ error: "Cet arr\xEAt n'appartient pas \xE0 cette session" });
     return;
   }
+  assertOperatorOwns(userRole2, userId, dt2.createdBy ?? dt2.sessionOperatorId, "Vous ne pouvez supprimer que vos propres arr\xEAts");
   if (dt2.sessionStatus !== "active") throw new HttpError(409, "Impossible de supprimer un arr\xEAt d'une session d\xE9j\xE0 ferm\xE9e");
   await db3.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
   await audit(db3, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });
@@ -83812,9 +83824,10 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
     res.status(401).json({ error: "Non authentifi\xE9" });
     return;
   }
-  const [[sessionRow], [activeLot]] = await Promise.all([
+  const [[sessionRow], [activeLot], [dupBatch]] = await Promise.all([
     db3.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
-    db3.select({ id: lotEntries.id }).from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active"))).limit(1)
+    db3.select({ id: lotEntries.id }).from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active"))).limit(1),
+    db3.select({ id: lotEntries.id }).from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.batchNumber, batchNumber))).limit(1)
   ]);
   if (!sessionRow) {
     res.status(404).json({ error: "Session introuvable" });
@@ -83824,6 +83837,9 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
   if (activeLot) {
     res.status(409).json({ error: "Un lot est d\xE9j\xE0 actif dans cette session", lotId: activeLot.id });
     return;
+  }
+  if (dupBatch) {
+    throw new HttpError(409, "Ce num\xE9ro de lot est d\xE9j\xE0 enregistr\xE9 dans cette session");
   }
   const [[lotCountRow], [maxSortRow]] = await Promise.all([
     db3.select({ n: count() }).from(lotEntries).where(eq(lotEntries.sessionId, sessionId)),
@@ -83862,10 +83878,7 @@ lotsRouter.post("/:id/close", validate(closeLotSchema), asyncHandler(async (req,
     res.status(404).json({ error: "Lot introuvable" });
     return;
   }
-  if (userRole2 === "operator" && existing.operatorId !== userId) {
-    res.status(403).json({ error: "Acc\xE8s interdit" });
-    return;
-  }
+  assertOperatorOwns(userRole2, userId, existing.operatorId);
   if (existing.status !== "active") throw new HttpError(409, `Impossible de cl\xF4turer un lot en statut \xAB ${existing.status} \xBB`);
   const now = /* @__PURE__ */ new Date();
   const [lot] = await db3.update(lotEntries).set({
@@ -83899,11 +83912,8 @@ lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res
     res.status(404).json({ error: "Lot introuvable" });
     return;
   }
+  assertOperatorOwns(userRole2, userId, existing.operatorId);
   if (existing.status !== "active") throw new HttpError(409, "Seuls les lots actifs peuvent \xEAtre mis \xE0 jour via PATCH \u2014 utilisez POST /:id/correct pour les lots cl\xF4tur\xE9s");
-  if (userRole2 === "operator" && existing.operatorId !== userId) {
-    res.status(403).json({ error: "Acc\xE8s interdit" });
-    return;
-  }
   const updates = {};
   if (req.body.quantityProduced !== void 0) updates.quantityProduced = req.body.quantityProduced;
   if (req.body.quantityConforming !== void 0) updates.quantityConforming = req.body.quantityConforming;
@@ -83927,16 +83937,14 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
     res.status(404).json({ error: "Lot introuvable" });
     return;
   }
+  assertOperatorOwns(userRole2, userId, lot.operatorId);
   if (lot.status !== "active") throw new HttpError(409, "La cadence ne peut \xEAtre modifi\xE9e que sur un lot en cours");
-  if (userRole2 === "operator" && lot.operatorId !== userId) {
-    res.status(403).json({ error: "Acc\xE8s interdit" });
-    return;
-  }
   const unit = cadenceUnit2 ?? lot.cadenceUnit;
+  const oldCadenceInUnit = convertCadence(Number(lot.cadenceUsed), lot.cadenceUnit, unit);
   const [, [updated]] = await Promise.all([
     db3.insert(lotCadenceChanges).values({
       lotEntryId: lotId,
-      oldCadence: String(lot.cadenceUsed),
+      oldCadence: String(oldCadenceInUnit),
       newCadence: String(newCadence),
       cadenceUnit: unit,
       reason: reason ?? null,
@@ -83959,14 +83967,15 @@ lotsRouter.get("/:id/cadence", asyncHandler(async (req, res) => {
   res.json(rows);
 }));
 lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
-  const { db: db3, userId } = req;
+  const { db: db3, userId, userRole: userRole2 } = req;
   const { categoryId, durationMinutes, isShortStop, comment } = req.body;
   const lotId = String(req.params.id);
-  const [lot] = await db3.select({ id: lotEntries.id, status: lotEntries.status }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
+  const [lot] = await db3.select({ id: lotEntries.id, status: lotEntries.status, operatorId: lotEntries.operatorId }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
   if (!lot) {
     res.status(404).json({ error: "Lot introuvable" });
     return;
   }
+  assertOperatorOwns(userRole2, userId, lot.operatorId, "Vous ne pouvez ajouter des arr\xEAts que sur vos propres lots");
   if (lot.status !== "active" && lot.status !== "closed") {
     throw new HttpError(409, "Impossible d'ajouter un arr\xEAt sur un lot d\xE9j\xE0 d\xE9cid\xE9 par le superviseur");
   }
@@ -84007,7 +84016,7 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   const { db: db3, userId, userRole: userRole2 } = req;
   const lotId = String(req.params.id);
   const dtId = String(req.params.dtId);
-  const [row] = await db3.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId, lotStatus: lotEntries.status, createdBy: downtimeEvents.createdBy }).from(downtimeEvents).innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).where(eq(downtimeEvents.id, dtId)).limit(1);
+  const [row] = await db3.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId, lotStatus: lotEntries.status, createdBy: downtimeEvents.createdBy, operatorId: lotEntries.operatorId }).from(downtimeEvents).innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).where(eq(downtimeEvents.id, dtId)).limit(1);
   if (!row) {
     res.status(404).json({ error: "Arr\xEAt introuvable" });
     return;
@@ -84016,10 +84025,7 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     res.status(403).json({ error: "Cet arr\xEAt n'appartient pas \xE0 ce lot" });
     return;
   }
-  if (userRole2 === "operator" && row.createdBy !== userId) {
-    res.status(403).json({ error: "Vous ne pouvez supprimer que vos propres arr\xEAts" });
-    return;
-  }
+  assertOperatorOwns(userRole2, userId, row.createdBy ?? row.operatorId, "Vous ne pouvez supprimer que vos propres arr\xEAts");
   if (row.lotStatus !== "active" && row.lotStatus !== "closed") {
     throw new HttpError(409, "Impossible de supprimer un arr\xEAt sur un lot d\xE9j\xE0 d\xE9cid\xE9 par le superviseur");
   }
