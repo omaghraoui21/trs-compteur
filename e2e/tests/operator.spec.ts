@@ -82,6 +82,9 @@ test.describe("Operator — session lifecycle", () => {
     await page.getByPlaceholder(/26\d{3}|numéro.*lot|batch/i).fill("26013");
     // Submit
     await page.getByRole("button", { name: /démarrer le lot/i }).click();
+    // The first lot of a session shows a confirmation step before the POST;
+    // confirm it ("Démarrer", exact so it doesn't match "Démarrer le lot").
+    await page.getByRole("button", { name: "Démarrer", exact: true }).click();
 
     // Lot number or batch should appear in the timeline table.
     // The batch number also renders in the active-lot card title/heading,
