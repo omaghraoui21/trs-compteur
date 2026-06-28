@@ -112,7 +112,13 @@ export default function DashboardPage() {
   useEffect(() => { loadEquipments(); }, [loadEquipments]);
 
   const { from, to } = useMemo(() => {
-    if (zoom === "custom" && customFrom && customTo) return { from: customFrom, to: customTo };
+    // Only drive the query from a *valid* custom range (start ≤ end ≤ today).
+    // An invalid range only shows the inline alert; querying with from > to (or a
+    // future end) would otherwise fetch garbage behind the error message.
+    const today = new Date().toISOString().slice(0, 10);
+    if (zoom === "custom" && customFrom && customTo && customFrom <= customTo && customTo <= today) {
+      return { from: customFrom, to: customTo };
+    }
     return getPresetDates(zoom === "custom" ? "month" : zoom);
   }, [zoom, customFrom, customTo]);
 

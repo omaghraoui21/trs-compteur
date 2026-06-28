@@ -132,6 +132,22 @@ Exercising the admin delete flow surfaced a genuine keyboard/a11y defect:
 
 Suite is now **50 tests**.
 
+## Loop 4 — Dashboard invalid date-range still queried (real bug)
+The "Libre" custom range validates start ≤ end ≤ today and shows an inline
+alert, but the query memo (`{from,to}`) used the custom dates **without checking
+validity** — so an invalid range still hit the API behind the error message.
+Reachable: pick the end date first, then a later start date (the `from` input has
+no `min`). Probe confirmed the dashboard queried `from=…-29&to=…-19` (from > to)
+while the alert was shown.
+
+- **Fix** (`Dashboard.tsx`): the memo now only uses the custom range when
+  `start ≤ end ≤ today`, else falls back to the month preset (same as the empty
+  case) — the validation is now protective, not cosmetic.
+- **Coverage** (`dashboard.spec.ts`): an invalid range shows the alert and never
+  issues a query with `from > to`.
+
+Suite is now **51 tests**.
+
 ## Coverage added
 The **Admin / Configuration** page was the only major page with no E2E coverage
 (protected by `typecheck` alone — exactly the gap that let the Supervision crash
