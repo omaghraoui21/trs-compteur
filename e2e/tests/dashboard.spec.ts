@@ -23,7 +23,9 @@ test.describe("Dashboard", () => {
   test("CSV export triggers download and shows success toast", async ({ supervisorPage: page }) => {
     // Listen for download
     const downloadPromise = page.waitForEvent("download", { timeout: 5000 }).catch(() => null);
-    await page.getByRole("button", { name: /csv/i }).click();
+    // Exact "CSV" — the broad /csv/i also matches the by-product "Export CSV"
+    // button, tripping strict mode (same disambiguation as the title test above).
+    await page.getByRole("button", { name: "CSV", exact: true }).click();
     // Toast should appear
     await expect(page.getByText(/export csv téléchargé/i)).toBeVisible({ timeout: 3000 });
   });
