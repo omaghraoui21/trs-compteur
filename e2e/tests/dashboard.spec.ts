@@ -29,6 +29,24 @@ test.describe("Dashboard", () => {
     await expect(page.getByText(/export csv téléchargé/i)).toBeVisible({ timeout: 3000 });
   });
 
+  test("PDF export on an empty period is blocked with a message", async ({ supervisorPage: page }) => {
+    const period = { from: "2026-06-01", to: "2026-06-07", equipmentId: "equip-1" };
+    await page.unroute(/\/api\/dashboard\/trs/);
+    await page.route(/\/api\/dashboard\/trs/, (r) => r.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify({ period, daily: [], total: { ...TRS_EMPTY.session, reliability: { mtbf: 0, mttr: 0, availability: 0, breakdownCount: 0 } } }),
+    }));
+    await page.reload();
+    await expect(page.getByText(/tableau de bord trs/i)).toBeVisible();
+
+    let downloaded = false;
+    page.on("download", () => { downloaded = true; });
+    await page.getByRole("button", { name: "PDF", exact: true }).click();
+    await expect(page.getByText(/aucune donnée à exporter/i)).toBeVisible();
+    await page.waitForTimeout(300);
+    expect(downloaded, "no PDF should be generated for an empty period").toBe(false);
+  });
+
   test("CSV export neutralizes formula injection in product names", async ({ supervisorPage: page }) => {
     // A product named with a leading "=" would execute as a formula in Excel.
     const period = { from: "2026-06-01", to: "2026-06-07", equipmentId: "equip-1" };

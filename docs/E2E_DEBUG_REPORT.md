@@ -200,3 +200,12 @@ flow into the "Produit" column, so a product named e.g. `=HACK()` exported raw
   downloaded CSV must contain `'=HACK()` and never a raw `,=HACK`.
 
 Suite is now **55 tests**.
+
+## Loop 8 — PDF export of an empty period rendered "NaN %" (bug)
+The PDF button was gated only on `pdfLoading`, and `exportPdf` (unlike
+`exportCsv`) didn't guard empty data. `PdfReport` divides every time-band by
+`total.tT`, so exporting a period with no data (tT 0) produced a report full of
+"NaN %" cells. **Fix** (`Dashboard.tsx`): `exportPdf` now blocks empty periods
+with the same "Aucune donnée à exporter" toast as CSV. **Coverage**
+(`dashboard.spec.ts`): PDF on an empty period shows the message and generates no
+download. Suite is now **56 tests**.
