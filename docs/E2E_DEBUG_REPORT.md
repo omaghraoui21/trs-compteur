@@ -99,6 +99,39 @@ found. The only genuine defect surfaced visually was the Supervision crash (#1).
   chromium, runs `pnpm test:e2e`, uploads the Playwright report on failure) so
   this regression can't recur unnoticed.
 
+## Loop 2 — deeper interaction coverage
+A second evidence pass recorded the interaction states not previously captured
+(login error + password reveal, declare-downtime form, end-of-shift modal,
+change-password modal, admin create-room form) at desktop + mobile via
+`e2e/tour/interactions.spec.ts`. **No new app defects surfaced** — all states
+render correctly across both viewports. The verified-working flows that had zero
+regression protection were locked down with tests:
+- `auth.spec.ts`: password-visibility toggle flips the input `type` and the
+  toggle's accessible name (the element that caused the earlier selector clash).
+- `layout.spec.ts`: change-password modal — mismatched passwords show an error
+  and never call the API; matching passwords submit and show success.
+
+Suite is now **46 tests**.
+
+## Loop 3 — Admin delete confirmation (real a11y bug) + CRUD coverage
+Exercising the admin delete flow surfaced a genuine keyboard/a11y defect:
+
+- **Bug:** the `ConfirmDeleteModal` (destructive "Désactiver" confirmation,
+  `role="dialog" aria-modal`) never moved focus into itself on open — focus
+  stayed on the trash button *outside* the overlay. Its Escape handler relies on
+  the keydown bubbling up from a focused element inside the overlay, so **Escape
+  did nothing** and keyboard users were stranded outside the dialog. Verified
+  empirically (modal stayed open on Escape; `document.activeElement` was the
+  trash button). Unlike the Layout `ChangePasswordModal`, it had no focus
+  management.
+- **Fix** (`Admin.tsx`): focus the Cancel button on open (the safe default for a
+  destructive prompt), which also makes Escape work.
+- **Coverage** (`admin.spec.ts`): Escape closes the modal (regression),
+  Confirmer issues the DELETE + success toast, Annuler closes without deleting,
+  and "Ajouter" opens the create-room form.
+
+Suite is now **50 tests**.
+
 ## Coverage added
 The **Admin / Configuration** page was the only major page with no E2E coverage
 (protected by `typecheck` alone — exactly the gap that let the Supervision crash

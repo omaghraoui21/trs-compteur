@@ -1032,6 +1032,12 @@ function IconBtn({ icon: Icon, onClick, title, className = "text-gray-500 hover:
 }
 
 function ConfirmDeleteModal({ label, name, onConfirm, onCancel }: { label: string; name: string; onConfirm: () => void; onCancel: () => void }) {
+  // Move focus into the dialog on open so keyboard users land here and the
+  // Escape handler (which relies on the keydown bubbling up from a focused
+  // element inside the overlay) actually fires. Focusing Cancel — the safe
+  // option — is the right default for a destructive confirmation.
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { cancelRef.current?.focus(); }, []);
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
          role="presentation" onClick={onCancel} onKeyDown={e => { if (e.key === "Escape") onCancel(); }}>
@@ -1041,7 +1047,7 @@ function ConfirmDeleteModal({ label, name, onConfirm, onCancel }: { label: strin
         <h3 id="confirm-del-title" className="font-semibold mb-1">{label}</h3>
         <p className="text-sm text-gray-500 mb-4">« {name} »</p>
         <div className="flex gap-2 justify-end">
-          <button onClick={onCancel} className="px-3 py-1.5 text-sm text-gray-600 border rounded hover:bg-gray-50">Annuler</button>
+          <button ref={cancelRef} onClick={onCancel} className="px-3 py-1.5 text-sm text-gray-600 border rounded hover:bg-gray-50">Annuler</button>
           <button onClick={onConfirm} className="px-3 py-1.5 text-sm text-white bg-red-600 rounded hover:bg-red-700">Confirmer</button>
         </div>
       </div>

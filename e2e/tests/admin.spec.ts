@@ -46,4 +46,45 @@ test.describe("Admin — Configuration", () => {
     await page.goto("/admin");
     await expect(page.getByText(/aucun local/i)).toBeVisible();
   });
+
+  test("Ajouter opens the create-room form", async ({ adminPage: page }) => {
+    await page.goto("/admin");
+    await page.getByRole("button", { name: /ajouter/i }).click();
+    await expect(page.getByRole("heading", { name: /nouveau local/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /enregistrer/i })).toBeVisible();
+  });
+});
+
+test.describe("Admin — delete confirmation", () => {
+  test("Escape closes the confirmation modal", async ({ adminPage: page }) => {
+    await page.goto("/admin");
+    await page.getByRole("button", { name: /désactiver/i }).first().click();
+    await expect(page.getByText(/désactiver le local/i)).toBeVisible();
+    // Regression: focus is moved into the dialog so Escape dismisses it.
+    await page.keyboard.press("Escape");
+    await expect(page.getByText(/désactiver le local/i)).not.toBeVisible();
+  });
+
+  test("Confirmer issues the delete and shows a success toast", async ({ adminPage: page }) => {
+    let deleted = false;
+    await page.route(/\/api\/admin\/rooms\/room-1$/, (r) => {
+      deleted = true;
+      r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+    });
+    await page.goto("/admin");
+    await page.getByRole("button", { name: /désactiver/i }).first().click();
+    await page.getByRole("button", { name: /confirmer/i }).click();
+    await expect(page.getByText(/désactivé/i)).toBeVisible();
+    expect(deleted, "DELETE must be issued on confirm").toBe(true);
+  });
+
+  test("Annuler closes the modal without deleting", async ({ adminPage: page }) => {
+    let deleted = false;
+    await page.route(/\/api\/admin\/rooms\/room-1$/, (r) => { deleted = true; r.fulfill({ status: 200, body: "{}" }); });
+    await page.goto("/admin");
+    await page.getByRole("button", { name: /désactiver/i }).first().click();
+    await page.getByRole("button", { name: /annuler/i }).click();
+    await expect(page.getByText(/désactiver le local/i)).not.toBeVisible();
+    expect(deleted, "DELETE must not be issued on cancel").toBe(false);
+  });
 });
