@@ -55,4 +55,23 @@ test.describe("Dashboard", () => {
     await page.getByRole("button", { name: "Libre" }).click();
     await expect(page.locator("input[type='date']").first()).toBeVisible();
   });
+
+  test("an invalid custom range shows an alert and is not queried", async ({ supervisorPage: page }) => {
+    const ranges: { from: string | null; to: string | null }[] = [];
+    await page.route(/\/api\/dashboard\/trs/, (r) => {
+      const u = new URL(r.request().url());
+      ranges.push({ from: u.searchParams.get("from"), to: u.searchParams.get("to") });
+      r.fallback();
+    });
+    await page.getByRole("button", { name: "Libre" }).click();
+    // Pick the end date first, then a later start date → end < start (reachable
+    // because the "from" input has no min). The alert must show, and the query
+    // must never run with from > to.
+    await page.getByLabel("Date de fin").fill("2026-06-10");
+    await page.getByLabel("Date de début").fill("2026-06-20");
+    await expect(page.getByText(/postérieure à la date de début/i)).toBeVisible();
+    await page.waitForTimeout(300);
+    expect(ranges.every(r => r.from === null || r.to === null || r.from <= r.to),
+      `no query may use from > to, got ${JSON.stringify(ranges)}`).toBe(true);
+  });
 });
