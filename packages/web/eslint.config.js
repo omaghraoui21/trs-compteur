@@ -1,3 +1,6 @@
+// ESLint flat config for the @trs/web frontend (React 19 + TypeScript + Vite).
+// Applies the recommended JS + typescript-eslint rule sets plus React Hooks and
+// React Refresh checks. Run via `pnpm --filter @trs/web lint` (also wired into CI).
 import js from "@eslint/js";
 import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
