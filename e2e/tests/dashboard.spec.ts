@@ -1,4 +1,5 @@
-import { test, expect, mockDashboardRoutes } from "../fixtures";
+import { test, expect, mockDashboardRoutes, TRS_EMPTY } from "../fixtures";
+import * as fs from "fs";
 
 test.describe("Dashboard", () => {
   test.beforeEach(async ({ supervisorPage: page }) => {
@@ -23,9 +24,35 @@ test.describe("Dashboard", () => {
   test("CSV export triggers download and shows success toast", async ({ supervisorPage: page }) => {
     // Listen for download
     const downloadPromise = page.waitForEvent("download", { timeout: 5000 }).catch(() => null);
-    await page.getByRole("button", { name: /csv/i }).click();
+    await page.getByRole("button", { name: "CSV", exact: true }).click();
     // Toast should appear
     await expect(page.getByText(/export csv téléchargé/i)).toBeVisible({ timeout: 3000 });
+  });
+
+  test("CSV export neutralizes formula injection in product names", async ({ supervisorPage: page }) => {
+    // A product named with a leading "=" would execute as a formula in Excel.
+    const period = { from: "2026-06-01", to: "2026-06-07", equipmentId: "equip-1" };
+    const day = {
+      ...TRS_EMPTY.session, date: "2026-06-07", aClasserMin: 0, notes: null,
+      lots: [{ ...(TRS_EMPTY.lots?.[0] ?? {}), productName: "=HACK()", batchNumber: "26013" }],
+      reliability: { mtbf: 0, mttr: 0, availability: 0, breakdownCount: 0 },
+    };
+    await page.unroute(/\/api\/dashboard\/trs/);
+    await page.route(/\/api\/dashboard\/trs/, (r) => r.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify({ period, daily: [day], total: { ...day, reliability: day.reliability } }),
+    }));
+    await page.reload();
+    await expect(page.getByText(/tableau de bord trs/i)).toBeVisible();
+
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "CSV", exact: true }).click(),
+    ]);
+    const csv = fs.readFileSync(await download.path(), "utf8");
+    // The dangerous cell must be neutralized (prefixed with ') — never raw.
+    expect(csv).not.toMatch(/(^|,)=HACK/);
+    expect(csv).toContain("'=HACK()");
   });
 
   test("PDF button shows loading spinner while generating", async ({ supervisorPage: page }) => {

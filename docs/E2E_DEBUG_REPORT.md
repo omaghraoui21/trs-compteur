@@ -185,3 +185,18 @@ the downtime-submit handler — all sound. Added the missing coverage for the
 critical inter-lot downtime flow: select category + duration → POST
 `/sessions/:id/downtimes` with the right payload → returns to the timeline.
 Suite is now **54 tests**.
+
+## Loop 7 — CSV formula injection in dashboard export (security bug)
+The dashboard CSV export quoted fields per RFC-4180 but did **not** neutralize
+formula injection (CWE-1236): a cell starting with `= + - @` tab/CR is executed
+as a formula by Excel/Sheets. Product names are admin-controlled free text and
+flow into the "Produit" column, so a product named e.g. `=HACK()` exported raw
+(`,=HACK(),`) — verified by reading the generated CSV.
+
+- **Fix** (`Dashboard.tsx`): `csvEscape` now prefixes a `'` for non-numeric
+  cells starting with a dangerous char (numeric cells, incl. negatives, are
+  untouched). PDF export is unaffected (not formula-evaluated).
+- **Coverage** (`dashboard.spec.ts`): export with a `=HACK()` product name; the
+  downloaded CSV must contain `'=HACK()` and never a raw `,=HACK`.
+
+Suite is now **55 tests**.

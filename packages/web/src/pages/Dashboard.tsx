@@ -187,7 +187,12 @@ export default function DashboardPage() {
 
   // CSV export (RFC 4180 compliant)
   const csvEscape = (val: unknown): string => {
-    const s = String(val ?? "");
+    let s = String(val ?? "");
+    // Neutralize CSV/formula injection (CWE-1236): a cell starting with = + - @
+    // tab or CR is run as a formula by Excel/Sheets. Free-text columns (product
+    // names, batch numbers) are user/admin-controlled, so prefix a "'" for
+    // non-numeric values — numeric cells (incl. negatives) are left untouched.
+    if (/^[=+\-@\t\r]/.test(s) && !/^-?\d/.test(s)) s = "'" + s;
     return s.includes(",") || s.includes('"') || s.includes("\n") ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
   const csvRow = (fields: unknown[]) => fields.map(csvEscape).join(",");
