@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { getErrorMessage } from "@/lib/errors";
 import { Timer, Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
@@ -16,8 +17,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-    } catch (err: any) {
-      setError(err.message || "Erreur de connexion");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Erreur de connexion");
     } finally {
       setLoading(false);
     }

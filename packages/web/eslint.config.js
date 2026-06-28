@@ -27,10 +27,8 @@ export default tseslint.config(
         "warn",
         { allowConstantExport: true },
       ],
-      // The codebase uses `any` in a handful of error-catch and chart-callback
-      // spots. Surface it as guidance rather than a hard failure so adopting
-      // lint on the existing tree doesn't require a risky type refactor.
-      "@typescript-eslint/no-explicit-any": "warn",
+      // `no-explicit-any` stays at the recommended `error` severity — caught
+      // errors are typed `unknown` and narrowed via lib/errors#getErrorMessage.
       // Flag unused code (tsconfig has noUnusedLocals/Parameters off), but allow
       // intentionally-unused args/vars prefixed with an underscore.
       "@typescript-eslint/no-unused-vars": [

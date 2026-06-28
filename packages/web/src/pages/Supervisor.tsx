@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { api, type PendingLot, type Product, type LotDowntime, type CadenceChange, type CorrectLotInput, type ElectronicSignature } from "@/lib/api";
+import { getErrorMessage } from "@/lib/errors";
 import { fmtPct, trsColor, diffMinutes, fmtNumber, fmtDuration as fmtMinutes } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { ListSkeleton, Skeleton } from "@/components/Skeleton";
@@ -96,8 +97,8 @@ export default function SupervisorPage() {
       const [l, p] = await Promise.all([api.pendingLots(filter), api.products()]);
       setLots(l);
       setProducts(p);
-    } catch (err: any) {
-      toast.error(err.message || "Chargement des lots échoué");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Chargement des lots échoué");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -190,8 +191,8 @@ export default function SupervisorPage() {
       }
       setPendingSign(null);
       setSignPassword("");
-    } catch (err: any) {
-      toast.error(err.message || "Échec de la signature");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Échec de la signature");
     } finally {
       setSubmitting(false);
     }

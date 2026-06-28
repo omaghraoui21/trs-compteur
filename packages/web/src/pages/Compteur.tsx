@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { api, type Room, type Equipment, type Session, type SessionDetail, type Product, type DowntimeCategory, type ProductEquipmentCadence, type SessionTrsResponse, type TrsMetrics, type LotEntry, type LotDowntime } from "@/lib/api";
+import { getErrorMessage } from "@/lib/errors";
 import { fmtDuration, fmtPct, fmtNumber, trsColor, diffMinutes } from "@trs/engine";
 import { useToast } from "@/components/Toast";
 import { useActiveSession } from "@/lib/sessionContext";
@@ -132,7 +133,7 @@ export default function CompteurPage() {
     setBootError("");
     Promise.all([api.rooms(), api.products()])
       .then(([r, p]) => { setRooms(r); setProducts(p); })
-      .catch((err) => setBootError(err.message || "Erreur serveur"));
+      .catch((err: unknown) => setBootError(getErrorMessage(err) || "Erreur serveur"));
   }, []);
   useEffect(() => { loadBootstrap(); }, [loadBootstrap]);
 
@@ -222,8 +223,8 @@ export default function CompteurPage() {
         sessionCtx.set(null);
       }
       setView("timeline");
-    } catch (err: any) {
-      toast.error(err.message || "Chargement de l'équipement échoué");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Chargement de l'équipement échoué");
     }
   };
 
@@ -236,8 +237,8 @@ export default function CompteurPage() {
       setActiveSession(session);
       sessionCtx.set({ name: selectedEquipment.name, openedAt: new Date(session.openedAt) });
       await loadDetail(session.id);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setOpeningSession(false);
     }
@@ -260,8 +261,8 @@ export default function CompteurPage() {
       setShowCloseModal(false);
       setSessionNotes("");
       setView("pick-room");
-    } catch (err: any) {
-      toast.error(err.message || "Fermeture du compteur échouée");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Fermeture du compteur échouée");
       setShowCloseModal(false);
     } finally {
       setIsClosing(false);
@@ -297,8 +298,8 @@ export default function CompteurPage() {
                 setView("pick-equip");
                 api.equipments(r.id)
                   .then(setEquipmentsList)
-                  .catch((err: any) => {
-                    toast.error(err.message || "Impossible de charger les équipements");
+                  .catch((err: unknown) => {
+                    toast.error(getErrorMessage(err) || "Impossible de charger les équipements");
                     setSelectedRoom(null);
                     setView("pick-room");
                   });
@@ -740,8 +741,8 @@ export default function CompteurPage() {
                 try {
                   await api.deleteSessionDowntime(activeSession.id, dtId);
                   await loadDetail(activeSession.id);
-                } catch (err: any) {
-                  toast.error(err.message || "Échec de la suppression");
+                } catch (err: unknown) {
+                  toast.error(getErrorMessage(err) || "Échec de la suppression");
                 }
               }}
             />
@@ -896,8 +897,8 @@ function AClasserBanner({ minutes, onDeclare, categories, equipmentId, sessionId
       saveRecentDowntime(equipmentId, categoryId);
       toast.success("Temps classé");
       onQualified();
-    } catch (err: any) {
-      toast.error(err.message || "Échec du classement");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Échec du classement");
     } finally {
       setSelecting(false);
     }
@@ -1142,8 +1143,8 @@ function ActiveLotCard({ lot, products, onUpdate, onAddDowntime }: {
       toast.success(`Cadence mise à jour : ${val} ${lot.cadenceUnit}`);
       setEditingCadence(false); setNewCadence(""); setCadenceReason("");
       onUpdate();
-    } catch (err: any) {
-      toast.error(err.message || "Échec du changement de cadence");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Échec du changement de cadence");
     }
     setSavingCadence(false);
   };
@@ -1180,8 +1181,8 @@ function ActiveLotCard({ lot, products, onUpdate, onAddDowntime }: {
         quantityRejected: Math.max(0, Number(produced) - Number(conforming)),
       });
       onUpdate();
-    } catch (err: any) {
-      toast.error(err.message || "Échec de la clôture du lot");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Échec de la clôture du lot");
     }
     setClosing(false);
     setShowConfirm(false);
@@ -1264,8 +1265,8 @@ function ActiveLotCard({ lot, products, onUpdate, onAddDowntime }: {
                 await api.deleteDowntime(lot.id, dtId);
                 await fetchLotDts();
                 onUpdate();
-              } catch (err: any) {
-                toast.error(err.message || "Échec de la suppression");
+              } catch (err: unknown) {
+                toast.error(getErrorMessage(err) || "Échec de la suppression");
               }
             }}
           />
@@ -1397,8 +1398,8 @@ function NewLotForm({ session, products, cadences, equipmentId, defaultCadenceUn
         cadenceUnit,
       });
       onCreated();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
       setStep("form");
     }
     setLoading(false);
@@ -1684,8 +1685,8 @@ function AddDowntimeForm({ lotId, sessionId, equipmentId, categories, aClasserMi
       else await api.addSessionDowntime(sessionId, payload);
       saveRecentDowntime(equipmentId, catId);
       onAdded();
-    } catch (err: any) {
-      toast.error(err.message || "Échec de l'ajout de l'arrêt");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Échec de l'ajout de l'arrêt");
     }
     setLoading(false);
   };

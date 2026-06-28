@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback, useState, useRef, type ReactNode } from "react";
+import { createContext, useContext, useCallback, useMemo, useState, useRef, type ReactNode } from "react";
 import { CheckCircle, AlertCircle, X } from "lucide-react";
 
 type ToastVariant = "success" | "error";
@@ -106,10 +106,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setTimeout(() => remove(id), 5000);
   }, [remove]);
 
-  const api: ToastApi = {
+  // Memoize so the context value has a stable identity across renders — lets
+  // consumers safely list `toast` in effect/callback dependency arrays.
+  const api: ToastApi = useMemo(() => ({
     success: (message) => push(message, "success"),
     error: (message) => push(normalizeError(message), "error"),
-  };
+  }), [push]);
 
   return (
     <ToastContext.Provider value={api}>
