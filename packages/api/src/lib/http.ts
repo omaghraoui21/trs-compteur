@@ -10,11 +10,10 @@ export class HttpError extends Error {
   }
 }
 
-// Operators may only act on records they own; supervisors and admins are
-// unrestricted. `ownerId == null` means the record has no recorded owner
-// (e.g. legacy rows created before ownership was tracked) — those are not
-// blocked, so an operator can still manage their own un-attributed records.
-// Throws 403 otherwise. Centralizes the ownership guard used across routes.
+// Ownership guard shared across routes: operators may act only on records they
+// own; supervisors and admins are unrestricted. A null `ownerId` (no recorded
+// owner) bypasses the check. Throws HttpError(403) otherwise. Call sites that
+// pass a fallback owner (e.g. `createdBy ?? operatorId`) document why there.
 export function assertOperatorOwns(
   userRole: string | undefined,
   userId: string | undefined,
