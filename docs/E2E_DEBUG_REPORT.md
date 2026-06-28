@@ -209,3 +209,12 @@ The PDF button was gated only on `pdfLoading`, and `exportPdf` (unlike
 with the same "Aucune donnée à exporter" toast as CSV. **Coverage**
 (`dashboard.spec.ts`): PDF on an empty period shows the message and generates no
 download. Suite is now **56 tests**.
+
+## Loop 9 — finish the window.confirm → modal migration (a11y/consistency)
+The Admin **Users** panel still deactivated users via `window.confirm` while
+every other panel uses the accessible `ConfirmDeleteModal` (LOOP_STATE had
+recorded this migration as done — Users was missed). `window.confirm` is
+unstyleable, not focus-managed, and effectively untestable. Migrated
+deactivation to the shared `useConfirmDelete` modal (reactivation stays
+immediate). Added admin tests: deactivation opens the modal + Escape closes it;
+confirming PATCHes `isActive:false`. Suite is now **58 tests**.
