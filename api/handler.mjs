@@ -83464,7 +83464,11 @@ function computeAClasserMin(tO, lotsDurationMin, plannedStopsMin, unplannedStops
 }
 
 // packages/api/src/lib/cadence.ts
-var perMin = (v2, unit) => unit === "u/min" ? v2 : v2 / 60;
+function convertCadence(value, from, to2) {
+  if (from === to2) return value;
+  return from === "u/h" ? value / 60 : value * 60;
+}
+var perMin = (v2, unit) => convertCadence(v2, unit, "u/min");
 function effectiveLotCadence(lot, changes) {
   if (!changes || changes.length === 0) {
     return {
@@ -83936,7 +83940,7 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
   if (lot.status !== "active") throw new HttpError(409, "La cadence ne peut \xEAtre modifi\xE9e que sur un lot en cours");
   assertOperatorOwns(userRole2, userId, lot.operatorId);
   const unit = cadenceUnit2 ?? lot.cadenceUnit;
-  const oldCadenceInUnit = unit === lot.cadenceUnit ? Number(lot.cadenceUsed) : lot.cadenceUnit === "u/h" ? Number(lot.cadenceUsed) / 60 : Number(lot.cadenceUsed) * 60;
+  const oldCadenceInUnit = convertCadence(Number(lot.cadenceUsed), lot.cadenceUnit, unit);
   const [, [updated]] = await Promise.all([
     db3.insert(lotCadenceChanges).values({
       lotEntryId: lotId,

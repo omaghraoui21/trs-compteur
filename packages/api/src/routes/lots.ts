@@ -5,6 +5,7 @@ import { diffMinutes } from "@trs/engine";
 import { authenticate, requireRole } from "../middleware";
 import { asyncHandler, validate, HttpError, assertOperatorOwns } from "../lib/http";
 import { audit } from "../lib/audit";
+import { convertCadence } from "../lib/cadence";
 import { reauthSigner, recordSignature } from "../lib/sign";
 import { startLotSchema, closeLotSchema, updateLotSchema, addDowntimeSchema, validateLotSchema, changeCadenceSchema, correctLotSchema } from "../schemas";
 
@@ -21,6 +22,8 @@ lotsRouter.post("/", validate(startLotSchema), asyncHandler(async (req, res) => 
 
   // Verify session exists + is active, check for an active lot, and check for
   // a duplicate batch number in the same session — all reads against indexed columns.
+  // NB: the dup-batch check is app-level only (TOCTOU-racy) until the deferred
+  // unique index uq_lot_entries_session_batch lands; see migration 0012 follow-up.
   const [[sessionRow], [activeLot], [dupBatch]] = await Promise.all([
     db.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
     db.select({ id: lotEntries.id }).from(lotEntries)
@@ -173,14 +176,8 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
   // lot's starting cadence from (oldCadence, cadenceUnit). When this change
   // also switches the unit, express the old cadence in the new unit so the row
   // stays internally consistent — otherwise the lot's initial cadence would be
-  // read under the wrong unit (a 60× error in TP). No-op when the unit is
-  // unchanged, which is the only case the operator UI produces.
-  const oldCadenceInUnit =
-    unit === lot.cadenceUnit
-      ? Number(lot.cadenceUsed)
-      : lot.cadenceUnit === "u/h"
-        ? Number(lot.cadenceUsed) / 60   // u/h → u/min
-        : Number(lot.cadenceUsed) * 60;  // u/min → u/h
+  // read under the wrong unit (a 60× error in TP).
+  const oldCadenceInUnit = convertCadence(Number(lot.cadenceUsed), lot.cadenceUnit, unit);
 
   // The insert and update are independent — run in parallel.
   const [, [updated]] = await Promise.all([

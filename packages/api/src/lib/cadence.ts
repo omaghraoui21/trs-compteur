@@ -6,7 +6,14 @@ export interface CadenceChangeRow {
   changedAt: Date | string;
 }
 
-const perMin = (v: number, unit: string) => (unit === "u/min" ? v : v / 60);
+// Convert a cadence value between the two supported units ("u/h" / "u/min").
+// The only conversion factor (60) lives here so read and write paths agree.
+export function convertCadence(value: number, from: string, to: string): number {
+  if (from === to) return value;
+  return from === "u/h" ? value / 60 : value * 60;
+}
+
+const perMin = (v: number, unit: string) => convertCadence(v, unit, "u/min");
 
 // Returns the cadence inputs for computeLotTrs (which now handles time-weighting
 // natively via its cadenceChanges field).
