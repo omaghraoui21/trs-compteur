@@ -176,3 +176,12 @@ state) plus an `adminPage` fixture and `mockAdminRoutes` helper.
 - `e2e/tests/{auth,operator,supervisor,dashboard}.spec.ts` — selector/copy repairs.
 - `e2e/tour/` — reusable before/after video + screenshot recorder.
 - `package.json` — add `@playwright/test` dev dependency.
+
+## Loop 6 — downtime-submit coverage (no new bug)
+Probed the new-lot batch-number regex (`^[A-Z0-9-_./]{1,30}$` — confirmed no
+unintended `-` range; rejects `;@[]^<=>?`), the chronometer downtime entry
+(ceil to ≥1 min, interval cleared on unmount, can't double-start via UI), and
+the downtime-submit handler — all sound. Added the missing coverage for the
+critical inter-lot downtime flow: select category + duration → POST
+`/sessions/:id/downtimes` with the right payload → returns to the timeline.
+Suite is now **54 tests**.
