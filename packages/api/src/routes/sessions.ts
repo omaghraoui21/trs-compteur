@@ -169,8 +169,9 @@ sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async 
     db.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, sessionId)),
   ]);
   if (!sessionRow) { res.status(404).json({ error: "Session introuvable" }); return; }
-  if (sessionRow.status !== "active") throw new HttpError(409, "Impossible d'ajouter un événement à une session fermée");
+  // Ownership before status so a non-owner can't probe a session's state.
   assertOperatorOwns(userRole, userId, sessionRow.operatorId, "Vous ne pouvez ajouter des événements qu'à votre propre session");
+  if (sessionRow.status !== "active") throw new HttpError(409, "Impossible d'ajouter un événement à une session fermée");
 
   const maxOrder = maxSortRow?.m ?? 0;
 
@@ -205,8 +206,9 @@ sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(
 
   const [session] = await db.select({ id: sessions.id, status: sessions.status, operatorId: sessions.operatorId }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
   if (!session) { res.status(404).json({ error: "Session introuvable" }); return; }
-  if (session.status !== "active") throw new HttpError(409, "Impossible d'ajouter un arrêt à une session fermée");
+  // Ownership before status so a non-owner can't probe a session's state.
   assertOperatorOwns(userRole, userId, session.operatorId, "Vous ne pouvez ajouter des arrêts qu'à votre propre session");
+  if (session.status !== "active") throw new HttpError(409, "Impossible d'ajouter un arrêt à une session fermée");
 
   const now = new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 60_000);
@@ -275,11 +277,12 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   // the ownership check so the caller gets 400 (wrong endpoint), not 403/404.
   if (dt.lotEntryId !== null) { res.status(400).json({ error: "Cet arrêt est rattaché à un lot — utilisez DELETE /lots/:id/downtimes/:dtId" }); return; }
   if (dt.sessionId !== sessionId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à cette session" }); return; }
-  if (dt.sessionStatus !== "active") throw new HttpError(409, "Impossible de supprimer un arrêt d'une session déjà fermée");
+  // Ownership before status so a non-owner can't probe a session's state.
   // Fall back to session ownership for legacy stops with no recorded creator,
   // so an un-attributed stop can still only be removed by the session's own
   // operator (not any operator).
   assertOperatorOwns(userRole, userId, dt.createdBy ?? dt.sessionOperatorId, "Vous ne pouvez supprimer que vos propres arrêts");
+  if (dt.sessionStatus !== "active") throw new HttpError(409, "Impossible de supprimer un arrêt d'une session déjà fermée");
 
   await db.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
   await audit(db, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });

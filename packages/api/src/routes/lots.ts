@@ -134,8 +134,8 @@ lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res
   const [existing] = await db.select({ status: lotEntries.status, operatorId: lotEntries.operatorId })
     .from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
   if (!existing) { res.status(404).json({ error: "Lot introuvable" }); return; }
-  if (existing.status !== "active") throw new HttpError(409, "Seuls les lots actifs peuvent être mis à jour via PATCH — utilisez POST /:id/correct pour les lots clôturés");
   assertOperatorOwns(userRole, userId, existing.operatorId);
+  if (existing.status !== "active") throw new HttpError(409, "Seuls les lots actifs peuvent être mis à jour via PATCH — utilisez POST /:id/correct pour les lots clôturés");
 
   const updates: Partial<{ quantityProduced: number; quantityConforming: number; quantityRejected: number; cadenceUsed: string; cadenceUnit: string }> = {};
   if (req.body.quantityProduced !== undefined) updates.quantityProduced = req.body.quantityProduced;
@@ -166,8 +166,8 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
 
   const [lot] = await db.select().from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
   if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
-  if (lot.status !== "active") throw new HttpError(409, "La cadence ne peut être modifiée que sur un lot en cours");
   assertOperatorOwns(userRole, userId, lot.operatorId);
+  if (lot.status !== "active") throw new HttpError(409, "La cadence ne peut être modifiée que sur un lot en cours");
 
   const unit = cadenceUnit ?? lot.cadenceUnit;
 
@@ -219,10 +219,10 @@ lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(asyn
 
   const [lot] = await db.select({ id: lotEntries.id, status: lotEntries.status, operatorId: lotEntries.operatorId }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1);
   if (!lot) { res.status(404).json({ error: "Lot introuvable" }); return; }
+  assertOperatorOwns(userRole, userId, lot.operatorId, "Vous ne pouvez ajouter des arrêts que sur vos propres lots");
   if (lot.status !== "active" && lot.status !== "closed") {
     throw new HttpError(409, "Impossible d'ajouter un arrêt sur un lot déjà décidé par le superviseur");
   }
-  assertOperatorOwns(userRole, userId, lot.operatorId, "Vous ne pouvez ajouter des arrêts que sur vos propres lots");
 
   const now = new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 60_000);

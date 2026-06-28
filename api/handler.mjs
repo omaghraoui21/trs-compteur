@@ -83621,8 +83621,8 @@ sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async 
     res.status(404).json({ error: "Session introuvable" });
     return;
   }
-  if (sessionRow.status !== "active") throw new HttpError(409, "Impossible d'ajouter un \xE9v\xE9nement \xE0 une session ferm\xE9e");
   assertOperatorOwns(userRole2, userId, sessionRow.operatorId, "Vous ne pouvez ajouter des \xE9v\xE9nements qu'\xE0 votre propre session");
+  if (sessionRow.status !== "active") throw new HttpError(409, "Impossible d'ajouter un \xE9v\xE9nement \xE0 une session ferm\xE9e");
   const maxOrder = maxSortRow?.m ?? 0;
   const now = /* @__PURE__ */ new Date();
   const endedAt = durationMinutes ? new Date(now.getTime() + durationMinutes * 6e4) : void 0;
@@ -83649,8 +83649,8 @@ sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(
     res.status(404).json({ error: "Session introuvable" });
     return;
   }
-  if (session.status !== "active") throw new HttpError(409, "Impossible d'ajouter un arr\xEAt \xE0 une session ferm\xE9e");
   assertOperatorOwns(userRole2, userId, session.operatorId, "Vous ne pouvez ajouter des arr\xEAts qu'\xE0 votre propre session");
+  if (session.status !== "active") throw new HttpError(409, "Impossible d'ajouter un arr\xEAt \xE0 une session ferm\xE9e");
   const now = /* @__PURE__ */ new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 6e4);
   const [dt2] = await db3.insert(downtimeEvents).values({
@@ -83710,8 +83710,8 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     res.status(403).json({ error: "Cet arr\xEAt n'appartient pas \xE0 cette session" });
     return;
   }
-  if (dt2.sessionStatus !== "active") throw new HttpError(409, "Impossible de supprimer un arr\xEAt d'une session d\xE9j\xE0 ferm\xE9e");
   assertOperatorOwns(userRole2, userId, dt2.createdBy ?? dt2.sessionOperatorId, "Vous ne pouvez supprimer que vos propres arr\xEAts");
+  if (dt2.sessionStatus !== "active") throw new HttpError(409, "Impossible de supprimer un arr\xEAt d'une session d\xE9j\xE0 ferm\xE9e");
   await db3.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
   await audit(db3, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });
   res.status(204).send();
@@ -83912,8 +83912,8 @@ lotsRouter.patch("/:id", validate(updateLotSchema), asyncHandler(async (req, res
     res.status(404).json({ error: "Lot introuvable" });
     return;
   }
-  if (existing.status !== "active") throw new HttpError(409, "Seuls les lots actifs peuvent \xEAtre mis \xE0 jour via PATCH \u2014 utilisez POST /:id/correct pour les lots cl\xF4tur\xE9s");
   assertOperatorOwns(userRole2, userId, existing.operatorId);
+  if (existing.status !== "active") throw new HttpError(409, "Seuls les lots actifs peuvent \xEAtre mis \xE0 jour via PATCH \u2014 utilisez POST /:id/correct pour les lots cl\xF4tur\xE9s");
   const updates = {};
   if (req.body.quantityProduced !== void 0) updates.quantityProduced = req.body.quantityProduced;
   if (req.body.quantityConforming !== void 0) updates.quantityConforming = req.body.quantityConforming;
@@ -83937,8 +83937,8 @@ lotsRouter.post("/:id/cadence", validate(changeCadenceSchema), asyncHandler(asyn
     res.status(404).json({ error: "Lot introuvable" });
     return;
   }
-  if (lot.status !== "active") throw new HttpError(409, "La cadence ne peut \xEAtre modifi\xE9e que sur un lot en cours");
   assertOperatorOwns(userRole2, userId, lot.operatorId);
+  if (lot.status !== "active") throw new HttpError(409, "La cadence ne peut \xEAtre modifi\xE9e que sur un lot en cours");
   const unit = cadenceUnit2 ?? lot.cadenceUnit;
   const oldCadenceInUnit = convertCadence(Number(lot.cadenceUsed), lot.cadenceUnit, unit);
   const [, [updated]] = await Promise.all([
@@ -83975,10 +83975,10 @@ lotsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(asyn
     res.status(404).json({ error: "Lot introuvable" });
     return;
   }
+  assertOperatorOwns(userRole2, userId, lot.operatorId, "Vous ne pouvez ajouter des arr\xEAts que sur vos propres lots");
   if (lot.status !== "active" && lot.status !== "closed") {
     throw new HttpError(409, "Impossible d'ajouter un arr\xEAt sur un lot d\xE9j\xE0 d\xE9cid\xE9 par le superviseur");
   }
-  assertOperatorOwns(userRole2, userId, lot.operatorId, "Vous ne pouvez ajouter des arr\xEAts que sur vos propres lots");
   const now = /* @__PURE__ */ new Date();
   const endedAt = new Date(now.getTime() + durationMinutes * 6e4);
   const [dt2] = await db3.insert(downtimeEvents).values({
