@@ -113,6 +113,25 @@ regression protection were locked down with tests:
 
 Suite is now **46 tests**.
 
+## Loop 3 — Admin delete confirmation (real a11y bug) + CRUD coverage
+Exercising the admin delete flow surfaced a genuine keyboard/a11y defect:
+
+- **Bug:** the `ConfirmDeleteModal` (destructive "Désactiver" confirmation,
+  `role="dialog" aria-modal`) never moved focus into itself on open — focus
+  stayed on the trash button *outside* the overlay. Its Escape handler relies on
+  the keydown bubbling up from a focused element inside the overlay, so **Escape
+  did nothing** and keyboard users were stranded outside the dialog. Verified
+  empirically (modal stayed open on Escape; `document.activeElement` was the
+  trash button). Unlike the Layout `ChangePasswordModal`, it had no focus
+  management.
+- **Fix** (`Admin.tsx`): focus the Cancel button on open (the safe default for a
+  destructive prompt), which also makes Escape work.
+- **Coverage** (`admin.spec.ts`): Escape closes the modal (regression),
+  Confirmer issues the DELETE + success toast, Annuler closes without deleting,
+  and "Ajouter" opens the create-room form.
+
+Suite is now **50 tests**.
+
 ## Coverage added
 The **Admin / Configuration** page was the only major page with no E2E coverage
 (protected by `typecheck` alone — exactly the gap that let the Supervision crash
