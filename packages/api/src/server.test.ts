@@ -798,6 +798,39 @@ describe("delete downtime endpoints", () => {
   closeSessionAfterAll(() => sessionId, () => auth);
 });
 
+describe("duplicate batch number rejection", () => {
+  const auth = { Authorization: `Bearer ${""}` };
+  let sessionId: string;
+
+  it("rejects a second lot reusing a batch number already in the session (409)", async () => {
+    auth.Authorization = `Bearer ${opToken}`;
+    const eqs = await request(app).get("/api/ref/equipments").set(auth);
+    const rooms = await request(app).get("/api/ref/rooms").set(auth);
+    const products = await request(app).get("/api/ref/products").set(auth);
+    const equipmentId = (eqs.body.equipments ?? eqs.body)[0].id;
+    const roomId = (rooms.body.rooms ?? rooms.body)[0].id;
+    const productId = (products.body.products ?? products.body)[0].id;
+
+    const ses = await request(app).post("/api/sessions/open").set(auth).send({ equipmentId, roomId });
+    expect(ses.status).toBe(201);
+    sessionId = ses.body.id ?? ses.body.session?.id;
+
+    const first = await request(app).post("/api/lots").set(auth)
+      .send({ sessionId, productId, batchNumber: "DUP-BATCH-1", cadenceUsed: 100, cadenceUnit: "u/min" });
+    expect(first.status).toBe(201);
+    const firstId = first.body.id ?? first.body.lot?.id;
+    // Close it so the active-lot guard doesn't mask the duplicate-batch guard.
+    await request(app).post(`/api/lots/${firstId}/close`).set(auth)
+      .send({ quantityProduced: 10, quantityConforming: 10 });
+
+    const dup = await request(app).post("/api/lots").set(auth)
+      .send({ sessionId, productId, batchNumber: "DUP-BATCH-1", cadenceUsed: 100, cadenceUnit: "u/min" });
+    expect(dup.status).toBe(409);
+  });
+
+  closeSessionAfterAll(() => sessionId, () => auth);
+});
+
 describe("dashboard pending-lots status filter", () => {
   it("rejects an unknown status value (400 — Zod query)", async () => {
     const res = await request(app)
