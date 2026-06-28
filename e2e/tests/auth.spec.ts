@@ -46,6 +46,19 @@ test("shows login form with email and password fields", async ({ page }) => {
   await expect(page.getByRole("button", { name: /se connecter/i })).toBeVisible();
 });
 
+test("password visibility toggle reveals and hides the password", async ({ page }) => {
+  await page.goto("/login");
+  const pw = page.locator("#login-password");
+  await pw.fill("s3cret");
+  await expect(pw).toHaveAttribute("type", "password");
+  // Reveal
+  await page.getByRole("button", { name: /afficher le mot de passe/i }).click();
+  await expect(pw).toHaveAttribute("type", "text");
+  // Hide again (the toggle's accessible name flips)
+  await page.getByRole("button", { name: /masquer le mot de passe/i }).click();
+  await expect(pw).toHaveAttribute("type", "password");
+});
+
 test("shows error message on invalid credentials", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel(/email/i).fill("wrong@example.com");
