@@ -121,3 +121,34 @@ test.describe("Admin — user deactivation modal", () => {
     expect(body).toMatchObject({ isActive: false });
   });
 });
+
+test.describe("Admin — reset-password modal", () => {
+  const OTHER_USER = { id: "user-op-9", email: "op9@dpi.local", displayName: "Opérateur Neuf", role: "operator", isActive: true, createdAt: "2026-01-01T00:00:00.000Z" };
+
+  test.beforeEach(async ({ adminPage: page }) => {
+    await page.unroute(/\/api\/admin\/users$/);
+    await page.route(/\/api\/admin\/users$/, (r) =>
+      r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([OTHER_USER]) }));
+    await page.goto("/admin");
+    await page.getByRole("tab", { name: /utilisateurs/i }).click();
+    await page.getByRole("button", { name: /réinitialiser le mot de passe/i }).first().click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+  });
+
+  test("Escape closes the modal (focus is moved into the dialog)", async ({ adminPage: page }) => {
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).not.toBeVisible();
+  });
+
+  test("submitting a new password POSTs it", async ({ adminPage: page }) => {
+    let body: any = null;
+    await page.route(/\/api\/admin\/users\/user-op-9\/password$/, (r) => {
+      body = JSON.parse(r.request().postData() || "{}");
+      r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+    });
+    await page.getByLabel("Nouveau mot de passe").fill("newpass123");
+    await page.getByRole("button", { name: /réinitialiser/i }).last().click();
+    await expect(page.getByText(/mot de passe réinitialisé/i)).toBeVisible();
+    expect(body).toMatchObject({ password: "newpass123" });
+  });
+});

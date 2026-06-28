@@ -83,6 +83,7 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
   const [form, setForm] = useState({ email: "", displayName: "", password: "", role: "operator" });
   const [pwFor, setPwFor] = useState<AdminUser | null>(null);
   const [newPw, setNewPw] = useState("");
+  const pwDialogRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,6 +92,11 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
     finally { setLoading(false); }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
+
+  // Move focus into the reset-password dialog on open so keyboard users land
+  // there and the Escape handler fires (it relies on a focused element inside
+  // the overlay) — same pattern as ConfirmDeleteModal.
+  useEffect(() => { if (pwFor) pwDialogRef.current?.querySelector("input")?.focus(); }, [pwFor]);
 
   const create = async () => {
     try {
@@ -218,6 +224,7 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
           onKeyDown={e => { if (e.key === "Escape") setPwFor(null); }}
         >
           <div
+            ref={pwDialogRef}
             className="bg-white rounded-xl p-5 w-full max-w-sm"
             role="dialog"
             aria-modal="true"
