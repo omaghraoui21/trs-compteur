@@ -88,3 +88,36 @@ test.describe("Admin — delete confirmation", () => {
     expect(deleted, "DELETE must not be issued on cancel").toBe(false);
   });
 });
+
+test.describe("Admin — user deactivation modal", () => {
+  const OTHER_USER = { id: "user-op-9", email: "op9@dpi.local", displayName: "Opérateur Neuf", role: "operator", isActive: true, createdAt: "2026-01-01T00:00:00.000Z" };
+
+  test.beforeEach(async ({ adminPage: page }) => {
+    // List a non-self user so its deactivate toggle is enabled.
+    await page.unroute(/\/api\/admin\/users$/);
+    await page.route(/\/api\/admin\/users$/, (r) =>
+      r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([OTHER_USER]) }));
+    await page.goto("/admin");
+    await page.getByRole("tab", { name: /utilisateurs/i }).click();
+    await expect(page.getByText("op9@dpi.local")).toBeVisible();
+  });
+
+  test("deactivation opens the accessible modal (not window.confirm) and Escape closes it", async ({ adminPage: page }) => {
+    await page.getByRole("button", { name: /actif/i }).click();
+    await expect(page.getByText(/désactiver l'utilisateur/i)).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByText(/désactiver l'utilisateur/i)).not.toBeVisible();
+  });
+
+  test("confirming deactivation PATCHes the user inactive", async ({ adminPage: page }) => {
+    let body: any = null;
+    await page.route(/\/api\/admin\/users\/user-op-9$/, (r) => {
+      body = JSON.parse(r.request().postData() || "{}");
+      r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...OTHER_USER, isActive: false }) });
+    });
+    await page.getByRole("button", { name: /actif/i }).click();
+    await page.getByRole("button", { name: /confirmer/i }).click();
+    await expect(page.getByText(/désactivé/i)).toBeVisible();
+    expect(body).toMatchObject({ isActive: false });
+  });
+});

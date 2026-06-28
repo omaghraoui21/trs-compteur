@@ -102,12 +102,19 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
     } catch (e: any) { toast.error(e.message || "Création échouée"); }
   };
 
+  // Deactivation goes through the shared accessible confirmation modal (same as
+  // every other admin panel); reactivation is immediate.
+  const { ask: askDeactivate, modal: deactivateModal } = useConfirmDelete({
+    label: "Désactiver l'utilisateur ? Il ne pourra plus se connecter.",
+    del: (id) => api.admin.updateUser(id, { isActive: false }),
+    done: (n) => `${n} désactivé`,
+    reload: load,
+    onError: (m) => toast.error(m || "Mise à jour échouée"),
+  });
+
   const toggleActive = async (u: AdminUser) => {
-    if (u.isActive) {
-      const ok = window.confirm(`Désactiver ${u.displayName} ? Cette personne ne pourra plus se connecter.`);
-      if (!ok) return;
-    }
-    try { await api.admin.updateUser(u.id, { isActive: !u.isActive }); load(); }
+    if (u.isActive) { askDeactivate(u.id, u.displayName); return; }
+    try { await api.admin.updateUser(u.id, { isActive: true }); load(); }
     catch (e: any) { toast.error(e.message || "Mise à jour échouée"); }
   };
 
@@ -129,6 +136,7 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
 
   return (
     <div>
+      {deactivateModal}
       <div className="flex justify-end mb-3">
         {!creating && (
           <button onClick={() => setCreating(true)} className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700">
