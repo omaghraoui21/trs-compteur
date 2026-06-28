@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { fmtDuration } from "@trs/engine";
 import type { SixLossesResult } from "@/lib/api";
 import { AlertTriangle } from "lucide-react";
@@ -23,7 +23,7 @@ interface Props {
 }
 
 export default function SixLossesChart({ data }: Props) {
-  const { losses, totalLossMin, tT } = data;
+  const { losses, totalLossMin } = data;
 
   const nonZeroLosses = losses.filter(l => l.minutes > 0);
   if (nonZeroLosses.length === 0) {

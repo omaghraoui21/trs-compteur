@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
 import { api, type Equipment, type DashboardTrsResponse, type ParetoResponse, type ParetoItem, type ComparisonResponse, type TrsMetrics, type DailyTrs, type LotTrs, type ByProductResponse, type SixLossesResponse, type HeatmapResponse, type DowntimeLogEntry, type DowntimeLogResponse } from "@/lib/api";
+import { getErrorMessage } from "@/lib/errors";
 import { fmtPct, fmtDuration, fmtNumber, trsColor, familleToNorme, computeOeeBenchmark } from "@trs/engine";
 import type { BenchmarkRating } from "@trs/engine";
 import { useToast } from "@/components/Toast";
@@ -103,9 +104,9 @@ export default function DashboardPage() {
     api.equipments().then(list => {
       setEquipmentsList(list);
       if (list.length > 0) setSelectedEquipment(list[0].id);
-    }).catch((err) => {
+    }).catch((err: unknown) => {
       setEquipFailed(true);
-      toast.error(err.message || "Chargement des équipements échoué");
+      toast.error(getErrorMessage(err) || "Chargement des équipements échoué");
     });
   }, [toast]);
 
@@ -151,8 +152,8 @@ export default function DashboardPage() {
       setHeatmapData(heatRes);
       setDowntimeLog(logRes);
       setPrevData(prevRes);
-    } catch (err: any) {
-      toast.error(err.message || "Chargement du tableau de bord échoué");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Chargement du tableau de bord échoué");
       setLoadFailed(true);
       setData(null);
       setParetoData(null);
@@ -164,7 +165,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedEquipment, from, to, zoom]);
+  }, [selectedEquipment, from, to, zoom, toast]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -260,7 +261,7 @@ export default function DashboardPage() {
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Export PDF téléchargé");
-    } catch (err: any) {
+    } catch {
       toast.error("Génération PDF échouée");
     } finally {
       setPdfLoading(false);

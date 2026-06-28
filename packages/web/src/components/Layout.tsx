@@ -2,6 +2,7 @@ import { type ReactNode, useState, useEffect, useCallback, useRef } from "react"
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/components/Toast";
 import { useActiveSession } from "@/lib/sessionContext";
 import { fmtDuration, diffMinutes } from "@trs/engine";
@@ -208,8 +209,8 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
       await api.changePassword(oldPassword, newPassword);
       toast.success("Mot de passe modifié");
       onClose();
-    } catch (e: any) {
-      toast.error(e.message || "Échec du changement de mot de passe");
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e) || "Échec du changement de mot de passe");
     } finally {
       setSaving(false);
     }

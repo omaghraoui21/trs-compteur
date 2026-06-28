@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, Fragment, useRef } from "react";
 import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type ProductEquipmentCadence, type AdminUser, type AuditLogEntry } from "@/lib/api";
+import { getErrorMessage } from "@/lib/errors";
 import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, List, Network, ChevronDown, ChevronRight, Users, KeyRound, ScrollText, ChevronLeft } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
@@ -87,7 +88,7 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     try { setUsers(await api.admin.listUsers()); }
-    catch (e: any) { toast.error(e.message || "Chargement des utilisateurs échoué"); }
+    catch (e: unknown) { toast.error(getErrorMessage(e) || "Chargement des utilisateurs échoué"); }
     finally { setLoading(false); }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
@@ -99,7 +100,7 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
       setCreating(false);
       setForm({ email: "", displayName: "", password: "", role: "operator" });
       load();
-    } catch (e: any) { toast.error(e.message || "Création échouée"); }
+    } catch (e: unknown) { toast.error(getErrorMessage(e) || "Création échouée"); }
   };
 
   const toggleActive = async (u: AdminUser) => {
@@ -108,12 +109,12 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
       if (!ok) return;
     }
     try { await api.admin.updateUser(u.id, { isActive: !u.isActive }); load(); }
-    catch (e: any) { toast.error(e.message || "Mise à jour échouée"); }
+    catch (e: unknown) { toast.error(getErrorMessage(e) || "Mise à jour échouée"); }
   };
 
   const changeRole = async (u: AdminUser, role: string) => {
     try { await api.admin.updateUser(u.id, { role }); load(); }
-    catch (e: any) { toast.error(e.message || "Changement de rôle échoué"); }
+    catch (e: unknown) { toast.error(getErrorMessage(e) || "Changement de rôle échoué"); }
   };
 
   const resetPassword = async () => {
@@ -122,7 +123,7 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
       await api.admin.resetUserPassword(pwFor.id, newPw);
       toast.success(`Mot de passe réinitialisé pour ${pwFor.displayName}`);
       setPwFor(null); setNewPw("");
-    } catch (e: any) { toast.error(e.message || "Réinitialisation échouée"); }
+    } catch (e: unknown) { toast.error(getErrorMessage(e) || "Réinitialisation échouée"); }
   };
 
   if (loading) return <TableSkeleton />;
@@ -243,7 +244,7 @@ function RoomsPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setRooms(await api.admin.listRooms()); } catch (e: any) { setError(e.message); }
+    try { setRooms(await api.admin.listRooms()); } catch (e: unknown) { setError(getErrorMessage(e)); }
     setLoading(false);
   }, []);
 
@@ -265,7 +266,7 @@ function RoomsPanel() {
         await api.admin.createRoom(form);
       }
       resetForm(); load();
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(getErrorMessage(e)); }
   };
 
   const { ask: remove, modal: deleteModal } = useConfirmDelete({
@@ -310,7 +311,7 @@ function RoomsPanel() {
                     <div className="flex gap-1">
                       <IconBtn icon={Pencil} onClick={() => startEdit(r)} title="Modifier" />
                       {r.isActive && <IconBtn icon={Trash2} onClick={() => remove(r.id, r.name)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                      {!r.isActive && <IconBtn icon={Check} onClick={async () => { try { await api.admin.updateRoom(r.id, { isActive: true }); toast.success(`Local "${r.name}" réactivé`); load(); } catch (e: any) { setError(e.message); } }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
+                      {!r.isActive && <IconBtn icon={Check} onClick={async () => { try { await api.admin.updateRoom(r.id, { isActive: true }); toast.success(`Local "${r.name}" réactivé`); load(); } catch (e: unknown) { setError(getErrorMessage(e)); } }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
                     </div>
                   </td>
                 </tr>
@@ -340,7 +341,7 @@ function EquipmentsPanel() {
     try {
       const [eq, rm] = await Promise.all([api.admin.listEquipments(), api.admin.listRooms()]);
       setItems(eq); setRooms(rm.filter(r => r.isActive));
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(getErrorMessage(e)); }
     setLoading(false);
   }, []);
 
@@ -363,7 +364,7 @@ function EquipmentsPanel() {
         await api.admin.createEquipment(payload);
       }
       resetForm(); load();
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(getErrorMessage(e)); }
   };
 
   const { ask: remove, modal: deleteModal } = useConfirmDelete({
@@ -435,7 +436,7 @@ function EquipmentsPanel() {
                     <div className="flex gap-1">
                       <IconBtn icon={Pencil} onClick={() => startEdit(e)} title="Modifier" />
                       {e.isActive && <IconBtn icon={Trash2} onClick={() => remove(e.id, e.name)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                      {!e.isActive && <IconBtn icon={Check} onClick={async () => { try { await api.admin.updateEquipment(e.id, { isActive: true }); toast.success(`Équipement "${e.name}" réactivé`); load(); } catch (err: any) { setError(err.message); } }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
+                      {!e.isActive && <IconBtn icon={Check} onClick={async () => { try { await api.admin.updateEquipment(e.id, { isActive: true }); toast.success(`Équipement "${e.name}" réactivé`); load(); } catch (err: unknown) { setError(getErrorMessage(err)); } }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
                     </div>
                   </td>
                 </tr>
@@ -461,7 +462,7 @@ function ProductsPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setItems(await api.admin.listProducts()); } catch (e: any) { setError(e.message); }
+    try { setItems(await api.admin.listProducts()); } catch (e: unknown) { setError(getErrorMessage(e)); }
     setLoading(false);
   }, []);
 
@@ -483,7 +484,7 @@ function ProductsPanel() {
         await api.admin.createProduct({ ...form, defaultCadence: form.defaultCadence || undefined });
       }
       resetForm(); load();
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(getErrorMessage(e)); }
   };
 
   const { ask: remove, modal: deleteModal } = useConfirmDelete({
@@ -537,7 +538,7 @@ function ProductsPanel() {
                     <div className="flex gap-1">
                       <IconBtn icon={Pencil} onClick={() => startEdit(p)} title="Modifier" />
                       {p.isActive && <IconBtn icon={Trash2} onClick={() => remove(p.id, p.name)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                      {!p.isActive && <IconBtn icon={Check} onClick={async () => { try { await api.admin.updateProduct(p.id, { isActive: true }); toast.success(`Produit "${p.name}" réactivé`); load(); } catch (err: any) { setError(err.message); } }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
+                      {!p.isActive && <IconBtn icon={Check} onClick={async () => { try { await api.admin.updateProduct(p.id, { isActive: true }); toast.success(`Produit "${p.name}" réactivé`); load(); } catch (err: unknown) { setError(getErrorMessage(err)); } }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
                     </div>
                   </td>
                 </tr>
@@ -553,7 +554,6 @@ function ProductsPanel() {
 // ─── Cadences Panel (Product × Equipment) ────────────────
 
 function CadencesPanel() {
-  const toast = useToast();
   const [cadences, setCadences] = useState<ProductEquipmentCadence[]>([]);
   const [productsList, setProductsList] = useState<AdminProduct[]>([]);
   const [equipmentsList, setEquipmentsList] = useState<AdminEquipment[]>([]);
@@ -568,7 +568,7 @@ function CadencesPanel() {
     try {
       const [c, p, e] = await Promise.all([api.admin.listCadences(), api.admin.listProducts(), api.admin.listEquipments()]);
       setCadences(c); setProductsList(p.filter(x => x.isActive)); setEquipmentsList(e.filter(x => x.isActive));
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(getErrorMessage(e)); }
     setLoading(false);
   }, []);
 
@@ -582,7 +582,7 @@ function CadencesPanel() {
     try {
       await api.admin.upsertCadence({ productId: form.productId, equipmentId: form.equipmentId, cadenceValue: Number(form.cadenceValue), cadenceUnit: form.cadenceUnit, trsObjective: form.trsObjective ? Number(form.trsObjective) : undefined });
       resetForm(); load();
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(getErrorMessage(e)); }
   };
 
   const { ask: remove, modal: deleteModal } = useConfirmDelete({
@@ -594,7 +594,6 @@ function CadencesPanel() {
   const productNameMap = useMemo(() => new Map(productsList.map(p => [p.id, p.name] as const)), [productsList]);
   const equipmentNameMap = useMemo(() => new Map(equipmentsList.map(e => [e.id, e.name] as const)), [equipmentsList]);
   const productName = (id: string) => productNameMap.get(id) ?? id;
-  const equipmentName = (id: string) => equipmentNameMap.get(id) ?? id;
 
   const filteredCadences = useMemo(() => {
     const q = cadenceSearch.toLowerCase();
@@ -720,7 +719,7 @@ function DowntimesPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setItems(await api.admin.listDowntimeCategories()); } catch (e: any) { setError(e.message); }
+    try { setItems(await api.admin.listDowntimeCategories()); } catch (e: unknown) { setError(getErrorMessage(e)); }
     setLoading(false);
   }, []);
 
@@ -742,7 +741,7 @@ function DowntimesPanel() {
         await api.admin.createDowntimeCategory({ ...form, appliesToEquipmentType: form.appliesToEquipmentType || undefined });
       }
       resetForm(); load();
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(getErrorMessage(e)); }
   };
 
   const { ask: remove, modal: deleteModal } = useConfirmDelete({
@@ -754,7 +753,7 @@ function DowntimesPanel() {
     try {
       await api.admin.updateDowntimeCategory(cat.id, { isPlanned: !cat.isPlanned });
       load();
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(getErrorMessage(e)); }
   };
 
   if (loading) return <Spinner />;
@@ -864,7 +863,7 @@ function DowntimesPanel() {
                       <div className="flex gap-1">
                         <IconBtn icon={Pencil} onClick={() => startEdit(c)} title="Modifier" />
                         {c.isActive && <IconBtn icon={Trash2} onClick={() => remove(c.id, c.label)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
-                        {!c.isActive && <IconBtn icon={Check} onClick={async () => { try { await api.admin.updateDowntimeCategory(c.id, { isActive: true }); toast.success(`Catégorie "${c.label}" réactivée`); load(); } catch (err: any) { setError(err.message); } }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
+                        {!c.isActive && <IconBtn icon={Check} onClick={async () => { try { await api.admin.updateDowntimeCategory(c.id, { isActive: true }); toast.success(`Catégorie "${c.label}" réactivée`); load(); } catch (err: unknown) { setError(getErrorMessage(err)); } }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}
                       </div>
                     </td>
                   </tr>
@@ -910,7 +909,11 @@ function DowntimeTree({ categories }: { categories: AdminDowntimeCategory[] }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const toggle = (key: string) =>
-    setCollapsed(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
 
   // All famille node keys across both branches — used by collapse-all.
   const allKeys = useMemo(() => {
@@ -1058,7 +1061,7 @@ function useConfirmDelete(opts: { label: string; del: (id: string) => Promise<un
   const confirm = async () => {
     if (!pending) return;
     try { await opts.del(pending.id); toast.success(opts.done(pending.name)); opts.reload(); }
-    catch (e: any) { opts.onError(e.message); }
+    catch (e: unknown) { opts.onError(getErrorMessage(e)); }
     setPending(null);
   };
   const modal = pending
@@ -1171,8 +1174,8 @@ function AuditLogPanel() {
       });
       setEntries(rows);
       setOffset(off);
-    } catch (err: any) {
-      toast.error(err.message || "Chargement du journal échoué");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Chargement du journal échoué");
     } finally {
       setLoading(false);
     }
