@@ -15,9 +15,13 @@ function fmtLotDuration(start: string, end: string | null): string {
   return end ? fmtMinutes(diffMinutes(start, end)) : "En cours";
 }
 
-// YYYY-MM-DD → DD/MM/YYYY without UTC-midnight shift
-function fmtSessionDate(iso: string): string {
+// YYYY-MM-DD → DD/MM/YYYY without UTC-midnight shift.
+// Guard against a missing/malformed date so one bad record never crashes the
+// whole validation queue (the page is wrapped in an ErrorBoundary).
+function fmtSessionDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
   const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return "—";
   return `${d}/${m}/${y}`;
 }
 
@@ -328,7 +332,7 @@ export default function SupervisorPage() {
                       )}
                     </div>
                     {/* Context: product · equipment · operator · date */}
-                    <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-2 flex-wrap">
+                    <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2 flex-wrap">
                       <span>{product?.name ?? "—"} · Lot #{lot.lotOrder}</span>
                       {lot.endedAt && (
                         <span className="inline-flex items-center gap-0.5">
@@ -347,7 +351,7 @@ export default function SupervisorPage() {
                     </div>
                     <QualityBar tq={tq} />
                   </div>
-                  {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400 shrink-0 mt-1" aria-hidden="true" /> : <ChevronDown className="h-4 w-4 text-gray-400 shrink-0 mt-1" aria-hidden="true" />}
+                  {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-500 shrink-0 mt-1" aria-hidden="true" /> : <ChevronDown className="h-4 w-4 text-gray-500 shrink-0 mt-1" aria-hidden="true" />}
                 </div>
               </button>
 
@@ -406,7 +410,7 @@ export default function SupervisorPage() {
                     <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
                       Arrêts enregistrés
                       {totalDowntimeMin !== null && totalDowntimeMin > 0 && (
-                        <span className="ml-1 font-normal text-gray-400">
+                        <span className="ml-1 font-normal text-gray-500">
                           — {fmtMinutes(totalDowntimeMin)} · <span className="text-amber-600">planifié {fmtMinutes(plannedMin)}</span> · <span className="text-red-600">non planifié {fmtMinutes(unplannedMin)}</span>
                         </span>
                       )}
@@ -423,7 +427,7 @@ export default function SupervisorPage() {
                       </div>
                     )}
                     {dts && dts.length === 0 && !lotDataFailed[lot.id] && (
-                      <div className="text-xs text-gray-400 py-1">Aucun arrêt enregistré sur ce lot.</div>
+                      <div className="text-xs text-gray-500 py-1">Aucun arrêt enregistré sur ce lot.</div>
                     )}
                     {dts && dts.length > 0 && (
                       <div className="space-y-1">
@@ -432,7 +436,7 @@ export default function SupervisorPage() {
                             <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${dt.isPlanned ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
                               {dt.isPlanned ? "P" : "NP"}
                             </span>
-                            <span className="text-gray-400 shrink-0">{dt.famille}</span>
+                            <span className="text-gray-500 shrink-0">{dt.famille}</span>
                             <span className="text-gray-300">›</span>
                             <span className="font-medium text-gray-700 flex-1">{dt.reason}</span>
                             <span className="shrink-0 font-mono text-gray-500">{fmtMinutes(dt.durationMinutes)}</span>
@@ -634,7 +638,7 @@ export default function SupervisorPage() {
 
                   <button
                     onClick={() => setExpanded(null)}
-                    className="w-full flex items-center justify-center gap-1 text-xs text-gray-400 hover:text-gray-600 py-1 border-t mt-1"
+                    className="w-full flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-gray-600 py-1 border-t mt-1"
                   >
                     <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" /> Réduire
                   </button>
@@ -670,7 +674,7 @@ export default function SupervisorPage() {
                 : pendingSign.action === "reject" ? "Rejet du lot"
                 : "Correction des données du lot"}
             </p>
-            <p className="text-xs text-gray-400 mb-4">
+            <p className="text-xs text-gray-500 mb-4">
               Conformément au 21 CFR Part 11, saisissez votre mot de passe pour signer cette décision. Votre nom et l'horodatage seront enregistrés de façon inaltérable.
             </p>
             <input
@@ -684,7 +688,7 @@ export default function SupervisorPage() {
               placeholder="Mot de passe"
               className="w-full border rounded-lg px-3 py-2 text-sm mb-1"
             />
-            <p className="text-[10px] text-gray-400 mb-3">Appuyez sur Entrée pour signer</p>
+            <p className="text-[10px] text-gray-500 mb-3">Appuyez sur Entrée pour signer</p>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setPendingSign(null)} disabled={submitting}
                 className="px-3 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50 disabled:opacity-50">Annuler</button>

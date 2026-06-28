@@ -18,7 +18,7 @@ export default function ParetoChart({ pareto, totalMin, onSelectCode }: Props) {
   if (pareto.length === 0) return (
     <div className="bg-white rounded-xl border shadow-sm p-4" role="region" aria-label="Pareto des arrêts">
       <h3 className="font-semibold text-sm mb-3">Pareto des arrêts</h3>
-      <div className="text-center text-gray-400 py-8 text-sm">Aucun arrêt enregistré</div>
+      <div className="text-center text-gray-500 py-8 text-sm">Aucun arrêt enregistré</div>
     </div>
   );
 

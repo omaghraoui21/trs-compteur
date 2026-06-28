@@ -37,7 +37,7 @@ export function RateGauge({
 
   return (
     <div className="bg-white rounded-2xl border shadow-sm p-4 flex flex-col items-center">
-      <div className="text-[11px] uppercase tracking-wider text-gray-400 mb-1">{label}</div>
+      <div className="text-[11px] uppercase tracking-wider text-gray-500 mb-1">{label}</div>
       <svg viewBox="0 0 200 116" className="w-full max-w-[220px]" role="img"
         aria-label={`${label} ${value}${unit ? " " + unit : ""}${hasTarget ? ` sur ${max}` : ""}`}>
         {/* track */}
@@ -60,7 +60,7 @@ export function RateGauge({
           {unit ? ` ${unit}` : ""} · <span style={{ color }}>{(ratio * 100).toFixed(0)}%</span>
         </div>
       ) : (
-        <div className="text-xs text-gray-400 -mt-1">Pas de consigne de référence</div>
+        <div className="text-xs text-gray-500 -mt-1">Pas de consigne de référence</div>
       )}
     </div>
   );

@@ -31,6 +31,20 @@ let opToken: string;
 let supToken: string;
 let admToken: string;
 
+// Free the equipment for later describe blocks — one active session per
+// equipment is enforced server-side, so leaving a session open would 409 the
+// next open. The session id and auth header are read lazily because each
+// describe block fills them in during its own setup `it(...)`.
+function closeSessionAfterAll(
+  getSessionId: () => string | undefined,
+  getAuth: () => Record<string, string>,
+): void {
+  afterAll(async () => {
+    const id = getSessionId();
+    if (id) await request(app).post(`/api/sessions/${id}/close`).set(getAuth()).send({});
+  });
+}
+
 async function login(email: string, password: string): Promise<string> {
   const res = await request(app).post("/api/auth/login").send({ email, password });
   expect(res.status).toBe(200);
@@ -625,11 +639,7 @@ describe("session-level stops + cadence changes (refonte arrêts)", () => {
     expect(c2.status).toBe(409);
   });
 
-  // Free the equipment for later describe blocks — one active session per
-  // equipment is enforced server-side, so leaving this open would 409 the next open.
-  afterAll(async () => {
-    if (sessionId) await request(app).post(`/api/sessions/${sessionId}/close`).set(auth).send({});
-  });
+  closeSessionAfterAll(() => sessionId, () => auth);
 });
 
 describe("POST /sessions/:id/events", () => {
@@ -666,9 +676,7 @@ describe("POST /sessions/:id/events", () => {
     expect(res.status).toBe(400);
   });
 
-  afterAll(async () => {
-    if (sessionId) await request(app).post(`/api/sessions/${sessionId}/close`).set(auth).send({});
-  });
+  closeSessionAfterAll(() => sessionId, () => auth);
 });
 
 describe("delete downtime endpoints", () => {
@@ -758,9 +766,7 @@ describe("delete downtime endpoints", () => {
     expect(res.status).toBe(404);
   });
 
-  afterAll(async () => {
-    if (sessionId) await request(app).post(`/api/sessions/${sessionId}/close`).set(auth).send({});
-  });
+  closeSessionAfterAll(() => sessionId, () => auth);
 });
 
 describe("dashboard pending-lots status filter", () => {

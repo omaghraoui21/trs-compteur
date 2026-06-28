@@ -16,7 +16,7 @@ export default function ByProductChart({ byProduct }: Props) {
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
           <Package className="h-4 w-4 text-blue-600" aria-hidden="true" /> TRS par produit
         </h3>
-        <div className="text-center text-gray-400 py-8 text-sm">Aucun lot clôturé dans la période</div>
+        <div className="text-center text-gray-500 py-8 text-sm">Aucun lot clôturé dans la période</div>
       </div>
     );
   }
@@ -40,7 +40,7 @@ export default function ByProductChart({ byProduct }: Props) {
       </h3>
       <p className="text-xs text-gray-500 mb-3">
         {byProduct.length} produit(s) — TRS = ΣtU / ΣtR
-        {byProduct[0]?.trAllocated && <span className="text-gray-400"> · DO réparti au prorata du temps de fonctionnement</span>}
+        {byProduct[0]?.trAllocated && <span className="text-gray-500"> · DO réparti au prorata du temps de fonctionnement</span>}
       </p>
 
       <ResponsiveContainer width="100%" height={260}>

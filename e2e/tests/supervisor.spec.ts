@@ -33,7 +33,9 @@ test.describe("Supervisor — lot validation queue", () => {
 
   test("shows 'Réduire' collapse button inside expanded card", async ({ supervisorPage: page }) => {
     await page.getByText("26013").click();
-    await expect(page.getByRole("button", { name: /réduire/i })).toBeVisible();
+    // exact:true so we match only the footer "Réduire" button, not the header
+    // toggle whose aria-label is "Réduire le lot 26013".
+    await expect(page.getByRole("button", { name: "Réduire", exact: true })).toBeVisible();
   });
 
   test("collapse button closes the expanded card", async ({ supervisorPage: page }) => {
@@ -41,8 +43,8 @@ test.describe("Supervisor — lot validation queue", () => {
     // Expanded detail is visible
     await expect(page.getByRole("button", { name: /valider/i })).toBeVisible();
 
-    // Click collapse
-    await page.getByRole("button", { name: /réduire/i }).click();
+    // Click collapse (footer button, not the header toggle)
+    await page.getByRole("button", { name: "Réduire", exact: true }).click();
     // Detail should be hidden
     await expect(page.getByRole("button", { name: /valider/i })).not.toBeVisible();
   });
@@ -56,6 +58,9 @@ test.describe("Supervisor — lot validation queue", () => {
 
   test("clicking 'Rejeter' opens signature modal", async ({ supervisorPage: page }) => {
     await page.getByText("26013").click();
+    // A rejection comment is mandatory (GMP); without it, clicking "Rejeter"
+    // only surfaces an inline error instead of the signature modal.
+    await page.getByLabel(/commentaire superviseur/i).fill("Quantités incohérentes");
     await page.getByRole("button", { name: /rejeter/i }).click();
     await expect(page.getByText(/signature électronique/i)).toBeVisible();
   });

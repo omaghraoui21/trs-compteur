@@ -32,7 +32,7 @@ export default function SixLossesChart({ data }: Props) {
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden="true" /> 6 Grandes Pertes (Nakajima)
         </h3>
-        <div className="text-center text-gray-400 py-8 text-sm">Aucune perte enregistrée</div>
+        <div className="text-center text-gray-500 py-8 text-sm">Aucune perte enregistrée</div>
       </div>
     );
   }

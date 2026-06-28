@@ -101,14 +101,14 @@ export default function TrsVerificationPanel({ metrics }: Props) {
       {/* Headline: measured vs calculated TRS */}
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div className="rounded-xl bg-gray-50 p-3 text-center">
-          <div className="text-[11px] uppercase tracking-wide text-gray-400">TRS mesuré</div>
+          <div className="text-[11px] uppercase tracking-wide text-gray-500">TRS mesuré</div>
           <div className="text-2xl font-bold text-gray-800">{fmtPct(trsMeasured)}</div>
-          <div className="text-[10px] text-gray-400 mt-0.5">tU / tR</div>
+          <div className="text-[10px] text-gray-500 mt-0.5">tU / tR</div>
         </div>
         <div className="rounded-xl bg-gray-50 p-3 text-center">
-          <div className="text-[11px] uppercase tracking-wide text-gray-400">TRS calculé</div>
+          <div className="text-[11px] uppercase tracking-wide text-gray-500">TRS calculé</div>
           <div className="text-2xl font-bold text-gray-800">{fmtPct(trsCalculated)}</div>
-          <div className="text-[10px] text-gray-400 mt-0.5">DO × TP × TQ</div>
+          <div className="text-[10px] text-gray-500 mt-0.5">DO × TP × TQ</div>
         </div>
       </div>
 
@@ -121,14 +121,14 @@ export default function TrsVerificationPanel({ metrics }: Props) {
               : <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" aria-label="À vérifier" />}
             <div className="flex-1 min-w-0">
               <span className="font-medium text-gray-700">{c.label}</span>
-              <span className="text-gray-400 ml-1 font-mono">{c.detail}</span>
+              <span className="text-gray-500 ml-1 font-mono">{c.detail}</span>
             </div>
           </li>
         ))}
       </ul>
 
       {!decompOk && (
-        <p className="text-[11px] text-gray-400 mt-2 leading-snug">
+        <p className="text-[11px] text-gray-500 mt-2 leading-snug">
           L'écart DO×TP×TQ provient du mélange de produits à cadences différentes :
           la qualité est comptée en pièces (Σconf/Σprod) tandis que les temps sont
           pondérés par la cadence. Le TRS de référence reste tU/tR.

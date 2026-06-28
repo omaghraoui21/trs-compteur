@@ -1,9 +1,11 @@
 import { test as base, expect, type Page } from "@playwright/test";
 import {
-  OPERATOR_USER, SUPERVISOR_USER,
+  OPERATOR_USER, SUPERVISOR_USER, ADMIN_USER,
   ROOM, EQUIPMENT, PRODUCT, CADENCE, DOWNTIME_CATEGORY,
   SESSION, SESSION_DETAIL_EMPTY, LOT_ACTIVE, LOT_CLOSED,
   DOWNTIME_EVENT, TRS_EMPTY, PENDING_LOT,
+  ADMIN_ROOM, ADMIN_EQUIPMENT, ADMIN_PRODUCT, ADMIN_DOWNTIME_CATEGORY,
+  ADMIN_CADENCE, ADMIN_USER_ROW,
 } from "./data";
 
 export { expect };
@@ -16,6 +18,9 @@ async function injectTokens(page: Page) {
   await page.addInitScript(() => {
     localStorage.setItem("trs_token", "fake-access-token");
     localStorage.setItem("trs_refresh", "fake-refresh-token");
+    // Suppress the first-run onboarding overlay — it covers the operator view
+    // and intercepts pointer events, breaking every interaction-based test.
+    localStorage.setItem("trs_onboarding_done", "1");
   });
 }
 
@@ -106,6 +111,21 @@ export async function mockDashboardRoutes(page: Page) {
   await json(page, /\/api\/ref\/equipments/, [EQUIPMENT]);
 }
 
+export async function mockAdminRoutes(page: Page) {
+  // Order matters: register the more specific cadences route before products,
+  // but each pattern is anchored with $ so they don't overlap.
+  await json(page, /\/api\/admin\/rooms$/, [ADMIN_ROOM]);
+  await json(page, /\/api\/admin\/equipments$/, [ADMIN_EQUIPMENT]);
+  await json(page, /\/api\/admin\/products$/, [ADMIN_PRODUCT]);
+  await json(page, /\/api\/admin\/downtime-categories$/, [ADMIN_DOWNTIME_CATEGORY]);
+  await json(page, /\/api\/admin\/cadences$/, [ADMIN_CADENCE]);
+  await json(page, /\/api\/admin\/users$/, [ADMIN_USER_ROW]);
+  await json(page, /\/api\/admin\/audit-log/, []);
+  // The app shell polls this for the nav badge whenever an admin/supervisor is
+  // signed in; mock it so the Configuration page makes no un-stubbed requests.
+  await json(page, /\/api\/dashboard\/pending-lots\/count/, { count: 0 });
+}
+
 // ─── Custom test fixture ──────────────────────────────────────────────────────
 
 type Fixtures = {
@@ -113,6 +133,8 @@ type Fixtures = {
   operatorPage: Page;
   /** Page with supervisor auth + all common routes mocked. */
   supervisorPage: Page;
+  /** Page with admin auth + admin (Configuration) routes mocked. */
+  adminPage: Page;
 };
 
 export const test = base.extend<Fixtures>({
@@ -132,6 +154,15 @@ export const test = base.extend<Fixtures>({
     await mockSessionRoutes(page);
     await mockLotRoutes(page);
     await mockDashboardRoutes(page);
+    await use(page);
+  },
+
+  adminPage: async ({ page }, use) => {
+    await injectTokens(page);
+    await mockAuthRoutes(page, ADMIN_USER);
+    await mockRefRoutes(page);
+    await mockSessionRoutes(page);
+    await mockAdminRoutes(page);
     await use(page);
   },
 });
