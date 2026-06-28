@@ -83691,7 +83691,8 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     sessionId: downtimeEvents.sessionId,
     lotEntryId: downtimeEvents.lotEntryId,
     sessionStatus: sessions.status,
-    createdBy: downtimeEvents.createdBy
+    createdBy: downtimeEvents.createdBy,
+    sessionOperatorId: sessions.operatorId
   }).from(downtimeEvents).leftJoin(sessions, eq(downtimeEvents.sessionId, sessions.id)).where(eq(downtimeEvents.id, dtId)).limit(1);
   if (!dt2) {
     res.status(404).json({ error: "Arr\xEAt introuvable" });
@@ -83706,7 +83707,7 @@ sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     return;
   }
   if (dt2.sessionStatus !== "active") throw new HttpError(409, "Impossible de supprimer un arr\xEAt d'une session d\xE9j\xE0 ferm\xE9e");
-  assertOperatorOwns(userRole2, userId, dt2.createdBy, "Vous ne pouvez supprimer que vos propres arr\xEAts");
+  assertOperatorOwns(userRole2, userId, dt2.createdBy ?? dt2.sessionOperatorId, "Vous ne pouvez supprimer que vos propres arr\xEAts");
   await db3.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
   await audit(db3, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });
   res.status(204).send();
@@ -84011,7 +84012,7 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   const { db: db3, userId, userRole: userRole2 } = req;
   const lotId = String(req.params.id);
   const dtId = String(req.params.dtId);
-  const [row] = await db3.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId, lotStatus: lotEntries.status, createdBy: downtimeEvents.createdBy }).from(downtimeEvents).innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).where(eq(downtimeEvents.id, dtId)).limit(1);
+  const [row] = await db3.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId, lotStatus: lotEntries.status, createdBy: downtimeEvents.createdBy, operatorId: lotEntries.operatorId }).from(downtimeEvents).innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id)).where(eq(downtimeEvents.id, dtId)).limit(1);
   if (!row) {
     res.status(404).json({ error: "Arr\xEAt introuvable" });
     return;
@@ -84020,7 +84021,7 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
     res.status(403).json({ error: "Cet arr\xEAt n'appartient pas \xE0 ce lot" });
     return;
   }
-  assertOperatorOwns(userRole2, userId, row.createdBy, "Vous ne pouvez supprimer que vos propres arr\xEAts");
+  assertOperatorOwns(userRole2, userId, row.createdBy ?? row.operatorId, "Vous ne pouvez supprimer que vos propres arr\xEAts");
   if (row.lotStatus !== "active" && row.lotStatus !== "closed") {
     throw new HttpError(409, "Impossible de supprimer un arr\xEAt sur un lot d\xE9j\xE0 d\xE9cid\xE9 par le superviseur");
   }

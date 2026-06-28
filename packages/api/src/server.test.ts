@@ -766,16 +766,29 @@ describe("delete downtime endpoints", () => {
     expect(res.status).toBe(404);
   });
 
-  it("lets an operator delete a legacy session stop with NULL created_by (not 403)", async () => {
+  it("restricts deletion of a legacy NULL-created_by stop to the session's own operator", async () => {
     const cats = await request(app).get("/api/ref/downtime-categories").set(auth);
     const categoryId = (cats.body.categories ?? cats.body)[0].id;
     const sd = await request(app)
       .post(`/api/sessions/${sessionId}/downtimes`)
       .set(auth).send({ categoryId, durationMinutes: 7 });
     expect(sd.status).toBe(201);
-    // Simulate a pre-attribution row: clear created_by, then the owning operator
-    // must still be able to delete it (assertOperatorOwns skips when ownerId is null).
+    // Simulate a pre-attribution row (created_by IS NULL).
     await sql`UPDATE downtime_events SET created_by = NULL WHERE id = ${sd.body.id}`;
+
+    // A *different* operator must NOT be able to delete it — with created_by
+    // unknown, ownership falls back to the session's operator, not "any operator".
+    await request(app).post("/api/admin/users").set({ Authorization: `Bearer ${admToken}` }).send({
+      email: "other-op@dpi.local", displayName: "Autre Opérateur", password: "secret123", role: "operator",
+    });
+    const otherTok = (await request(app).post("/api/auth/login")
+      .send({ email: "other-op@dpi.local", password: "secret123" })).body.token;
+    const forbidden = await request(app)
+      .delete(`/api/sessions/${sessionId}/downtimes/${sd.body.id}`)
+      .set({ Authorization: `Bearer ${otherTok}` });
+    expect(forbidden.status).toBe(403);
+
+    // The session's own operator still can.
     const del = await request(app)
       .delete(`/api/sessions/${sessionId}/downtimes/${sd.body.id}`)
       .set(auth);

@@ -278,13 +278,14 @@ lotsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
   const dtId = String(req.params.dtId);
 
   // Join with the lot so we can check ownership + lot status in one query.
-  const [row] = await db.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId, lotStatus: lotEntries.status, createdBy: downtimeEvents.createdBy })
+  const [row] = await db.select({ id: downtimeEvents.id, lotEntryId: downtimeEvents.lotEntryId, lotStatus: lotEntries.status, createdBy: downtimeEvents.createdBy, operatorId: lotEntries.operatorId })
     .from(downtimeEvents)
     .innerJoin(lotEntries, eq(downtimeEvents.lotEntryId, lotEntries.id))
     .where(eq(downtimeEvents.id, dtId)).limit(1);
   if (!row) { res.status(404).json({ error: "Arrêt introuvable" }); return; }
   if (row.lotEntryId !== lotId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à ce lot" }); return; }
-  assertOperatorOwns(userRole, userId, row.createdBy, "Vous ne pouvez supprimer que vos propres arrêts");
+  // Fall back to lot ownership for legacy stops with no recorded creator.
+  assertOperatorOwns(userRole, userId, row.createdBy ?? row.operatorId, "Vous ne pouvez supprimer que vos propres arrêts");
   if (row.lotStatus !== "active" && row.lotStatus !== "closed") {
     throw new HttpError(409, "Impossible de supprimer un arrêt sur un lot déjà décidé par le superviseur");
   }
