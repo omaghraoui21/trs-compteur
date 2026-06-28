@@ -218,3 +218,12 @@ unstyleable, not focus-managed, and effectively untestable. Migrated
 deactivation to the shared `useConfirmDelete` modal (reactivation stays
 immediate). Added admin tests: deactivation opens the modal + Escape closes it;
 confirming PATCHes `isActive:false`. Suite is now **58 tests**.
+
+## Loop 10 — reset-password modal had the same focus/Escape bug (a11y)
+The Admin reset-password modal (`role="dialog" aria-modal` + Escape handler) had
+no focus management — focus stayed on the key button outside the overlay, so
+Escape did nothing and keyboard users were stranded (same defect class fixed in
+loop 3 for ConfirmDeleteModal). Verified empirically (modal stayed open; active
+element was the key button). **Fix** (`Admin.tsx`): focus the dialog's input on
+open via a ref+effect. **Coverage** (`admin.spec.ts`): Escape closes the modal;
+submitting a new password POSTs `{password}`. Suite is now **60 tests**.
