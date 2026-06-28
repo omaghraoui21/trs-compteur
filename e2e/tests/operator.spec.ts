@@ -83,10 +83,10 @@ test.describe("Operator — session lifecycle", () => {
     // Submit
     await page.getByRole("button", { name: /démarrer le lot/i }).click();
 
-    // The freshly-started lot's batch number appears in the timeline once the
-    // mocked session detail reloads with the active lot. getByText (substring)
-    // matches the single rendered occurrence in this view — getByRole("cell")
-    // finds nothing here because the lot is not rendered as a real table cell.
+    // The freshly-started lot's batch number appears once the mocked session
+    // detail reloads with the active lot. getByText is the locator that has been
+    // green in CI for this view; getByRole("cell", …) was tried and matched
+    // nothing here, so don't reintroduce it without verifying against the run.
     await expect(page.getByText("26013")).toBeVisible();
   });
 
