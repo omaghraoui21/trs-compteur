@@ -108,6 +108,32 @@ test.describe("Operator — session lifecycle", () => {
     await expect(page.getByText("Panne machine")).toBeVisible();
   });
 
+  test("submitting an inter-lot downtime posts it and returns to the timeline", async ({ operatorPage: page }) => {
+    await page.route(/\/api\/sessions\/session-1$/, (r) =>
+      r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(SESSION_DETAIL_EMPTY) }),
+    );
+    let posted: any = null;
+    await page.route(/\/api\/sessions\/session-1\/downtimes/, (r) => {
+      posted = JSON.parse(r.request().postData() || "{}");
+      r.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "dt-x" }) });
+    });
+
+    await page.goto("/compteur");
+    await page.getByText("Salle de Production").click();
+    await page.getByText("Blistereuse IMA TR135S").click();
+    await page.getByRole("button", { name: /ouvrir le compteur/i }).click();
+    await page.getByRole("button", { name: /déclarer un arrêt/i }).click();
+
+    // Select category + a duration preset, then submit.
+    await page.getByRole("button", { name: /panne machine/i }).first().click();
+    await page.getByRole("button", { name: "15", exact: true }).click();
+    await page.getByRole("button", { name: /enregistrer l'arrêt/i }).click();
+
+    // Returns to the timeline (the action buttons are visible again).
+    await expect(page.getByRole("button", { name: /nouveau lot/i })).toBeVisible();
+    expect(posted, "downtime payload").toMatchObject({ categoryId: "cat-1", durationMinutes: 15 });
+  });
+
   test("end-of-shift modal appears on 'Fermer'", async ({ operatorPage: page }) => {
     await page.route(/\/api\/sessions\/session-1$/, (r) =>
       r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(SESSION_DETAIL_EMPTY) }),
