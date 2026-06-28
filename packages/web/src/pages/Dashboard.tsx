@@ -260,7 +260,7 @@ export default function DashboardPage() {
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Export PDF téléchargé");
-    } catch (err: any) {
+    } catch {
       toast.error("Génération PDF échouée");
     } finally {
       setPdfLoading(false);

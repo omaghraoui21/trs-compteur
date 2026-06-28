@@ -636,8 +636,6 @@ export default function CompteurPage() {
             <ActiveLotCard
               lot={activeLot}
               products={products}
-              categories={categories}
-              sessionId={activeSession.id}
               onUpdate={() => loadDetail(activeSession.id)}
               onAddDowntime={() => setView("add-downtime")}
             />
@@ -1111,8 +1109,8 @@ function TrsSummaryCard({ sessionTrs, equipmentId, trsObjective }: { sessionTrs:
 
 // ─── Active Lot Card (U2 touch, U4 real-time validation) ─
 
-function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDowntime }: {
-  lot: LotEntry; products: Product[]; categories: DowntimeCategory[]; sessionId: string;
+function ActiveLotCard({ lot, products, onUpdate, onAddDowntime }: {
+  lot: LotEntry; products: Product[];
   onUpdate: () => void; onAddDowntime: () => void;
 }) {
   const product = products.find(p => p.id === lot.productId);
