@@ -169,7 +169,7 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
               const isSelf = u.id === currentUserId;
               return (
                 <tr key={u.id} className="border-t">
-                  <td data-label="Nom" className="px-4 py-2 font-medium">{u.displayName}{isSelf && <span className="ml-1 text-xs text-gray-400">(vous)</span>}</td>
+                  <td data-label="Nom" className="px-4 py-2 font-medium">{u.displayName}{isSelf && <span className="ml-1 text-xs text-gray-500">(vous)</span>}</td>
                   <td data-label="Email" className="px-4 py-2 text-gray-500">{u.email}</td>
                   <td data-label="Rôle" className="px-4 py-2">
                     <select
@@ -187,7 +187,7 @@ function UsersPanel({ currentUserId }: { currentUserId: string }) {
                     <button onClick={() => toggleActive(u)} disabled={isSelf} className="inline-flex items-center gap-1 disabled:opacity-40">
                       {u.isActive
                         ? <><ToggleRight className="h-4 w-4 text-green-600" aria-hidden="true" /> <span className="text-green-700 text-xs">Actif</span></>
-                        : <><ToggleLeft className="h-4 w-4 text-gray-400" aria-hidden="true" /> <span className="text-gray-400 text-xs">Inactif</span></>}
+                        : <><ToggleLeft className="h-4 w-4 text-gray-500" aria-hidden="true" /> <span className="text-gray-500 text-xs">Inactif</span></>}
                     </button>
                   </td>
                   <td data-label="Actions" className="px-4 py-2 text-right">
@@ -622,7 +622,7 @@ function CadencesPanel() {
       <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
         <div>
           <p className="text-sm text-gray-500">{cadences.length} cadences configurées</p>
-          <p className="text-xs text-gray-400 mt-1">Cadence théorique par couple produit × équipement. Pré-remplit automatiquement le formulaire opérateur.</p>
+          <p className="text-xs text-gray-500 mt-1">Cadence théorique par couple produit × équipement. Pré-remplit automatiquement le formulaire opérateur.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <input
@@ -637,7 +637,7 @@ function CadencesPanel() {
         </div>
       </div>
       {cadenceSearch && filteredCadences.length === 0 && (
-        <p className="text-sm text-gray-400 py-4 text-center">Aucune cadence correspond à « {cadenceSearch} ».</p>
+        <p className="text-sm text-gray-500 py-4 text-center">Aucune cadence correspond à « {cadenceSearch} ».</p>
       )}
 
       {error && <ErrorBanner msg={error} onClose={() => setError("")} />}
@@ -674,7 +674,7 @@ function CadencesPanel() {
         <div key={eqName} className="mb-6">
           <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
             <Cpu className="h-4 w-4" aria-hidden="true" /> {eqName}
-            <span className="text-xs font-normal text-gray-400">({items.length} produits)</span>
+            <span className="text-xs font-normal text-gray-500">({items.length} produits)</span>
           </h3>
           <div className="overflow-x-auto">
             <table className="rtable w-full text-sm">
@@ -698,7 +698,7 @@ function CadencesPanel() {
       ))}
 
       {cadences.length === 0 && (
-        <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-400 text-sm">
+        <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-500 text-sm">
           Aucune cadence configurée. Ajoutez des cadences pour pré-remplir automatiquement le formulaire opérateur.
         </div>
       )}
@@ -771,7 +771,7 @@ function DowntimesPanel() {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
         <div>
           <p className="text-sm text-gray-500">{items.length} catégories d'arrêts</p>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400 mt-1">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mt-1">
             <span className="flex items-center gap-1">
               <span className="inline-block w-3 h-3 rounded bg-amber-100 border border-amber-300" /> Planifié (affecte tAP)
             </span>
@@ -821,7 +821,7 @@ function DowntimesPanel() {
           </div>
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => setForm({ ...form, isPlanned: !form.isPlanned })} aria-pressed={form.isPlanned} className="flex items-center gap-2">
-              {form.isPlanned ? <ToggleRight className="h-6 w-6 text-amber-600" aria-hidden="true" /> : <ToggleLeft className="h-6 w-6 text-gray-400" aria-hidden="true" />}
+              {form.isPlanned ? <ToggleRight className="h-6 w-6 text-amber-600" aria-hidden="true" /> : <ToggleLeft className="h-6 w-6 text-gray-500" aria-hidden="true" />}
               <span className="text-sm">{form.isPlanned ? "Arrêt planifié" : "Arrêt non planifié"}</span>
             </button>
           </div>
@@ -835,7 +835,7 @@ function DowntimesPanel() {
           <div key={famille} className="mb-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
               {famille}
-              <span className="text-xs font-normal text-gray-400">({cats.length})</span>
+              <span className="text-xs font-normal text-gray-500">({cats.length})</span>
             </h3>
             <div className="overflow-x-auto">
             <table className="rtable w-full text-sm">
@@ -943,7 +943,7 @@ function DowntimeTree({ categories }: { categories: AdminDowntimeCategory[] }) {
             {/* Branch root */}
             <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${branch.bgClass} border ${branch.borderClass}`}>
               <span className="font-semibold text-sm" style={{ color: branch.color }}>{branch.label}</span>
-              <span className="text-xs text-gray-400 font-normal">{branchCats.length} raison{branchCats.length > 1 ? "s" : ""}</span>
+              <span className="text-xs text-gray-500 font-normal">{branchCats.length} raison{branchCats.length > 1 ? "s" : ""}</span>
             </div>
 
             {/* Famille nodes */}
@@ -962,10 +962,10 @@ function DowntimeTree({ categories }: { categories: AdminDowntimeCategory[] }) {
                     >
                       <span className="text-gray-300 mr-0.5">├─</span>
                       {isCollapsed
-                        ? <ChevronRight className="h-3.5 w-3.5 text-gray-400 shrink-0" aria-hidden="true" />
-                        : <ChevronDown className="h-3.5 w-3.5 text-gray-400 shrink-0" aria-hidden="true" />}
+                        ? <ChevronRight className="h-3.5 w-3.5 text-gray-500 shrink-0" aria-hidden="true" />
+                        : <ChevronDown className="h-3.5 w-3.5 text-gray-500 shrink-0" aria-hidden="true" />}
                       <span className="text-xs font-medium text-gray-700">{famille}</span>
-                      <span className="text-xs text-gray-400">({activeCount}/{cats.length})</span>
+                      <span className="text-xs text-gray-500">({activeCount}/{cats.length})</span>
                     </button>
 
                     {/* Leaf reason nodes */}
@@ -978,12 +978,12 @@ function DowntimeTree({ categories }: { categories: AdminDowntimeCategory[] }) {
                           >
                             <span className="text-gray-300 shrink-0">{i === cats.length - 1 ? "└─" : "├─"}</span>
                             <span className="font-medium text-gray-800">{c.label}</span>
-                            <span className="font-mono text-gray-400">{c.code}</span>
+                            <span className="font-mono text-gray-500">{c.code}</span>
                             {c.appliesToEquipmentType && (
                               <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 capitalize">{c.appliesToEquipmentType}</span>
                             )}
                             {!c.isActive && (
-                              <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-400">inactif</span>
+                              <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">inactif</span>
                             )}
                           </div>
                         ))}
@@ -998,7 +998,7 @@ function DowntimeTree({ categories }: { categories: AdminDowntimeCategory[] }) {
       })}
 
       {categories.length === 0 && (
-        <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-400 text-sm">
+        <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-500 text-sm">
           Aucune catégorie d'arrêt configurée.
         </div>
       )}
@@ -1216,7 +1216,7 @@ function AuditLogPanel() {
             className="border rounded-lg px-2 py-1.5 text-sm" />
         </div>
         <button onClick={() => { setActionFilter(""); setEntityFilter(""); setFromDate(""); setToDate(""); }}
-          className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 border rounded-lg">
+          className="text-xs text-gray-500 hover:text-gray-600 px-2 py-1.5 border rounded-lg">
           Réinitialiser
         </button>
       </div>
@@ -1239,7 +1239,7 @@ function AuditLogPanel() {
               </thead>
               <tbody className="divide-y">
                 {entries.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-8 text-gray-400">Aucune entrée pour ces filtres.</td></tr>
+                  <tr><td colSpan={6} className="text-center py-8 text-gray-500">Aucune entrée pour ces filtres.</td></tr>
                 )}
                 {entries.map(e => {
                   const isExpanded = expanded === e.id;
@@ -1259,9 +1259,9 @@ function AuditLogPanel() {
                         <td className="px-4 py-2.5 text-xs text-gray-500">
                           {e.entityType}{e.entityId && <span className="text-gray-300 ml-1">#{e.entityId.slice(0, 8)}</span>}
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-gray-400 font-mono">{e.ipAddress ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-500 font-mono">{e.ipAddress ?? "—"}</td>
                         <td className="px-4 py-2.5">
-                          {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />}
+                          {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-gray-500" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-500" aria-hidden="true" />}
                         </td>
                       </tr>
                       {isExpanded && e.payload && (

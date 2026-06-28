@@ -14,6 +14,46 @@ export const SUPERVISOR_USER = {
   role: "supervisor",
 };
 
+export const ADMIN_USER = {
+  id: "user-ad-1",
+  email: "admin@dpi.local",
+  displayName: "Admin Test",
+  role: "admin",
+};
+
+// ─── Admin (Configuration) mock objects ──────────────────────────────────────
+// Shapes match the Admin* interfaces in packages/web/src/lib/api.ts.
+
+export const ADMIN_ROOM = {
+  id: "room-1", code: "SP-01", name: "Salle de Production",
+  description: null, isActive: true, createdAt: "2026-01-01T00:00:00.000Z",
+};
+
+export const ADMIN_EQUIPMENT = {
+  id: "equip-1", roomId: "room-1", code: "BLI-01", name: "Blistereuse IMA TR135S",
+  equipmentType: "blistereuse", trsObjective: "75", defaultCadenceUnit: "u/min",
+  microStopThresholdMin: 5, isActive: true, createdAt: "2026-01-01T00:00:00.000Z",
+};
+
+export const ADMIN_PRODUCT = {
+  id: "prod-1", code: "PROD-001", name: "Aeronide 200µg", defaultCadence: "120",
+  cadenceUnit: "u/min", unit: "blister", isActive: true, createdAt: "2026-01-01T00:00:00.000Z",
+};
+
+export const ADMIN_DOWNTIME_CATEGORY = {
+  id: "cat-1", code: "PANNE", label: "Panne machine", famille: "Panne équipement",
+  isPlanned: false, appliesToEquipmentType: null, isActive: true, createdAt: "2026-01-01T00:00:00.000Z",
+};
+
+export const ADMIN_CADENCE = {
+  id: "cad-1", productId: "prod-1", equipmentId: "equip-1",
+  cadenceValue: "120", cadenceUnit: "u/min", trsObjective: "80",
+};
+
+export const ADMIN_USER_ROW = {
+  ...ADMIN_USER, isActive: true, createdAt: "2026-01-01T00:00:00.000Z",
+};
+
 export const ROOM = {
   id: "room-1",
   code: "SP-01",
@@ -127,7 +167,7 @@ export const DOWNTIME_EVENT = {
 
 export const TRS_EMPTY = {
   session: {
-    tO: 540, tR: 0, tF: 0, tN: 0, tU: 0,
+    tT: 1440, tO: 540, tR: 0, tF: 0, tN: 0, tU: 0,
     DO: 0, TP: 0, TQ: 0, TRS: 0, TRG: 0,
     lotCount: 0, totalProduced: 0, totalConforming: 0, totalRebut: 0,
     tAP: 0, fermeture: 0, ecartCadenceMin: 0, nonQualiteMin: 0,
@@ -163,9 +203,16 @@ export const TRS_WITH_LOT = {
   aClasserMin: 0,
 };
 
-// Pending lots for supervisor
+// Pending lots for supervisor.
+// PendingLot extends LotEntry with session/equipment context fields that the
+// supervisor card renders (sessionDate is split() for display — must be present).
 export const PENDING_LOT = {
   ...LOT_CLOSED,
   supervisorId: null,
   supervisorAction: null,
+  operatorName: "Opérateur Test",
+  sessionDate: "2026-06-07",
+  sessionNotes: null,
+  equipmentName: "Blistereuse IMA TR135S",
+  equipmentCode: "BLI-01",
 };

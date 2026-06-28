@@ -30,7 +30,7 @@ export default function HeatmapChart({ heatmap }: Props) {
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
           <Grid className="h-4 w-4 text-blue-600" aria-hidden="true" /> Heatmap TRS
         </h3>
-        <div className="text-center text-gray-400 py-8 text-sm">Aucune donnée</div>
+        <div className="text-center text-gray-500 py-8 text-sm">Aucune donnée</div>
       </div>
     );
   }
@@ -70,7 +70,7 @@ export default function HeatmapChart({ heatmap }: Props) {
           {/* Day labels column */}
           <div className="flex flex-col gap-0.5 mr-1">
             {DAYS_FR.map(d => (
-              <div key={d} className="h-8 flex items-center text-[10px] text-gray-400 w-6">{d}</div>
+              <div key={d} className="h-8 flex items-center text-[10px] text-gray-500 w-6">{d}</div>
             ))}
           </div>
 
@@ -112,7 +112,7 @@ export default function HeatmapChart({ heatmap }: Props) {
           <div key={v} className="w-4 h-3 rounded-sm" style={{ backgroundColor: trsToColor(v || 1) }} />
         ))}
         <span>100%</span>
-        <span className="ml-2 text-gray-400">= TRS journalier</span>
+        <span className="ml-2 text-gray-500">= TRS journalier</span>
       </div>
     </div>
   );
