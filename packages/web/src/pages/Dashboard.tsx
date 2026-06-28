@@ -244,7 +244,10 @@ export default function DashboardPage() {
   };
 
   const exportPdf = async () => {
-    if (!data || pdfLoading) return;
+    if (pdfLoading) return;
+    // Guard empty periods like the CSV export does — otherwise PdfReport divides
+    // by total.tT (0) and renders "NaN %" cells throughout the report.
+    if (!data?.daily?.length) { toast.error("Aucune donnée à exporter pour cette période."); return; }
     setPdfLoading(true);
     try {
       const [{ pdf }, { default: PdfReport }] = await Promise.all([
