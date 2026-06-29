@@ -125,6 +125,10 @@ export const downtimeCategories = pgTable("downtime_categories", {
   isPlanned: boolean("is_planned").notNull().default(false),
   appliesToEquipmentType: text("applies_to_equipment_type"), // blistereuse | geluleuse | null (both)
   isActive: boolean("is_active").notNull().default(true),
+  // Favourite quick-stops: up to 4 categories surfaced on the operator main
+  // screen as one-tap chrono buttons. favoriteOrder (1-4) sets their position.
+  isFavorite: boolean("is_favorite").notNull().default(false),
+  favoriteOrder: integer("favorite_order"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
