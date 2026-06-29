@@ -904,7 +904,7 @@ function DowntimesPanel() {
             <p>Soustraits du temps requis (tR) pour obtenir le temps de fonctionnement (tF).</p>
             <p className="font-mono mt-1">tF = tR − Σ(arrêts non planifiés)</p>
           </div>
-          <div className="col-span-2 border-t border-blue-200 pt-2">
+          <div className="sm:col-span-2 border-t border-blue-200 pt-2">
             <p className="font-medium">TRS = DO × TP × TQ</p>
             <p>DO = tF/tR (Disponibilité) · TP = tN/tF (Performance) · TQ = conformes/produits (Qualité)</p>
           </div>
