@@ -106,8 +106,11 @@ test.describe("Dashboard", () => {
   });
 
   test("zoom level buttons change the active selection", async ({ supervisorPage: page }) => {
-    await page.getByRole("button", { name: /semaine/i }).click();
-    await expect(page.getByRole("button", { name: /semaine/i })).toHaveClass(/bg-blue/);
+    // Target the filter-bar zoom by its explicit accessible name (the Évolution
+    // chart has its own "Semaine" button — the filter is "Période : semaine").
+    const weekFilter = page.getByRole("button", { name: "Période : semaine" });
+    await weekFilter.click();
+    await expect(weekFilter).toHaveAttribute("aria-pressed", "true");
   });
 
   test("custom date range inputs appear when 'Libre' is selected", async ({ supervisorPage: page }) => {
