@@ -152,3 +152,25 @@ test.describe("Admin — reset-password modal", () => {
     expect(body).toMatchObject({ password: "newpass123" });
   });
 });
+
+test.describe("Admin — edit (Pencil) flow", () => {
+  test("editing a room prefills the form and PATCHes on save", async ({ adminPage: page }) => {
+    let patched: any = null;
+    await page.route(/\/api\/admin\/rooms\/room-1$/, (r) => {
+      if (r.request().method() === "PATCH") {
+        patched = JSON.parse(r.request().postData() || "{}");
+        return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({}) });
+      }
+      return r.fallback();
+    });
+    await page.goto("/admin");
+    await expect(page.getByText("Salle de Production")).toBeVisible();
+    await page.getByRole("button", { name: "Modifier" }).first().click();
+    // Form opens prefilled with the existing values.
+    await expect(page.getByRole("heading", { name: /modifier local/i })).toBeVisible();
+    await expect(page.getByLabel("Nom")).toHaveValue("Salle de Production");
+    await page.getByLabel("Nom").fill("Salle de Production B");
+    await page.getByRole("button", { name: /enregistrer/i }).click();
+    await expect.poll(() => patched).toMatchObject({ name: "Salle de Production B" });
+  });
+});
