@@ -129,3 +129,28 @@ test.describe("Supervisor — correction coherence", () => {
     await expect(page.getByRole("button", { name: /signer la correction/i })).toBeEnabled();
   });
 });
+
+test.describe("Supervisor — status tabs", () => {
+  test("switching to Validés / Rejetés refetches with the status filter", async ({ supervisorPage: page }) => {
+    const queried: string[] = [];
+    await page.route(/\/api\/dashboard\/pending-lots(\?|$)/, (r) => {
+      const u = new URL(r.request().url());
+      queried.push(u.searchParams.get("status") || "none");
+      r.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    });
+    await page.goto("/supervisor");
+    await expect(page.getByRole("heading", { name: /validation des lots/i })).toBeVisible();
+    await page.getByRole("tab", { name: /^validés/i }).click();
+    await expect.poll(() => queried).toContain("validated");
+    await page.getByRole("tab", { name: /^rejetés/i }).click();
+    await expect.poll(() => queried).toContain("rejected");
+  });
+
+  test("each tab shows an empty state when there are no lots", async ({ supervisorPage: page }) => {
+    await page.route(/\/api\/dashboard\/pending-lots(\?|$)/, (r) =>
+      r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await page.goto("/supervisor");
+    await page.getByRole("tab", { name: /^rejetés/i }).click();
+    await expect(page.getByText(/aucun lot/i)).toBeVisible();
+  });
+});
