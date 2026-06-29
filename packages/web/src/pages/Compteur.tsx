@@ -2006,7 +2006,7 @@ function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, isC
         </div>
 
         {classifiedBlocking && (
-          <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-3 font-medium">
+          <p id="eos-blocked-reason" className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-3 font-medium">
             Fermez ce modal et déclarez les arrêts inter-lots avant de clore la session.
           </p>
         )}
@@ -2031,6 +2031,8 @@ function EndOfShiftModal({ trsData, hasActiveLot, aClasserMin, trsObjective, isC
             Annuler
           </button>
           <button onClick={onConfirm} disabled={classifiedBlocking || isClosing}
+            aria-describedby={classifiedBlocking ? "eos-blocked-reason" : undefined}
+            title={classifiedBlocking ? "Déclarez les arrêts inter-lots non classés avant de fermer la session." : undefined}
             className={`flex-1 bg-red-600 text-white ${BTN_PRIMARY} hover:bg-red-700 disabled:opacity-40 disabled:pointer-events-none`}>
             {isClosing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Square className="h-4 w-4" aria-hidden="true" />}
             {isClosing ? "Fermeture…" : "Fermer"}

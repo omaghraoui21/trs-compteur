@@ -222,9 +222,12 @@ test.describe("Unclassified time banner", () => {
     await page.getByRole("button", { name: /ouvrir le compteur/i }).click();
     await page.getByRole("button", { name: /fermer la session/i }).click();
 
-    // The close button inside the modal should be disabled
+    // The close button inside the modal should be disabled…
     const confirmBtn = page.getByRole("button", { name: /^fermer$/i }).last();
     await expect(confirmBtn).toBeDisabled();
+    // …and explain why (accessible reason + visible blocking message).
+    await expect(page.locator("#eos-blocked-reason")).toBeVisible();
+    await expect(confirmBtn).toHaveAttribute("aria-describedby", "eos-blocked-reason");
   });
 });
 
