@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, Fragment, useRef } from "react";
 import { api, type AdminRoom, type AdminEquipment, type AdminProduct, type AdminDowntimeCategory, type ProductEquipmentCadence, type AdminUser, type AuditLogEntry } from "@/lib/api";
-import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, List, Network, ChevronDown, ChevronRight, Users, KeyRound, ScrollText, ChevronLeft, Star } from "lucide-react";
+import { Settings, Building2, Cpu, Package, AlertTriangle, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight, Gauge, List, Network, ChevronDown, ChevronRight, Users, KeyRound, ScrollText, ChevronLeft } from "lucide-react";
 import { TableSkeleton } from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/lib/auth";
@@ -772,19 +772,6 @@ function DowntimesPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  // Favourite quick-stops shown on the operator main screen (max 4).
-  const favCount = items.filter(c => c.isFavorite).length;
-  const toggleFavorite = async (cat: AdminDowntimeCategory) => {
-    if (!cat.isFavorite && favCount >= 4) { toast.error("Maximum 4 arrêts favoris."); return; }
-    try {
-      await api.admin.updateDowntimeCategory(cat.id, {
-        isFavorite: !cat.isFavorite,
-        favoriteOrder: cat.isFavorite ? null : favCount + 1,
-      });
-      load();
-    } catch (e: any) { setError(e.message); }
-  };
-
   if (loading) return <Spinner />;
 
   // Group by famille
@@ -890,15 +877,6 @@ function DowntimesPanel() {
                     <td data-label="Statut" className="py-2 px-3"><StatusBadge active={c.isActive} /></td>
                     <td data-label="Actions" className="py-2 px-3">
                       <div className="flex gap-1">
-                        <button
-                          onClick={() => toggleFavorite(c)}
-                          aria-pressed={!!c.isFavorite}
-                          aria-label={c.isFavorite ? `Retirer ${c.label} des favoris` : `Ajouter ${c.label} aux favoris`}
-                          title={c.isFavorite ? "Favori (écran principal) — cliquez pour retirer" : "Définir comme arrêt favori (écran principal)"}
-                          className={`p-1.5 rounded transition ${c.isFavorite ? "text-amber-500 hover:bg-amber-50" : "text-gray-300 hover:bg-gray-100 hover:text-amber-400"}`}
-                        >
-                          <Star className="h-3.5 w-3.5" aria-hidden="true" fill={c.isFavorite ? "currentColor" : "none"} />
-                        </button>
                         <IconBtn icon={Pencil} onClick={() => startEdit(c)} title="Modifier" />
                         {c.isActive && <IconBtn icon={Trash2} onClick={() => remove(c.id, c.label)} title="Désactiver" className="text-red-500 hover:bg-red-50" />}
                         {!c.isActive && <IconBtn icon={Check} onClick={async () => { try { await api.admin.updateDowntimeCategory(c.id, { isActive: true }); toast.success(`Catégorie "${c.label}" réactivée`); load(); } catch (err: any) { setError(err.message); } }} title="Réactiver" className="text-green-600 hover:bg-green-50" />}

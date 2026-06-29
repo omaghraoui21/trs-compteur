@@ -177,8 +177,6 @@ export const createDowntimeCategorySchema = z.object({
 });
 export const updateDowntimeCategorySchema = createDowntimeCategorySchema.partial().extend({
   isActive: z.boolean().optional(),
-  isFavorite: z.boolean().optional(),
-  favoriteOrder: z.number().int().min(1).max(4).nullable().optional(),
 });
 
 export const createCadenceSchema = z.object({

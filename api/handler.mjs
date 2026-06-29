@@ -78280,10 +78280,6 @@ var downtimeCategories = pgTable("downtime_categories", {
   appliesToEquipmentType: text("applies_to_equipment_type"),
   // blistereuse | geluleuse | null (both)
   isActive: boolean("is_active").notNull().default(true),
-  // Favourite quick-stops: up to 4 categories surfaced on the operator main
-  // screen as one-tap chrono buttons. favoriteOrder (1-4) sets their position.
-  isFavorite: boolean("is_favorite").notNull().default(false),
-  favoriteOrder: integer("favorite_order"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
 var phaseTemplates = pgTable("phase_templates", {
@@ -82936,9 +82932,7 @@ var createDowntimeCategorySchema = external_exports.object({
   appliesToEquipmentType: external_exports.string().nullable().optional()
 });
 var updateDowntimeCategorySchema = createDowntimeCategorySchema.partial().extend({
-  isActive: external_exports.boolean().optional(),
-  isFavorite: external_exports.boolean().optional(),
-  favoriteOrder: external_exports.number().int().min(1).max(4).nullable().optional()
+  isActive: external_exports.boolean().optional()
 });
 var createCadenceSchema = external_exports.object({
   productId: external_exports.string().uuid("productId invalide"),
@@ -84706,7 +84700,7 @@ adminRouter.post("/downtime-categories", validate(createDowntimeCategorySchema),
   res.status(201).json(row);
 }));
 adminRouter.patch("/downtime-categories/:id", validate(updateDowntimeCategorySchema), asyncHandler(async (req, res) => {
-  const { code, label, famille, isPlanned, appliesToEquipmentType, isActive, isFavorite, favoriteOrder } = req.body;
+  const { code, label, famille, isPlanned, appliesToEquipmentType, isActive } = req.body;
   const updates = {};
   if (code !== void 0) updates.code = code;
   if (label !== void 0) updates.label = label;
@@ -84714,8 +84708,6 @@ adminRouter.patch("/downtime-categories/:id", validate(updateDowntimeCategorySch
   if (isPlanned !== void 0) updates.isPlanned = isPlanned;
   if (appliesToEquipmentType !== void 0) updates.appliesToEquipmentType = appliesToEquipmentType || null;
   if (isActive !== void 0) updates.isActive = isActive;
-  if (isFavorite !== void 0) updates.isFavorite = isFavorite;
-  if (favoriteOrder !== void 0) updates.favoriteOrder = favoriteOrder;
   if (Object.keys(updates).length === 0) {
     res.status(400).json({ error: "Aucune mise \xE0 jour" });
     return;

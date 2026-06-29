@@ -159,16 +159,14 @@ adminRouter.post("/downtime-categories", validate(createDowntimeCategorySchema),
 }));
 
 adminRouter.patch("/downtime-categories/:id", validate(updateDowntimeCategorySchema), asyncHandler(async (req, res) => {
-  const { code, label, famille, isPlanned, appliesToEquipmentType, isActive, isFavorite, favoriteOrder } = req.body;
-  const updates: Partial<{ code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null; isActive: boolean; isFavorite: boolean; favoriteOrder: number | null }> = {};
+  const { code, label, famille, isPlanned, appliesToEquipmentType, isActive } = req.body;
+  const updates: Partial<{ code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null; isActive: boolean }> = {};
   if (code !== undefined) updates.code = code;
   if (label !== undefined) updates.label = label;
   if (famille !== undefined) updates.famille = famille;
   if (isPlanned !== undefined) updates.isPlanned = isPlanned;
   if (appliesToEquipmentType !== undefined) updates.appliesToEquipmentType = appliesToEquipmentType || null;
   if (isActive !== undefined) updates.isActive = isActive;
-  if (isFavorite !== undefined) updates.isFavorite = isFavorite;
-  if (favoriteOrder !== undefined) updates.favoriteOrder = favoriteOrder;
   if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Aucune mise à jour" }); return; }
   const [row] = await req.db.update(downtimeCategories).set(updates).where(eq(downtimeCategories.id, String(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Categorie introuvable" }); return; }

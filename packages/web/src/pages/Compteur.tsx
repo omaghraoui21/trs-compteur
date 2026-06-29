@@ -5,7 +5,7 @@ import { useToast } from "@/components/Toast";
 import { useActiveSession } from "@/lib/sessionContext";
 import { Onboarding } from "@/components/Onboarding";
 import { RateGauge } from "@/components/RateGauge";
-import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle, Zap, CheckCircle, XCircle, Wrench, Droplets, RotateCcw, Cpu, Loader2, Trash2, Star } from "lucide-react";
+import { Timer, Play, Square, Plus, ChevronLeft, AlertTriangle, Clock, Package, Gauge, TrendingUp, TrendingDown, StopCircle, Zap, CheckCircle, XCircle, Wrench, Droplets, RotateCcw, Cpu, Loader2, Trash2 } from "lucide-react";
 import { ListSkeleton } from "@/components/Skeleton";
 import BackButton from "@/components/BackButton";
 
@@ -493,16 +493,6 @@ export default function CompteurPage() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Favorite quick-stops — admin-programmed, one-tap chrono (start/stop) */}
-      {activeSession && activeSession.status === "active" && (
-        <FavoritesQuickBar
-          favorites={[...categories].filter(c => c.isFavorite).sort((a, b) => (a.favoriteOrder ?? 99) - (b.favoriteOrder ?? 99)).slice(0, 4)}
-          sessionId={activeSession.id}
-          lotId={activeLot?.id ?? null}
-          onRecorded={() => loadDetail(activeSession.id)}
-        />
       )}
 
       {/* Live rate gauge + current-order table (Line-Performance style) */}
@@ -1308,95 +1298,6 @@ function ActiveLotCard({ lot, products, categories, sessionId, onUpdate, onAddDo
             <Square className={BTN_ICON} aria-hidden="true" /> Clôturer lot
           </button>
         )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Favorite quick-stops ──────────────────────────────────
-// Admin-programmed favourite downtime categories shown on the main operator
-// screen as one-tap chrono buttons: first tap starts the timer, second tap
-// stops it and records the downtime (rounded up to ≥1 min). Only one runs at a
-// time — the others are disabled while a chrono is active.
-function FavoritesQuickBar({ favorites, sessionId, lotId, onRecorded }: {
-  favorites: DowntimeCategory[];
-  sessionId: string;
-  lotId: string | null;
-  onRecorded: () => void;
-}) {
-  const toast = useToast();
-  const [running, setRunning] = useState<{ id: string; startedAt: number } | null>(null);
-  const [elapsed, setElapsed] = useState(0);
-  const [saving, setSaving] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
-
-  const start = (id: string) => {
-    setRunning({ id, startedAt: Date.now() });
-    setElapsed(0);
-    intervalRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
-  };
-
-  const stopAndRecord = async (cat: DowntimeCategory, startedAt: number) => {
-    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
-    const durationMinutes = Math.max(1, Math.ceil((Date.now() - startedAt) / 60_000));
-    setSaving(true);
-    try {
-      const payload = { categoryId: cat.id, durationMinutes };
-      if (lotId) await api.addDowntime(lotId, payload);
-      else await api.addSessionDowntime(sessionId, payload);
-      toast.success(`Arrêt « ${cat.label} » enregistré (${durationMinutes} min)`);
-      setRunning(null);
-      setElapsed(0);
-      onRecorded();
-    } catch (err: any) {
-      toast.error(err.message || "Échec de l'enregistrement de l'arrêt");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const onTap = (cat: DowntimeCategory) => {
-    if (saving) return;
-    if (running?.id === cat.id) stopAndRecord(cat, running.startedAt);
-    else if (!running) start(cat.id);
-  };
-
-  if (favorites.length === 0) return null;
-
-  const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-
-  return (
-    <div className="bg-white rounded-2xl border shadow-sm p-4 mb-4">
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <Star className="h-4 w-4 text-amber-500" aria-hidden="true" />
-        <h3 className="font-semibold text-sm">Arrêts favoris</h3>
-        <span className="text-xs text-gray-500">Appui = démarrer le chrono · nouvel appui = arrêter</span>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="group" aria-label="Arrêts favoris">
-        {favorites.map(cat => {
-          const isRunning = running?.id === cat.id;
-          const disabled = (!!running && !isRunning) || saving;
-          return (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => onTap(cat)}
-              disabled={disabled}
-              aria-pressed={isRunning}
-              className={`min-w-0 min-h-[72px] rounded-xl px-3 py-2 text-sm font-semibold flex flex-col items-center justify-center gap-1 transition active:scale-95 disabled:opacity-40 disabled:pointer-events-none ${
-                isRunning ? "bg-red-600 text-white motion-safe:animate-pulse" : "bg-orange-50 text-orange-700 hover:bg-orange-100"
-              }`}
-            >
-              {isRunning
-                ? <StopCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
-                : <Play className="h-5 w-5 shrink-0" aria-hidden="true" />}
-              <span className="line-clamp-2 leading-tight text-center">{cat.label}</span>
-              {isRunning && <span className="font-mono text-xs tabular-nums">{fmt(elapsed)}</span>}
-            </button>
-          );
-        })}
       </div>
     </div>
   );
