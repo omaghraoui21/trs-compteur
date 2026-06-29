@@ -50,7 +50,9 @@ test.describe("Operator — favourite quick-stops", () => {
     await expect(btn).toHaveAttribute("aria-pressed", "true");
     await btn.click();                                   // stop + record
     await expect.poll(() => posted).toMatchObject({ categoryId: "cat-1" });
-    await expect(page.getByText(/enregistré/i)).toBeVisible();
+    // Specific to the success toast (the timeline empty-state also contains
+    // "…arrêts enregistrés…", so a bare /enregistré/i is ambiguous).
+    await expect(page.getByText(/« Bouchage blistéreuse » enregistré/i)).toBeVisible();
     await expect(btn).toHaveAttribute("aria-pressed", "false");
   });
 });
