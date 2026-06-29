@@ -300,13 +300,19 @@ export default function DashboardPage() {
         <div>
           <label className="block text-xs text-gray-500 mb-1">Période</label>
           <div className="flex border rounded-lg overflow-hidden">
-            {(["day", "week", "month", "custom"] as ZoomLevel[]).map(z => (
-              <button key={z} onClick={() => setZoom(z)}
-                aria-pressed={zoom === z}
-                className={`px-3 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${zoom === z ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
-                {z === "day" ? "Jour" : z === "week" ? "Sem." : z === "month" ? "Mois" : "Libre"}
-              </button>
-            ))}
+            {(["day", "week", "month", "custom"] as ZoomLevel[]).map(z => {
+              // Distinct, fully-spelled accessible names — the "Sem." abbreviation
+              // is ambiguous vs the Évolution chart's own "Semaine" button.
+              const aria = z === "day" ? "Période : jour" : z === "week" ? "Période : semaine" : z === "month" ? "Période : mois" : "Période : libre (dates personnalisées)";
+              return (
+                <button key={z} onClick={() => setZoom(z)}
+                  aria-pressed={zoom === z}
+                  aria-label={aria}
+                  className={`px-3 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${zoom === z ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
+                  {z === "day" ? "Jour" : z === "week" ? "Sem." : z === "month" ? "Mois" : "Libre"}
+                </button>
+              );
+            })}
           </div>
         </div>
 
