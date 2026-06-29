@@ -88,6 +88,34 @@ describe("computeLotTrs", () => {
     expect(result!.warnings).toEqual([]);
   });
 
+  // Fully hand-computable worked example (round numbers) doubling as living
+  // documentation of the NF E 60-182 chain at the lot level.
+  it("NF E 60-182 worked example: cadence 100 u/min, 240 min lot, 40 min stop", () => {
+    const result = computeLotTrs({
+      cadence: 100,
+      cadenceUnit: "u/min",
+      produced: 18000,
+      conforming: 17100,
+      startedAt: new Date("2026-06-01T08:00:00Z"),
+      endedAt: new Date("2026-06-01T12:00:00Z"), // 240 min
+      downtimes: [{ durationMinutes: 40, isPlanned: false, famille: "Panne équipement" }],
+    });
+    expect(result).not.toBeNull();
+    // tF = lot duration − stops = 240 − 40 = 200 min
+    expect(result!.tF).toBe(200);
+    // tN = produced / cadence = 18000 / 100 = 180 min  →  TP = tN/tF = 180/200 = 0.90
+    expect(result!.tN).toBe(180);
+    expect(result!.TP).toBeCloseTo(0.9, 6);
+    // TQ = conforming / produced = 17100 / 18000 = 0.95
+    expect(result!.TQ).toBeCloseTo(0.95, 6);
+    // tU = conforming / cadence = 17100 / 100 = 171 min
+    expect(result!.tU).toBeCloseTo(171, 6);
+    expect(result!.rebut).toBe(900);
+    // Lot performance × quality = 0.90 × 0.95 = 0.855
+    expect(result!.TP * result!.TQ).toBeCloseTo(0.855, 6);
+    expect(result!.downtimeByNorme).toEqual({ AB: 40 });
+  });
+
   it("computes 100% quality when all produced is conforming", () => {
     const result = computeLotTrs({
       cadence: 7200,
