@@ -29,6 +29,21 @@ test.describe("Dashboard", () => {
     await expect(page.getByText(/export csv téléchargé/i)).toBeVisible({ timeout: 3000 });
   });
 
+  test("CSV export has the expected NF E 60-182 column header", async ({ supervisorPage: page }) => {
+    // Lock the column order — downstream/GMP consumers depend on it.
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "CSV", exact: true }).click(),
+    ]);
+    const csv = fs.readFileSync(await download.path(), "utf8");
+    const header = csv.split("\n")[0].trim();
+    expect(header).toBe(
+      "Date,Produit,Lot,tT,tO,Fermeture,tAP,tR,tF,tN,tU,Lots,NPR,NPB,NPC,DO,TP,TQ,TRS,TRG,Non classé (min),Pannes,MTBF (min),MTTR (min)",
+    );
+    // A TOTAL summary row is always appended.
+    expect(csv).toMatch(/\nTOTAL,/);
+  });
+
   test("PDF export on an empty period is blocked with a message", async ({ supervisorPage: page }) => {
     const period = { from: "2026-06-01", to: "2026-06-07", equipmentId: "equip-1" };
     await page.unroute(/\/api\/dashboard\/trs/);

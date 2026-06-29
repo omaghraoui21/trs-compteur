@@ -1,5 +1,23 @@
 import { test, expect } from "../fixtures";
 
+// ─── App shell: role-based navigation ─────────────────────────────────────────
+// The "Configuration" entry is gated to admin/supervisor (navItems roles).
+
+test.describe("Navigation RBAC", () => {
+  test("operator sees Session/Validation/Dashboard but not Configuration", async ({ operatorPage: page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: /session/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /validation/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /tableau de bord/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /configuration/i })).toHaveCount(0);
+  });
+
+  test("admin sees the Configuration entry", async ({ adminPage: page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: /configuration/i })).toBeVisible();
+  });
+});
+
 // ─── App shell: change-password modal ─────────────────────────────────────────
 // The modal lives in Layout and is reachable from every authenticated page via
 // the header key button. Covers its client-side validation + success path.
