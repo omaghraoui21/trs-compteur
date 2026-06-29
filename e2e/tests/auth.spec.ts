@@ -67,6 +67,19 @@ test("shows error message on invalid credentials", async ({ page }) => {
   await expect(page.getByText(/identifiants invalides/i)).toBeVisible();
 });
 
+test("the login error receives focus and is announced (role=alert)", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel(/email/i).fill("wrong@example.com");
+  await page.locator("#login-password").fill("badpassword");
+  await page.getByRole("button", { name: /se connecter/i }).click();
+  const err = page.locator("#login-error");
+  await expect(err).toBeVisible();
+  await expect(err).toHaveAttribute("role", "alert");
+  await expect(err).toBeFocused();
+  // Inputs reference the error for assistive tech.
+  await expect(page.getByLabel(/email/i)).toHaveAttribute("aria-describedby", /login-error/);
+});
+
 test("shows spinner while login request is in flight", async ({ page }) => {
   // Delay the response to observe the loading state
   await page.unroute(/\/api\/auth\/login/);
