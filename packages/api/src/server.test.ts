@@ -537,6 +537,32 @@ describe("admin reference data CRUD + audit trail", () => {
       .set({ Authorization: `Bearer ${opToken}` });
     expect(res.status).toBe(403);
   });
+
+  it("marks a downtime category as a favourite quick-stop and exposes it via /ref", async () => {
+    const cats = await request(app).get("/api/ref/downtime-categories").set(sup());
+    const catId = cats.body[0].id;
+
+    const patch = await request(app)
+      .patch(`/api/admin/downtime-categories/${catId}`)
+      .set(sup())
+      .send({ isFavorite: true, favoriteOrder: 1 });
+    expect(patch.status).toBe(200);
+    expect(patch.body.isFavorite).toBe(true);
+    expect(patch.body.favoriteOrder).toBe(1);
+
+    // The operator-facing ref endpoint must surface the favourite flag + order.
+    const ref = await request(app).get("/api/ref/downtime-categories").set(sup());
+    const fav = ref.body.find((c: any) => c.id === catId);
+    expect(fav.isFavorite).toBe(true);
+    expect(fav.favoriteOrder).toBe(1);
+
+    // favoriteOrder out of the 1..4 range is rejected by validation (400).
+    const bad = await request(app)
+      .patch(`/api/admin/downtime-categories/${catId}`)
+      .set(sup())
+      .send({ favoriteOrder: 9 });
+    expect(bad.status).toBe(400);
+  });
 });
 
 describe("self-service password change", () => {
