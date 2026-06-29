@@ -63,7 +63,7 @@ function ToastItem({ t, onRemove }: { t: Toast; onRemove: () => void }) {
 
   return (
     <div
-      role="alert"
+      role={t.variant === "error" ? "alert" : "status"}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
