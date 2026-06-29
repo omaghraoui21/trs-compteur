@@ -177,7 +177,7 @@ export const api = {
     listDowntimeCategories: () => request<AdminDowntimeCategory[]>("/admin/downtime-categories"),
     createDowntimeCategory: (data: { code: string; label: string; famille: string; isPlanned?: boolean; appliesToEquipmentType?: string }) =>
       request<AdminDowntimeCategory>("/admin/downtime-categories", { method: "POST", body: JSON.stringify(data) }),
-    updateDowntimeCategory: (id: string, data: Partial<{ code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null; isActive: boolean }>) =>
+    updateDowntimeCategory: (id: string, data: Partial<{ code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null; isActive: boolean; isFavorite: boolean; favoriteOrder: number | null }>) =>
       request<AdminDowntimeCategory>(`/admin/downtime-categories/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deleteDowntimeCategory: (id: string) =>
       request<AdminDowntimeCategory>(`/admin/downtime-categories/${id}`, { method: "DELETE" }),
@@ -218,7 +218,7 @@ export interface User { id: string; email: string; displayName: string; role: st
 export interface Room { id: string; code: string; name: string; description: string | null }
 export interface Equipment { id: string; roomId: string; code: string; name: string; equipmentType: string | null; trsObjective: string; defaultCadenceUnit: string }
 export interface Product { id: string; code: string; name: string; defaultCadence: string | null; cadenceUnit: string; unit: string }
-export interface DowntimeCategory { id: string; code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null }
+export interface DowntimeCategory { id: string; code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null; isFavorite?: boolean; favoriteOrder?: number | null }
 
 export interface Session { id: string; equipmentId: string; roomId: string; operatorId: string; sessionDate: string; openedAt: string; closedAt: string | null; status: string; notes: string | null }
 export interface SessionEvent { id: string; sessionId: string; eventType: string; label: string | null; startedAt: string; endedAt: string | null; durationMinutes: number | null; isPlanned: boolean; lotEntryId: string | null; sortOrder: number; comment: string | null }
@@ -284,7 +284,7 @@ export interface AdminUser { id: string; email: string; displayName: string; rol
 export interface AdminRoom { id: string; code: string; name: string; description: string | null; isActive: boolean; createdAt: string }
 export interface AdminEquipment { id: string; roomId: string; code: string; name: string; equipmentType: string | null; trsObjective: string; defaultCadenceUnit: string; microStopThresholdMin: number; isActive: boolean; createdAt: string }
 export interface AdminProduct { id: string; code: string; name: string; defaultCadence: string | null; cadenceUnit: string; unit: string; isActive: boolean; createdAt: string }
-export interface AdminDowntimeCategory { id: string; code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null; isActive: boolean; createdAt: string }
+export interface AdminDowntimeCategory { id: string; code: string; label: string; famille: string; isPlanned: boolean; appliesToEquipmentType: string | null; isActive: boolean; createdAt: string; isFavorite?: boolean; favoriteOrder?: number | null }
 export interface ProductEquipmentCadence { id: string; productId: string; equipmentId: string; cadenceValue: string; cadenceUnit: string; trsObjective: string | null }
 
 // W: By-Product aggregation

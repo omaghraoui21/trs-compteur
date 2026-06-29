@@ -227,3 +227,21 @@ loop 3 for ConfirmDeleteModal). Verified empirically (modal stayed open; active
 element was the key button). **Fix** (`Admin.tsx`): focus the dialog's input on
 open via a ref+effect. **Coverage** (`admin.spec.ts`): Escape closes the modal;
 submitting a new password POSTs `{password}`. Suite is now **60 tests**.
+
+## Loop 11 — Favourite quick-stops (new feature, front-first)
+Admin marks up to **4 downtime categories as favourites** (★) in Paramètres →
+Arrêts; the **operator main screen** shows them as one-tap chrono buttons (tap =
+start timer, tap again = stop + record the downtime, rounded up to ≥1 min). Only
+one runs at a time; the others dim while a chrono is active. Reuses the existing
+downtime-category system (names + TRS/NF mapping already admin-managed).
+
+- Frontend (`Compteur.tsx` `FavoritesQuickBar`, `Admin.tsx` star toggle max-4,
+  `api.ts` `isFavorite`/`favoriteOrder` fields).
+- Coverage (`favorites.spec.ts`): admin ★ toggle PATCHes `isFavorite`; operator
+  bar shows favourites; tap→start→tap→records `POST …/downtimes`.
+- **Backend pending (2nd pass):** add `isFavorite`/`favoriteOrder` to the
+  `downtime_categories` schema + migration, accept them in the admin PATCH
+  validator and return them from `/ref/downtime-categories`. Until then the UI is
+  inert against the real API, so this stays on the branch (not merged to prod).
+
+Suite is now **63 tests**.
