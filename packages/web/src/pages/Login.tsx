@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth";
 import { Timer, Loader2, Eye, EyeOff } from "lucide-react";
 
@@ -9,6 +9,11 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [capsOn, setCapsOn] = useState(false);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  // Move focus to the error on a failed login so it is announced and seen.
+  useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +28,10 @@ export default function LoginPage() {
     }
   };
 
+  const trackCaps = (e: React.KeyboardEvent) => {
+    if (typeof e.getModifierState === "function") setCapsOn(e.getModifierState("CapsLock"));
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
@@ -35,7 +44,13 @@ export default function LoginPage() {
         <p className="text-center text-sm text-gray-500 mb-6 mt-1">Blistéreuse & Géluleuse — DPI</p>
 
         {error && (
-          <div role="alert" className="bg-red-50 text-red-600 text-sm rounded-lg p-3 mb-4 border border-red-200">
+          <div
+            ref={errorRef}
+            id="login-error"
+            role="alert"
+            tabIndex={-1}
+            className="bg-red-50 text-red-600 text-sm rounded-lg p-3 mb-4 border border-red-200 outline-none"
+          >
             {error}
           </div>
         )}
@@ -48,6 +63,9 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
+            inputMode="email"
+            autoFocus
+            aria-describedby={error ? "login-error" : undefined}
             className="w-full border rounded-lg px-3 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
             placeholder="operateur@dpi.local"
             required
@@ -62,7 +80,11 @@ export default function LoginPage() {
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onKeyUp={trackCaps}
+              onKeyDown={trackCaps}
+              onBlur={() => setCapsOn(false)}
               autoComplete="current-password"
+              aria-describedby={`${error ? "login-error " : ""}${capsOn ? "login-caps" : ""}`.trim() || undefined}
               className="w-full border rounded-lg px-3 py-3 pr-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
               required
             />
@@ -75,6 +97,9 @@ export default function LoginPage() {
               {showPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
             </button>
           </div>
+          {capsOn && (
+            <p id="login-caps" className="mt-1 text-xs text-amber-600">⇪ Verrouillage majuscules activé</p>
+          )}
         </div>
 
         <button
