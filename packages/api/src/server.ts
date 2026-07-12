@@ -18,6 +18,7 @@ import { refRouter } from "./routes/ref";
 import { dashboardRouter } from "./routes/dashboard";
 import { adminRouter } from "./routes/admin";
 import { maintenanceRouter } from "./routes/maintenance";
+import { eventsRouter } from "./routes/events";
 import { HttpError, asyncHandler } from "./lib/http";
 import type { Request, Response, NextFunction } from "express";
 
@@ -113,6 +114,7 @@ app.use("/api/", apiLimiter);
 // Brute-force protection guards the password endpoint only; /refresh and /logout
 // present high-entropy tokens and must not be throttled (busy shop floor shares one IP).
 app.use("/api/auth/login", authLimiter);
+app.use("/api/events", eventsRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/sessions", sessionsRouter);
 app.use("/api/lots", lotsRouter);

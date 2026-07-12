@@ -182,7 +182,9 @@ export default function SupervisorPage() {
         setLotSignatures(prev => ({ ...prev, [lotId]: [signature, ...(prev[lotId] ?? [])] }));
         toast.success("Données corrigées et signées");
       } else {
-        await api.validateLot(lotId, action, password, comment || undefined);
+        const expectedUpdatedAt = lots.find((lot) => lot.id === lotId)?.updatedAt;
+        if (!expectedUpdatedAt) throw new Error("Version du lot indisponible, actualisez la liste");
+        await api.validateLot(lotId, action, password, expectedUpdatedAt, comment || undefined);
         setLots(prev => prev.filter(l => l.id !== lotId));
         setExpanded(null);
         setComment("");

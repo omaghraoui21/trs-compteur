@@ -7,6 +7,7 @@ import CompteurPage from "./pages/Compteur";
 import SupervisorPage from "./pages/Supervisor";
 import DashboardPage from "./pages/Dashboard";
 import AdminPage from "./pages/Admin";
+import AtelierPage from "./pages/Atelier";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/" element={<ErrorBoundary label="Erreur sur la page Compteur"><CompteurPage /></ErrorBoundary>} />
         <Route path="/supervisor" element={<ErrorBoundary label="Erreur sur la page Supervision"><SupervisorPage /></ErrorBoundary>} />
         <Route path="/dashboard" element={<ErrorBoundary label="Erreur sur la page Tableau de bord"><DashboardPage /></ErrorBoundary>} />
+        {(user.role === "supervisor" || user.role === "admin") && <Route path="/atelier" element={<ErrorBoundary label="Erreur sur la page Atelier"><AtelierPage /></ErrorBoundary>} />}
         <Route path="/admin" element={<ErrorBoundary label="Erreur sur la page Administration"><AdminPage /></ErrorBoundary>} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

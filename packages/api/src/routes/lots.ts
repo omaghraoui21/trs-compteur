@@ -330,16 +330,19 @@ lotsRouter.post("/:id/correct", requireRole("supervisor", "admin"), validate(cor
 
 lotsRouter.post("/:id/validate", requireRole("supervisor", "admin"), validate(validateLotSchema), asyncHandler(async (req, res) => {
   const { db, userId } = req;
-  const { action, comment, password } = req.body; // action: "validate" | "reject"
+  const { action, comment, password, expectedUpdatedAt } = req.body; // action: "validate" | "reject"
   const status = action === "reject" ? "rejected" : "validated";
   const lotId = String(req.params.id);
 
   // Re-auth and lot status check in parallel — both reads are independent.
   const [signer, [existing]] = await Promise.all([
     reauthSigner(db, userId!, password),
-    db.select({ id: lotEntries.id, status: lotEntries.status }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1),
+    db.select({ id: lotEntries.id, status: lotEntries.status, updatedAt: lotEntries.updatedAt }).from(lotEntries).where(eq(lotEntries.id, lotId)).limit(1),
   ]);
   if (!existing) { res.status(404).json({ error: "Lot introuvable" }); return; }
+  if (existing.updatedAt.toISOString() !== expectedUpdatedAt) {
+    throw new HttpError(409, "Ce lot vient d'être modifié par un autre superviseur");
+  }
   if (existing.status !== "closed") {
     const desc = existing.status === "validated" ? "déjà validé"
       : existing.status === "rejected" ? "déjà rejeté"

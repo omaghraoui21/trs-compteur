@@ -5,7 +5,8 @@ import { api } from "@/lib/api";
 import { useToast } from "@/components/Toast";
 import { useActiveSession } from "@/lib/sessionContext";
 import { fmtDuration, diffMinutes } from "@trs/engine";
-import { Timer, ClipboardCheck, BarChart3, Settings, LogOut, KeyRound, Loader2 } from "lucide-react";
+import { Timer, ClipboardCheck, BarChart3, Settings, LogOut, KeyRound, Loader2, MonitorDot, WifiOff } from "lucide-react";
+import { useLiveEvents } from "@/lib/liveEvents";
 
 const HEADER_ICON_BTN = "p-1.5 rounded hover:bg-blue-600 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80";
 
@@ -19,6 +20,7 @@ const navItems = [
   { to: "/", label: "Session", short: "Session", icon: Timer },
   { to: "/supervisor", label: "Validation", short: "Validation", icon: ClipboardCheck },
   { to: "/dashboard", label: "Tableau de bord", short: "Dashboard", icon: BarChart3 },
+  { to: "/atelier", label: "Écran atelier", short: "Atelier", icon: MonitorDot, roles: ["admin", "supervisor"] },
   { to: "/admin", label: "Configuration", short: "Réglages", icon: Settings, roles: ["admin", "supervisor"] },
 ];
 
@@ -59,8 +61,17 @@ function useElapsed(openedAt: Date | null): string {
 }
 
 export default function Layout({ children }: { children: ReactNode }) {
+  useLiveEvents();
   const { user, logout } = useAuth();
   const [pwOpen, setPwOpen] = useState(false);
+  const [online, setOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const onOnline = () => setOnline(true);
+    const onOffline = () => setOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => { window.removeEventListener("online", onOnline); window.removeEventListener("offline", onOffline); };
+  }, []);
   const { equipmentName, openedAt } = useActiveSession();
   const elapsed = useElapsed(openedAt);
   const pendingCount = usePendingCount(user?.role);
@@ -92,6 +103,11 @@ export default function Layout({ children }: { children: ReactNode }) {
       </header>
 
       {pwOpen && <ChangePasswordModal onClose={() => setPwOpen(false)} />}
+      {!online && (
+        <div role="status" className="flex items-center justify-center gap-2 bg-amber-400 px-4 py-2 text-sm font-semibold text-amber-950">
+          <WifiOff className="h-4 w-4" aria-hidden="true" /> Hors ligne — les données déjà chargées restent accessibles.
+        </div>
+      )}
 
       <div className="flex-1 flex">
         {/* ── Desktop sidebar (lg+) ── */}

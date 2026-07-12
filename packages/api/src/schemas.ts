@@ -106,6 +106,7 @@ export const validateLotSchema = z
     comment: z.string().optional(),
     // 21 CFR Part 11: signing requires re-authentication with the signer's password.
     password: z.string().min(1, "Mot de passe requis pour signer"),
+    expectedUpdatedAt: z.string().datetime(),
   })
   .refine(d => d.action !== "reject" || (d.comment && d.comment.trim().length > 0), {
     message: "Un commentaire est obligatoire pour le rejet",

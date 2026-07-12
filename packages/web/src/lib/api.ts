@@ -118,8 +118,8 @@ export const api = {
     request<LotEntry>(`/lots/${lotId}/cadence`, { method: "POST", body: JSON.stringify(data) }),
   lotCadenceHistory: (lotId: string) => request<CadenceChange[]>(`/lots/${lotId}/cadence`),
   // 21 CFR Part 11: validation/rejection requires re-authentication (password).
-  validateLot: (id: string, action: "validate" | "reject", password: string, comment?: string) =>
-    request<{ lot: LotEntry; signature: ElectronicSignature }>(`/lots/${id}/validate`, { method: "POST", body: JSON.stringify({ action, comment, password }) }),
+  validateLot: (id: string, action: "validate" | "reject", password: string, expectedUpdatedAt: string, comment?: string) =>
+    request<{ lot: LotEntry; signature: ElectronicSignature }>(`/lots/${id}/validate`, { method: "POST", body: JSON.stringify({ action, comment, password, expectedUpdatedAt }) }),
   // 21 CFR Part 11: supervisor correction of operator data with signed audit trail.
   correctLot: (id: string, data: CorrectLotInput) =>
     request<{ lot: LotEntry; signature: ElectronicSignature }>(`/lots/${id}/correct`, { method: "POST", body: JSON.stringify(data) }),
@@ -140,6 +140,7 @@ export const api = {
     request<HeatmapResponse>(`/dashboard/heatmap?equipmentId=${equipmentId}&from=${from}&to=${to}`),
   dashboardDowntimeLog: (equipmentId: string, from: string, to: string) =>
     request<DowntimeLogResponse>(`/dashboard/downtime-log?equipmentId=${equipmentId}&from=${from}&to=${to}`),
+  liveOverview: () => request<LiveOverviewResponse>("/dashboard/live-overview"),
   pendingLots: (status?: "closed" | "validated" | "rejected" | "all") =>
     request<PendingLot[]>(`/dashboard/pending-lots${status ? `?status=${status}` : ""}`),
   pendingLotsCount: () => request<{ count: number }>("/dashboard/pending-lots/count"),
@@ -222,7 +223,7 @@ export interface DowntimeCategory { id: string; code: string; label: string; fam
 
 export interface Session { id: string; equipmentId: string; roomId: string; operatorId: string; sessionDate: string; openedAt: string; closedAt: string | null; status: string; notes: string | null }
 export interface SessionEvent { id: string; sessionId: string; eventType: string; label: string | null; startedAt: string; endedAt: string | null; durationMinutes: number | null; isPlanned: boolean; lotEntryId: string | null; sortOrder: number; comment: string | null }
-export interface LotEntry { id: string; sessionId: string; productId: string; batchNumber: string; lotOrder: number; cadenceUsed: string; cadenceUnit: string; quantityProduced: number; quantityConforming: number; quantityRejected: number; startedAt: string; endedAt: string | null; status: string; supervisorComment: string | null; validatedAt: string | null }
+export interface LotEntry { id: string; sessionId: string; productId: string; batchNumber: string; lotOrder: number; cadenceUsed: string; cadenceUnit: string; quantityProduced: number; quantityConforming: number; quantityRejected: number; startedAt: string; endedAt: string | null; status: string; supervisorComment: string | null; validatedAt: string | null; updatedAt: string }
 export interface DowntimeEvent { id: string; sessionId: string; lotEntryId: string | null; categoryId: string; startedAt: string; endedAt: string | null; durationMinutes: number; comment: string | null }
 // Returned by GET /lots/:id/downtimes — category joined server-side (famille/reason/isPlanned).
 export interface LotDowntime extends DowntimeEvent { famille: string; reason: string; isPlanned: boolean }
@@ -258,6 +259,12 @@ export interface ParetoItem { code: string; label: string; famille: string; isPl
 export interface ParetoResponse { pareto: ParetoItem[]; totalMin: number }
 export interface ComparisonEquipment { equipmentId: string; equipmentName: string; equipmentCode: string; equipmentType: string; trsObjective: number; daily: DailyTrs[]; total: TrsMetrics }
 export interface ComparisonResponse { period: { from: string; to: string }; equipments: ComparisonEquipment[] }
+export interface LiveMachine {
+  equipmentId: string; equipmentName: string; equipmentCode: string; equipmentType: string | null;
+  objective: number; status: "production" | "stopped" | "inactive"; sessionId: string | null;
+  openedAt: string | null; lotId: string | null; batchNumber: string | null; trs: number | null; activeAlertCount: number;
+}
+export interface LiveOverviewResponse { generatedAt: string; machines: LiveMachine[] }
 
 export interface PendingLot extends LotEntry {
   operatorName: string;

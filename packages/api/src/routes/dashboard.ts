@@ -14,6 +14,40 @@ import { dashboardRangeQuerySchema, comparisonQuerySchema, pendingLotsQuerySchem
 export const dashboardRouter = Router();
 dashboardRouter.use(authenticate);
 
+// ─── Live overview for wall-mounted Andon displays ─────────────
+dashboardRouter.get("/live-overview", requireRole("supervisor", "admin"), asyncHandler(async (req, res) => {
+  const { db } = req;
+  const [equipmentRows, activeSessions] = await Promise.all([
+    db.select().from(equipments).where(eq(equipments.isActive, true)),
+    db.select().from(sessions).where(eq(sessions.status, "active")),
+  ]);
+  const activeByEquipment = new Map(activeSessions.map((session) => [session.equipmentId, session]));
+  const sessionIds = activeSessions.map((session) => session.id);
+  const activeLots = sessionIds.length
+    ? await db.select().from(lotEntries).where(and(inArray(lotEntries.sessionId, sessionIds), eq(lotEntries.status, "active")))
+    : [];
+  const lotBySession = new Map(activeLots.map((lot) => [lot.sessionId, lot]));
+
+  const machines = equipmentRows.map((equipment) => {
+    const session = activeByEquipment.get(equipment.id);
+    const lot = session ? lotBySession.get(session.id) : undefined;
+    return {
+      equipmentId: equipment.id,
+      equipmentName: equipment.name,
+      equipmentCode: equipment.code,
+      equipmentType: equipment.equipmentType,
+      objective: Number(equipment.trsObjective),
+      status: session ? "production" : "inactive",
+      sessionId: session?.id ?? null,
+      openedAt: session?.openedAt ?? null,
+      lotId: lot?.id ?? null,
+      batchNumber: lot?.batchNumber ?? null,
+      trs: null,
+      activeAlertCount: 0,
+    };
+  });
+  res.json({ generatedAt: new Date().toISOString(), machines });
+}));
 
 // ─── Batch builder: same result as buildSessionTrs, but for many sessions in
 // a fixed number of queries (eliminates the per-session/per-lot N+1). Loads all
