@@ -366,3 +366,30 @@ export const productEquipmentCadences = pgTable("product_equipment_cadences", {
 }, (t) => [
   unique("uq_product_equipment_cadence").on(t.productId, t.equipmentId),
 ]);
+
+// ─── Configurable alert rules and triggered alerts ───────────
+
+export const alertRules = pgTable("alert_rules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  equipmentId: uuid("equipment_id").references(() => equipments.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  threshold: numeric("threshold", { precision: 10, scale: 2 }).notNull(),
+  severity: text("severity").notNull().default("warning"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, (t) => [index("idx_alert_rules_equipment").on(t.equipmentId)]);
+
+export const alerts = pgTable("alerts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  ruleId: uuid("rule_id").notNull().references(() => alertRules.id, { onDelete: "cascade" }),
+  equipmentId: uuid("equipment_id").references(() => equipments.id, { onDelete: "cascade" }),
+  sessionId: uuid("session_id").references(() => sessions.id, { onDelete: "cascade" }),
+  lotId: uuid("lot_id").references(() => lotEntries.id, { onDelete: "cascade" }),
+  entityKey: text("entity_key").notNull(),
+  message: text("message").notNull(),
+  severity: text("severity").notNull(),
+  triggeredAt: timestamp("triggered_at", { withTimezone: true }).notNull().defaultNow(),
+  acknowledgedBy: uuid("acknowledged_by").references(() => users.id),
+  acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+}, (t) => [index("idx_alerts_active").on(t.acknowledgedAt, t.triggeredAt)]);
