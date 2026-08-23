@@ -150,7 +150,18 @@ test.describe("Supervisor — status tabs", () => {
     await page.route(/\/api\/dashboard\/pending-lots(\?|$)/, (r) =>
       r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
     await page.goto("/supervisor");
-    await page.getByRole("tab", { name: /^rejetés/i }).click();
-    await expect(page.getByText(/aucun lot/i)).toBeVisible();
+
+    // Match the tab-specific EmptyState title exactly. EmptyState also renders a
+    // description ("Aucun lot dans cette catégorie."), so a loose /aucun lot/i
+    // resolves to two nodes and trips Playwright strict mode.
+    const tabs: [RegExp, string][] = [
+      [/^en attente/i, "Aucun lot en attente"],
+      [/^validés/i, "Aucun lot validé"],
+      [/^rejetés/i, "Aucun lot rejeté"],
+    ];
+    for (const [tab, title] of tabs) {
+      await page.getByRole("tab", { name: tab }).click();
+      await expect(page.getByText(title, { exact: true })).toBeVisible();
+    }
   });
 });
