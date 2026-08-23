@@ -1,0 +1,175 @@
+name: DB Backup (pg_dump)
+
+# Daily logical backup of the production database.
+#
+# Durable retention (pharma GxP / 21 CFR Part 11 typically require multi-year
+# retention) is achieved by uploading each dump to S3-compatible object storage.
+# That step activates automatically once the BACKUP_S3_* secrets are set; until
+# then the workflow still runs and keeps a short-term GitHub artifact copy.
+#
+# To enable durable 4-year+ retention, set these repository secrets:
+#   DATABASE_URL              postgres connection string (required)
+#   BACKUP_S3_BUCKET          e.g. s3://my-pharma-db-backups/trs
+#   AWS_ACCESS_KEY_ID         storage access key
+#   AWS_SECRET_ACCESS_KEY     storage secret key
+#   AWS_DEFAULT_REGION        e.g. eu-west-3 (default: us-east-1)
+#   BACKUP_S3_ENDPOINT        (optional) custom endpoint for Backblaze B2 /
+#                             Cloudflare R2 / MinIO — omit for AWS S3
+# Then configure the bucket with a >=1825-day lifecycle and Object Lock (WORM)
+# so backups cannot be deleted or overwritten within the retention window.
+
+on:
+  schedule:
+    # Daily at 02:00 UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch: {}
+
+# Needed by the GxP deviation-alert steps below, which open/close a tracking issue.
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create + verify backup
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "FATAL: DATABASE_URL secret is not set"; exit 1
+          fi
+          TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          FILENAME="backup_${TIMESTAMP}.sql.gz"
+          # Run pg_dump from a pinned modern client image so the client version
+          # is always >= the server version (Neon tracks recent PostgreSQL).
+          docker run --rm -e DATABASE_URL postgres:17-alpine \
+            pg_dump "$DATABASE_URL" --no-owner --no-privileges \
+            | gzip > "$FILENAME"
+          # Integrity check — a backup that fails to decompress is worthless.
+          gzip -t "$FILENAME"
+          SIZE=$(stat -c%s "$FILENAME")
+          if [ "$SIZE" -lt 100 ]; then
+            echo "FATAL: backup suspiciously small (${SIZE} bytes)"; exit 1
+          fi
+          echo "BACKUP_FILE=$FILENAME" >> "$GITHUB_ENV"
+          ls -lh "$FILENAME"
+
+      # The `secrets` context is NOT available in step-level `if:` conditions,
+      # so detect configuration here and expose it as an output to gate on.
+      - name: Detect durable-storage config
+        id: s3cfg
+        env:
+          BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+        run: |
+          if [ -n "${BUCKET:-}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::BACKUP_S3_BUCKET is not set — backup kept only as a 90-day GitHub artifact. Set the BACKUP_S3_* secrets for durable multi-year retention (required for pharma GxP)."
+          fi
+
+      - name: Upload to durable object storage (S3-compatible)
+        if: steps.s3cfg.outputs.enabled == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
+          BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          ENDPOINT_FLAG=""
+          if [ -n "${ENDPOINT:-}" ]; then ENDPOINT_FLAG="--endpoint-url ${ENDPOINT}"; fi
+          aws s3 cp "$BACKUP_FILE" "${BUCKET%/}/${BACKUP_FILE}" $ENDPOINT_FLAG
+          echo "Uploaded $BACKUP_FILE to ${BUCKET%/}/"
+
+      # Short-term convenience copy. Durable retention is the S3 step above.
+      - name: Upload backup artifact (short-term copy)
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 90
+
+      # ── GxP deviation alerting ────────────────────────────────────────────
+      # A failed daily backup is a compliance deviation, not just a red check.
+      # Without this the only signal is a cross on an unrelated PR, so a broken
+      # backup can go unnoticed for weeks (it did: the production database went
+      # unreachable and every nightly run failed silently). These steps raise a
+      # tracking issue on failure and close it again once backups recover.
+      - name: Open/refresh GxP deviation issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const LABEL = 'backup-failure';
+            const TITLE = '🔴 GxP: échec du backup quotidien de la base de données';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const today = new Date().toISOString().slice(0, 10);
+
+            // Ensure the label exists (ignore "already exists").
+            try {
+              await github.rest.issues.createLabel({
+                ...context.repo, name: LABEL, color: 'b60205',
+                description: 'Sauvegarde BDD en échec — déviation GxP',
+              });
+            } catch (e) {
+              if (e.status !== 422) throw e;
+            }
+
+            const { data: open } = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: LABEL, per_page: 1,
+            });
+
+            const body = [
+              `La sauvegarde quotidienne (\`pg_dump\`) est **en échec**.`,
+              ``,
+              `- Dernier échec : **${today}**`,
+              `- Run : ${runUrl}`,
+              ``,
+              `**Impact GxP** : aucune sauvegarde vérifiée n'est produite tant que ce problème`,
+              `persiste. La rétention pluriannuelle exigée (21 CFR Part 11 / BPF) n'est donc`,
+              `plus assurée pour les journées concernées.`,
+              ``,
+              `**Causes fréquentes** : base de données arrêtée/suspendue ou injoignable,`,
+              `secret \`DATABASE_URL\` expiré, quota de stockage atteint.`,
+              ``,
+              `Cette issue se fermera automatiquement dès qu'une sauvegarde réussira.`,
+            ].join('\n');
+
+            if (open.length > 0) {
+              // Refresh in place rather than commenting daily — avoids turning a
+              // multi-week outage into dozens of near-identical notifications.
+              await github.rest.issues.update({ ...context.repo, issue_number: open[0].number, body });
+              core.notice(`Déviation backup déjà ouverte : #${open[0].number} (mise à jour)`);
+            } else {
+              const { data: created } = await github.rest.issues.create({
+                ...context.repo, title: TITLE, body, labels: [LABEL],
+              });
+              core.notice(`Déviation backup ouverte : #${created.number}`);
+            }
+
+      - name: Close GxP deviation issue on recovery
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const LABEL = 'backup-failure';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const { data: open } = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: LABEL, per_page: 10,
+            });
+            for (const issue of open) {
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: issue.number,
+                body: `✅ Sauvegarde rétablie le ${new Date().toISOString().slice(0, 10)}.\n\nRun : ${runUrl}`,
+              });
+              await github.rest.issues.update({
+                ...context.repo, issue_number: issue.number,
+                state: 'closed', state_reason: 'completed',
+              });
+              core.notice(`Déviation backup clôturée : #${issue.number}`);
+            }

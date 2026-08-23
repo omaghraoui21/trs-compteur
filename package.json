@@ -7,11 +7,23 @@
     "dev:web": "pnpm --filter @trs/web dev",
     "build": "pnpm -r build",
     "db:push": "pnpm --filter @trs/db push",
+    "db:generate": "pnpm --filter @trs/db generate",
+    "db:migrate": "pnpm --filter @trs/db migrate",
     "db:seed": "pnpm --filter @trs/api seed",
+    "db:reset": "./packages/api/node_modules/.bin/tsx scripts/reset-operational-data.ts",
+    "db:fresh-launch": "bash scripts/fresh-production-launch.sh",
     "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "lint": "pnpm -r lint"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "1.56.1",
+    "axe-core": "^4.12.1",
+    "esbuild": "^0.28.0"
   }
 }

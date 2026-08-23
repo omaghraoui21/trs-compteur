@@ -13,14 +13,20 @@ export function diffMinutes(start: Date | string, end: Date | string): number {
 
 /** Format minutes as "Xh YYmin" */
 export function fmtDuration(min: number): string {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
+  const rounded = Math.round(min);
+  const h = Math.floor(rounded / 60);
+  const m = rounded % 60;
   return h > 0 ? `${h}h${String(m).padStart(2, "0")}` : `${m} min`;
 }
 
 /** Format a ratio as percentage string */
 export function fmtPct(ratio: number): string {
   return `${(ratio * 100).toFixed(1)}%`;
+}
+
+/** Format an integer with French thousands separators (e.g. 12345 → "12 345") */
+export function fmtNumber(n: number): string {
+  return n.toLocaleString("fr-FR");
 }
 
 /** TRS color: green >= 75%, orange >= 55%, red < 55% */

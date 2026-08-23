@@ -1,64 +1,84 @@
 import { Router } from "express";
-import { eq, and, desc } from "drizzle-orm";
-import { sessions, sessionEvents, lotEntries, downtimeEvents } from "@trs/db";
-import { computeLotTrs, computeSessionTrs, diffMinutes } from "@trs/engine";
+import { eq, and, desc, inArray, isNull, max, sql } from "drizzle-orm";
+import { sessions, sessionEvents, lotEntries, downtimeEvents, downtimeCategories, lotCadenceChanges } from "@trs/db";
+import { computeLotTrs, computeSessionTrs, computeAClasserMin, computeMtbfMttr } from "@trs/engine";
 import { authenticate } from "../middleware";
+import { asyncHandler, validate, validateQuery, HttpError } from "../lib/http";
+import { audit } from "../lib/audit";
+import { effectiveLotCadence } from "../lib/cadence";
+import { groupBy, splitPlannedUnplanned } from "../lib/group";
+import { openSessionSchema, closeSessionSchema, addEventSchema, addDowntimeSchema, sessionListQuerySchema } from "../schemas";
 
 export const sessionsRouter = Router();
 sessionsRouter.use(authenticate);
 
 // ─── List sessions (with optional date/equipment filter) ─────
 
-sessionsRouter.get("/", async (req, res) => {
+sessionsRouter.get("/", validateQuery(sessionListQuerySchema), asyncHandler(async (req, res) => {
   const { db } = req;
-  const { date, equipmentId } = req.query;
-  let conditions = [];
-  if (date) conditions.push(eq(sessions.sessionDate, date as string));
-  if (equipmentId) conditions.push(eq(sessions.equipmentId, equipmentId as string));
+  const { date, equipmentId, status } = req.query as { date?: string; equipmentId?: string; status?: "active" | "closed" };
+  const conditions = [];
+  if (date) conditions.push(eq(sessions.sessionDate, date));
+  if (equipmentId) conditions.push(eq(sessions.equipmentId, equipmentId));
+  if (status) conditions.push(eq(sessions.status, status));
   const data = await db.select().from(sessions)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(sessions.openedAt));
   res.json(data);
-});
+}));
 
 // ─── Get single session with full timeline ────────────────────
 
-sessionsRouter.get("/:id", async (req, res) => {
+sessionsRouter.get("/:id", asyncHandler(async (req, res) => {
   const { db } = req;
   const [session] = await db.select().from(sessions).where(eq(sessions.id, String(req.params.id))).limit(1);
   if (!session) { res.status(404).json({ error: "Session introuvable" }); return; }
 
-  const events = await db.select().from(sessionEvents)
-    .where(eq(sessionEvents.sessionId, session.id))
-    .orderBy(sessionEvents.sortOrder);
+  const dtSelect = {
+    id: downtimeEvents.id,
+    sessionId: downtimeEvents.sessionId,
+    lotEntryId: downtimeEvents.lotEntryId,
+    categoryId: downtimeEvents.categoryId,
+    startedAt: downtimeEvents.startedAt,
+    endedAt: downtimeEvents.endedAt,
+    durationMinutes: downtimeEvents.durationMinutes,
+    comment: downtimeEvents.comment,
+    famille: downtimeCategories.famille,
+    reason: downtimeCategories.label,
+    isPlanned: downtimeCategories.isPlanned,
+  };
 
-  const lots = await db.select().from(lotEntries)
-    .where(eq(lotEntries.sessionId, session.id))
-    .orderBy(lotEntries.lotOrder);
+  const [events, lots, sessionDowntimes] = await Promise.all([
+    db.select().from(sessionEvents)
+      .where(eq(sessionEvents.sessionId, session.id))
+      .orderBy(sessionEvents.sortOrder),
+    db.select().from(lotEntries)
+      .where(eq(lotEntries.sessionId, session.id))
+      .orderBy(lotEntries.lotOrder),
+    db.select(dtSelect).from(downtimeEvents)
+      .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+      .where(and(eq(downtimeEvents.sessionId, session.id), isNull(downtimeEvents.lotEntryId))),
+  ]);
 
-  // Fetch downtimes for all lots
   const lotIds = lots.map(l => l.id);
-  let allDowntimes: (typeof downtimeEvents.$inferSelect)[] = [];
-  for (const lotId of lotIds) {
-    const dts = await db.select().from(downtimeEvents).where(eq(downtimeEvents.lotEntryId, lotId));
-    allDowntimes.push(...dts);
-  }
+  const lotDowntimes = lotIds.length > 0
+    ? await db.select(dtSelect).from(downtimeEvents)
+        .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+        .where(inArray(downtimeEvents.lotEntryId, lotIds))
+    : [];
 
-  res.json({ session, events, lots, downtimes: allDowntimes });
-});
+  res.json({ session, events, lots, downtimes: [...lotDowntimes, ...sessionDowntimes] });
+}));
 
 // ─── Open a new session (compteur) ────────────────────────────
 
-sessionsRouter.post("/open", async (req, res) => {
+sessionsRouter.post("/open", validate(openSessionSchema), asyncHandler(async (req, res) => {
   const { db, userId } = req;
   const { equipmentId, roomId } = req.body;
-  if (!equipmentId || !roomId || !userId) {
-    res.status(400).json({ error: "equipmentId, roomId requis" });
-    return;
-  }
+  if (!userId) { res.status(401).json({ error: "Non authentifié" }); return; }
 
   // Check no active session for this equipment
-  const [existing] = await db.select().from(sessions)
+  const [existing] = await db.select({ id: sessions.id }).from(sessions)
     .where(and(eq(sessions.equipmentId, equipmentId), eq(sessions.status, "active")))
     .limit(1);
   if (existing) {
@@ -67,7 +87,11 @@ sessionsRouter.post("/open", async (req, res) => {
   }
 
   const now = new Date();
-  const sessionDate = now.toISOString().slice(0, 10);
+  // Shift date must follow the plant's local calendar day, not UTC — otherwise a
+  // night shift opened just after local midnight is misdated. en-CA yields
+  // YYYY-MM-DD. Configure the plant timezone via APP_TIMEZONE (default Paris).
+  const tz = process.env.APP_TIMEZONE || "Europe/Paris";
+  const sessionDate = now.toLocaleDateString("en-CA", { timeZone: tz });
 
   const [session] = await db.insert(sessions).values({
     equipmentId,
@@ -78,54 +102,82 @@ sessionsRouter.post("/open", async (req, res) => {
     status: "active",
   }).returning();
 
+  await audit(db, req, "OPEN_SESSION", "session", session.id, { equipmentId, roomId });
   res.status(201).json(session);
-});
+}));
 
 // ─── Close a session ──────────────────────────────────────────
 
-sessionsRouter.post("/:id/close", async (req, res) => {
-  const { db } = req;
+sessionsRouter.post("/:id/close", validate(closeSessionSchema), asyncHandler(async (req, res) => {
+  const { db, userId, userRole } = req;
   const now = new Date();
+  const sessionId = String(req.params.id);
 
-  // Close any active lots first
-  await db.update(lotEntries)
-    .set({ status: "closed", endedAt: now })
-    .where(and(eq(lotEntries.sessionId, String(req.params.id)), eq(lotEntries.status, "active")));
+  // Always fetch — guards 404 for all roles, operator ownership, and double-close.
+  const [sessionRow] = await db.select({ operatorId: sessions.operatorId, status: sessions.status })
+    .from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  if (!sessionRow) { res.status(404).json({ error: "Session introuvable" }); return; }
+  // H1: Operators may only close their own sessions
+  if (userRole === "operator" && sessionRow.operatorId !== userId) { res.status(403).json({ error: "Accès interdit" }); return; }
+  // GMP: prevent duplicate CLOSE_SESSION audit entries from re-closing.
+  if (sessionRow.status !== "active") throw new HttpError(409, "Session déjà fermée");
 
-  // Close any open events
-  const openEvents = await db.select().from(sessionEvents)
-    .where(and(eq(sessionEvents.sessionId, String(req.params.id))));
-  for (const ev of openEvents) {
-    if (!ev.endedAt) {
-      const dur = diffMinutes(ev.startedAt, now);
-      await db.update(sessionEvents).set({ endedAt: now, durationMinutes: dur }).where(eq(sessionEvents.id, ev.id));
-    }
-  }
+  // Fetch any still-active lots before the batch close so we can audit each one.
+  const activeLots = await db.select({ id: lotEntries.id, batchNumber: lotEntries.batchNumber })
+    .from(lotEntries).where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active")));
 
+  // Close any active lots and open session events in parallel — both are
+  // independent batch updates; events also need durationMinutes computed in SQL.
+  await Promise.all([
+    db.update(lotEntries)
+      .set({ status: "closed", endedAt: now })
+      .where(and(eq(lotEntries.sessionId, sessionId), eq(lotEntries.status, "active"))),
+    db.update(sessionEvents)
+      .set({
+        endedAt: now,
+        durationMinutes: sql<number>`ROUND(EXTRACT(EPOCH FROM (${now.toISOString()}::timestamptz - ${sessionEvents.startedAt})) / 60)::integer`,
+      })
+      .where(and(eq(sessionEvents.sessionId, sessionId), isNull(sessionEvents.endedAt))),
+  ]);
+
+  const notes = req.body.notes?.trim() || null;
   const [session] = await db.update(sessions)
-    .set({ status: "closed", closedAt: now })
-    .where(eq(sessions.id, String(req.params.id)))
+    .set({ status: "closed", closedAt: now, ...(notes !== null ? { notes } : {}) })
+    .where(eq(sessions.id, sessionId))
     .returning();
 
+  if (session) {
+    // GMP: emit CLOSE_LOT for each auto-closed lot so lot-level audit trails are complete.
+    await Promise.all([
+      audit(db, req, "CLOSE_SESSION", "session", session.id, { notes, autoClosedLotCount: activeLots.length }),
+      ...activeLots.map(l => audit(db, req, "CLOSE_LOT", "lot", l.id, { autoClosedBySession: session.id, batchNumber: l.batchNumber })),
+    ]);
+  }
   res.json(session);
-});
+}));
 
 // ─── Add session event (phase) ────────────────────────────────
 
-sessionsRouter.post("/:id/events", async (req, res) => {
+sessionsRouter.post("/:id/events", validate(addEventSchema), asyncHandler(async (req, res) => {
   const { db } = req;
   const { eventType, label, durationMinutes, isPlanned, comment } = req.body;
+  const sessionId = String(req.params.id);
 
-  // Get max sort order
-  const existing = await db.select().from(sessionEvents)
-    .where(eq(sessionEvents.sessionId, String(req.params.id)));
-  const maxOrder = existing.reduce((max, e) => Math.max(max, e.sortOrder), 0);
+  // Session status check + sort-order aggregate run in parallel.
+  const [[sessionRow], [maxSortRow]] = await Promise.all([
+    db.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1),
+    db.select({ m: max(sessionEvents.sortOrder) }).from(sessionEvents).where(eq(sessionEvents.sessionId, sessionId)),
+  ]);
+  if (!sessionRow) { res.status(404).json({ error: "Session introuvable" }); return; }
+  if (sessionRow.status !== "active") throw new HttpError(409, "Impossible d'ajouter un événement à une session fermée");
+
+  const maxOrder = maxSortRow?.m ?? 0;
 
   const now = new Date();
   const endedAt = durationMinutes ? new Date(now.getTime() + durationMinutes * 60_000) : undefined;
 
   const [event] = await db.insert(sessionEvents).values({
-    sessionId: String(req.params.id),
+    sessionId,
     eventType,
     label,
     startedAt: now,
@@ -136,44 +188,168 @@ sessionsRouter.post("/:id/events", async (req, res) => {
     comment,
   }).returning();
 
+  await audit(db, req, "ADD_SESSION_EVENT", "sessionEvent", event.id, { sessionId: event.sessionId, eventType, durationMinutes });
   res.status(201).json(event);
-});
+}));
+
+// ─── Add a SESSION-LEVEL downtime (inter-lot, no active lot) ──────────
+// Used for changeover / cleaning / waiting that happen between lots. The
+// operator records a stop classified planned/unplanned exactly like a
+// lot-level one, but it attaches to the session instead of a lot.
+
+sessionsRouter.post("/:id/downtimes", validate(addDowntimeSchema), asyncHandler(async (req, res) => {
+  const { db, userId } = req;
+  const { categoryId, durationMinutes, isShortStop, comment } = req.body;
+  const sessionId = String(req.params.id);
+
+  const [session] = await db.select({ id: sessions.id, status: sessions.status }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  if (!session) { res.status(404).json({ error: "Session introuvable" }); return; }
+  if (session.status !== "active") throw new HttpError(409, "Impossible d'ajouter un arrêt à une session fermée");
+
+  const now = new Date();
+  const endedAt = new Date(now.getTime() + durationMinutes * 60_000);
+
+  const [dt] = await db.insert(downtimeEvents).values({
+    sessionId,
+    lotEntryId: null,
+    categoryId,
+    startedAt: now,
+    endedAt,
+    durationMinutes,
+    status: "closed",
+    isShortStop: isShortStop ?? null,
+    comment,
+    createdBy: userId,
+  }).returning();
+
+  await audit(db, req, "ADD_SESSION_DOWNTIME", "downtime", dt.id, { sessionId, categoryId, durationMinutes });
+  res.status(201).json(dt);
+}));
+
+// ─── List session-level downtimes ─────────────────────────────
+// Returns only session-level stops (lotEntryId IS NULL) with category join —
+// same projection as GET /lots/:id/downtimes so the frontend uses LotDowntime.
+
+sessionsRouter.get("/:id/downtimes", asyncHandler(async (req, res) => {
+  const { db } = req;
+  const sessionId = String(req.params.id);
+  const data = await db.select({
+    id: downtimeEvents.id,
+    sessionId: downtimeEvents.sessionId,
+    lotEntryId: downtimeEvents.lotEntryId,
+    categoryId: downtimeEvents.categoryId,
+    startedAt: downtimeEvents.startedAt,
+    endedAt: downtimeEvents.endedAt,
+    durationMinutes: downtimeEvents.durationMinutes,
+    comment: downtimeEvents.comment,
+    famille: downtimeCategories.famille,
+    reason: downtimeCategories.label,
+    isPlanned: downtimeCategories.isPlanned,
+  }).from(downtimeEvents)
+    .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+    .where(and(eq(downtimeEvents.sessionId, sessionId), isNull(downtimeEvents.lotEntryId)));
+  res.json(data);
+}));
+
+// ─── Delete a session-level downtime ──────────────────────────
+
+sessionsRouter.delete("/:id/downtimes/:dtId", asyncHandler(async (req, res) => {
+  const { db } = req;
+  const sessionId = String(req.params.id);
+  const dtId = String(req.params.dtId);
+
+  // Left join the session so lot-attached stops (sessionId IS NULL) are still
+  // found — they must yield a helpful 400 below, not a misleading 404.
+  const [dt] = await db.select({
+    id: downtimeEvents.id, sessionId: downtimeEvents.sessionId, lotEntryId: downtimeEvents.lotEntryId,
+    sessionStatus: sessions.status,
+  })
+    .from(downtimeEvents)
+    .leftJoin(sessions, eq(downtimeEvents.sessionId, sessions.id))
+    .where(eq(downtimeEvents.id, dtId)).limit(1);
+  if (!dt) { res.status(404).json({ error: "Arrêt introuvable" }); return; }
+  // A lot-attached stop has no sessionId — surface the correct endpoint before
+  // the ownership check so the caller gets 400 (wrong endpoint), not 403/404.
+  if (dt.lotEntryId !== null) { res.status(400).json({ error: "Cet arrêt est rattaché à un lot — utilisez DELETE /lots/:id/downtimes/:dtId" }); return; }
+  if (dt.sessionId !== sessionId) { res.status(403).json({ error: "Cet arrêt n'appartient pas à cette session" }); return; }
+  if (dt.sessionStatus !== "active") throw new HttpError(409, "Impossible de supprimer un arrêt d'une session déjà fermée");
+
+  await db.delete(downtimeEvents).where(eq(downtimeEvents.id, dtId));
+  await audit(db, req, "DELETE_SESSION_DOWNTIME", "downtime", dtId, { sessionId });
+  res.status(204).send();
+}));
 
 // ─── Get session TRS (computed) ───────────────────────────────
 
-sessionsRouter.get("/:id/trs", async (req, res) => {
+sessionsRouter.get("/:id/trs", asyncHandler(async (req, res) => {
   const { db } = req;
   const [session] = await db.select().from(sessions).where(eq(sessions.id, String(req.params.id))).limit(1);
   if (!session) { res.status(404).json({ error: "Session introuvable" }); return; }
 
   const closedAt = session.closedAt ?? new Date();
 
-  // Get planned stops from session events
-  const events = await db.select().from(sessionEvents)
-    .where(and(eq(sessionEvents.sessionId, session.id), eq(sessionEvents.isPlanned, true)));
-  const plannedStopsMin = events.reduce((s, e) => s + (e.durationMinutes ?? 0), 0);
+  // Three independent reads — run them concurrently:
+  //  1. session-level stops (inter-lot), category-joined for the planned/unplanned split
+  //  2. legacy planned phases (sessionEvents) — still count toward tAP during transition
+  //  3. lots (with their lot-level downtimes fetched below)
+  const [sessionDts, events, lots] = await Promise.all([
+    db.select({
+      durationMinutes: downtimeEvents.durationMinutes,
+      isPlanned: downtimeCategories.isPlanned,
+    }).from(downtimeEvents)
+      .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+      .where(and(eq(downtimeEvents.sessionId, session.id), isNull(downtimeEvents.lotEntryId))),
+    db.select().from(sessionEvents)
+      .where(and(eq(sessionEvents.sessionId, session.id), eq(sessionEvents.isPlanned, true))),
+    db.select().from(lotEntries)
+      .where(eq(lotEntries.sessionId, session.id))
+      .orderBy(lotEntries.lotOrder),
+  ]);
 
-  // Get lots with their downtimes
-  const lots = await db.select().from(lotEntries)
-    .where(eq(lotEntries.sessionId, session.id))
-    .orderBy(lotEntries.lotOrder);
+  const { plannedMin: sessionPlannedMin, unplannedMin: sessionUnplannedMin } = splitPlannedUnplanned(sessionDts);
+  const legacyPhasePlannedMin = events.reduce((s, e) => s + (e.durationMinutes ?? 0), 0);
+  const plannedStopsMin = sessionPlannedMin + legacyPhasePlannedMin;
+
+  // Two batched lot-level reads (downtimes + cadence changes), run concurrently.
+  const lotIds2 = lots.map(l => l.id);
+  const [allDts, cadenceChanges] = lotIds2.length > 0
+    ? await Promise.all([
+        db.select({
+          lotEntryId: downtimeEvents.lotEntryId,
+          durationMinutes: downtimeEvents.durationMinutes,
+          famille: downtimeCategories.famille,
+          isPlanned: downtimeCategories.isPlanned,
+        }).from(downtimeEvents)
+          .innerJoin(downtimeCategories, eq(downtimeEvents.categoryId, downtimeCategories.id))
+          .where(inArray(downtimeEvents.lotEntryId, lotIds2)),
+        db.select().from(lotCadenceChanges).where(inArray(lotCadenceChanges.lotEntryId, lotIds2)),
+      ])
+    : [[], []];
+
+  const dtsByLot = groupBy(allDts.filter(d => d.lotEntryId), d => d.lotEntryId!);
+  const changesByLot = groupBy(cadenceChanges, c => c.lotEntryId);
 
   const lotResults = [];
+  let lotsDurationMin = 0;
   for (const lot of lots) {
-    const dts = await db.select().from(downtimeEvents).where(eq(downtimeEvents.lotEntryId, lot.id));
+    const dts = dtsByLot.get(lot.id) ?? [];
+    const eff = effectiveLotCadence(lot, changesByLot.get(lot.id));
     const lotTrs = computeLotTrs({
-      cadence: Number(lot.cadenceUsed),
-      cadenceUnit: lot.cadenceUnit as "u/h" | "u/min",
+      cadence: eff.initialCadence,
+      cadenceUnit: eff.initialUnit,
+      cadenceChanges: eff.cadenceChanges,
       produced: lot.quantityProduced,
       conforming: lot.quantityConforming,
       startedAt: lot.startedAt,
       endedAt: lot.endedAt ?? closedAt,
       downtimes: dts.map(d => ({
         durationMinutes: d.durationMinutes,
-        isPlanned: false, // lot-level downtimes are unplanned
+        isPlanned: d.isPlanned,
+        famille: d.famille,
       })),
     });
     if (lotTrs) {
+      lotsDurationMin += lotTrs.lotDurationMin;
       lotResults.push({ ...lotTrs, produced: lot.quantityProduced, conforming: lot.quantityConforming, lotId: lot.id, batchNumber: lot.batchNumber });
     }
   }
@@ -182,8 +358,23 @@ sessionsRouter.get("/:id/trs", async (req, res) => {
     openedAt: session.openedAt,
     closedAt,
     plannedStopsMin,
+    unplannedStopsMin: sessionUnplannedMin,
     lots: lotResults,
   });
 
-  res.json({ session: sessionTrs, lots: lotResults });
-});
+  // « À classer » — open time covered neither by a lot nor by a declared stop.
+  // Must use plannedStopsMin (session planned downtimes + phases), the same term
+  // computeSessionTrs uses for tR, so phase time isn't wrongly counted as
+  // unclassified — and so this matches the dashboard's aggregation.
+  const aClasserMin = computeAClasserMin(sessionTrs.tO, lotsDurationMin, plannedStopsMin, sessionUnplannedMin);
+
+  // MTBF/MTTR — combine session-level and lot-level unplanned stops.
+  // Default micro-stop threshold = 5 min (ignores micro-stops from TP bucket).
+  const allDowntimesForReliability = [
+    ...sessionDts,
+    ...allDts.map(d => ({ durationMinutes: d.durationMinutes, isPlanned: d.isPlanned })),
+  ];
+  const reliability = computeMtbfMttr(allDowntimesForReliability, sessionTrs.tF);
+
+  res.json({ session: { ...sessionTrs, reliability }, lots: lotResults, aClasserMin });
+}));

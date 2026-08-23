@@ -2,7 +2,19 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import type { Db } from "@trs/db";
 
-const JWT_SECRET = process.env.JWT_SECRET || "trs-compteur-dev-secret";
+// C1: Refuse to start with a public default secret in production
+const JWT_SECRET = (() => {
+  const s = process.env.JWT_SECRET;
+  if (!s) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("FATAL: JWT_SECRET environment variable must be set in production");
+      process.exit(1);
+    }
+    console.warn("WARNING: JWT_SECRET not set — using insecure dev default");
+    return "trs-compteur-dev-secret";
+  }
+  return s;
+})();
 
 // Extend Express Request globally
 declare global {
@@ -11,6 +23,7 @@ declare global {
       db: Db;
       userId?: string;
       userRole?: string;
+      userEmail?: string;
     }
   }
 }
@@ -22,17 +35,20 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
     return;
   }
   try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { sub: string; role: string };
+    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { sub: string; role: string; email?: string };
     req.userId = payload.sub;
     req.userRole = payload.role;
+    req.userEmail = payload.email;
     next();
   } catch {
     res.status(401).json({ error: "Token invalide" });
   }
 }
 
-export function signToken(userId: string, role: string): string {
-  return jwt.sign({ sub: userId, role }, JWT_SECRET, { expiresIn: "12h" });
+// M2: short-lived access token — longevity is provided by the refresh-token flow
+// email is included so audit logs can name the actor without an extra DB query.
+export function signToken(userId: string, role: string, email: string): string {
+  return jwt.sign({ sub: userId, role, email }, JWT_SECRET, { expiresIn: "15m" });
 }
 
 export function requireRole(...roles: string[]) {

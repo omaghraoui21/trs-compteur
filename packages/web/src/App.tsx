@@ -1,10 +1,12 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./lib/auth";
 import Layout from "./components/Layout";
+import ErrorBoundary from "./components/ErrorBoundary";
 import LoginPage from "./pages/Login";
 import CompteurPage from "./pages/Compteur";
 import SupervisorPage from "./pages/Supervisor";
 import DashboardPage from "./pages/Dashboard";
+import AdminPage from "./pages/Admin";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -22,9 +24,10 @@ export default function App() {
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={<CompteurPage />} />
-        <Route path="/supervisor" element={<SupervisorPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/" element={<ErrorBoundary label="Erreur sur la page Compteur"><CompteurPage /></ErrorBoundary>} />
+        <Route path="/supervisor" element={<ErrorBoundary label="Erreur sur la page Supervision"><SupervisorPage /></ErrorBoundary>} />
+        <Route path="/dashboard" element={<ErrorBoundary label="Erreur sur la page Tableau de bord"><DashboardPage /></ErrorBoundary>} />
+        <Route path="/admin" element={<ErrorBoundary label="Erreur sur la page Administration"><AdminPage /></ErrorBoundary>} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Layout>
