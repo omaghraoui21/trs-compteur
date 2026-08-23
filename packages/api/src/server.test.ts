@@ -925,3 +925,44 @@ describe("GET /admin/audit-log", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("GET /health (monitoring contract)", () => {
+  it("reports ok + connected while the DB is reachable", async () => {
+    const res = await request(app).get("/api/health");
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("ok");
+    expect(res.body.db).toBe("connected");
+    expect(res.body.version).toBeTruthy();
+  });
+
+  it("exposes latency and uptime so monitors can see a slow DB, not just a dead one", async () => {
+    const res = await request(app).get("/api/health");
+    expect(typeof res.body.dbLatencyMs).toBe("number");
+    expect(res.body.dbLatencyMs).toBeGreaterThanOrEqual(0);
+    expect(typeof res.body.uptimeSec).toBe("number");
+    expect(res.body.uptimeSec).toBeGreaterThanOrEqual(0);
+  });
+
+  it("never leaks DB host/credentials — no reason field on the healthy path", async () => {
+    const res = await request(app).get("/api/health");
+    expect(res.body.reason).toBeUndefined();
+    // The whole payload must not carry connection details.
+    const body = JSON.stringify(res.body);
+    expect(body).not.toMatch(/postgres:\/\//);
+    expect(body).not.toMatch(new RegExp(TEST_DB));
+  });
+
+  it("is reachable without a token (monitors are unauthenticated)", async () => {
+    const res = await request(app).get("/api/health");
+    expect(res.status).toBe(200);
+  });
+
+  it("is exempt from the API rate limiter", async () => {
+    // 30 rapid pings must all succeed — a throttled health check would make an
+    // uptime monitor report a false outage.
+    const results = await Promise.all(
+      Array.from({ length: 30 }, () => request(app).get("/api/health")),
+    );
+    expect(results.every(r => r.status === 200)).toBe(true);
+  });
+});

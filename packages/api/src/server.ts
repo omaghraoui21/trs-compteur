@@ -121,14 +121,53 @@ app.use("/api/dashboard", dashboardRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/maintenance", maintenanceRouter);
 
-// C2: Real health check — actually pings the DB so monitors see real status
+// C2: Real health check — actually pings the DB so monitors see real status.
+//
+// The ping is bounded by HEALTH_DB_TIMEOUT_MS. createDb() uses connect_timeout: 15,
+// so against an unreachable database the endpoint would otherwise hang ~15 s: uptime
+// monitors then record an ambiguous client-side timeout instead of a clean 503, and
+// on Vercel the invocation can be killed before it ever answers.
+const VERSION = "1.0.0";
+const HEALTH_DB_TIMEOUT_MS = Number(process.env.HEALTH_DB_TIMEOUT_MS ?? 5000);
+const BOOTED_AT = Date.now();
+
+// /api/health is public, so never echo the driver's raw message: it embeds the
+// database host, port and user. Report a coarse machine-readable cause instead.
+function classifyDbError(err: unknown): string {
+  const code = (err as { code?: string } | null)?.code;
+  const message = err instanceof Error ? err.message : "";
+  if (code === "CONNECT_TIMEOUT" || /timed out/i.test(message)) return "timeout";
+  if (code === "ECONNREFUSED") return "connection_refused";
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN") return "dns_failure";
+  if (code === "28P01" || code === "28000") return "auth_failed";
+  if (code === "ECONNRESET" || code === "EPIPE") return "connection_lost";
+  return "unavailable";
+}
+
 app.get("/api/health", asyncHandler(async (_req, res) => {
+  const startedAt = Date.now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const base = () => ({
+    version: VERSION,
+    dbLatencyMs: Date.now() - startedAt,
+    uptimeSec: Math.round((Date.now() - BOOTED_AT) / 1000),
+  });
   try {
-    await db.execute(sql`SELECT 1`);
-    res.json({ status: "ok", version: "1.0.0", db: "connected" });
+    await Promise.race([
+      db.execute(sql`SELECT 1`),
+      new Promise((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`DB ping timed out after ${HEALTH_DB_TIMEOUT_MS} ms`)),
+          HEALTH_DB_TIMEOUT_MS,
+        );
+      }),
+    ]);
+    res.json({ status: "ok", db: "connected", ...base() });
   } catch (err) {
     console.error("Health check DB failure:", err);
-    res.status(503).json({ status: "error", version: "1.0.0", db: "disconnected" });
+    res.status(503).json({ status: "error", db: "disconnected", reason: classifyDbError(err), ...base() });
+  } finally {
+    clearTimeout(timer);
   }
 }));
 

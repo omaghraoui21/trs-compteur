@@ -7583,7 +7583,7 @@ var require_W3CTraceContextPropagator = __commonJS({
     var TraceState_1 = require_TraceState();
     exports.TRACE_PARENT_HEADER = "traceparent";
     exports.TRACE_STATE_HEADER = "tracestate";
-    var VERSION3 = "00";
+    var VERSION4 = "00";
     var VERSION_PART = "(?!ff)[\\da-f]{2}";
     var TRACE_ID_PART = "(?![0]{32})[\\da-f]{32}";
     var PARENT_ID_PART = "(?![0]{16})[\\da-f]{16}";
@@ -7607,7 +7607,7 @@ var require_W3CTraceContextPropagator = __commonJS({
         const spanContext = api_1.trace.getSpanContext(context2);
         if (!spanContext || (0, suppress_tracing_1.isTracingSuppressed)(context2) || !(0, api_1.isSpanContextValid)(spanContext))
           return;
-        const traceParent = `${VERSION3}-${spanContext.traceId}-${spanContext.spanId}-0${Number(spanContext.traceFlags || api_1.TraceFlags.NONE).toString(16)}`;
+        const traceParent = `${VERSION4}-${spanContext.traceId}-${spanContext.spanId}-0${Number(spanContext.traceFlags || api_1.TraceFlags.NONE).toString(16)}`;
         setter.set(carrier, exports.TRACE_PARENT_HEADER, traceParent);
         if (spanContext.traceState) {
           setter.set(carrier, exports.TRACE_STATE_HEADER, spanContext.traceState.serialize());
@@ -84908,13 +84908,43 @@ app.use("/api/ref", refRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/maintenance", maintenanceRouter);
+var VERSION3 = "1.0.0";
+var HEALTH_DB_TIMEOUT_MS = Number(process.env.HEALTH_DB_TIMEOUT_MS ?? 5e3);
+var BOOTED_AT = Date.now();
+function classifyDbError(err) {
+  const code = err?.code;
+  const message = err instanceof Error ? err.message : "";
+  if (code === "CONNECT_TIMEOUT" || /timed out/i.test(message)) return "timeout";
+  if (code === "ECONNREFUSED") return "connection_refused";
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN") return "dns_failure";
+  if (code === "28P01" || code === "28000") return "auth_failed";
+  if (code === "ECONNRESET" || code === "EPIPE") return "connection_lost";
+  return "unavailable";
+}
 app.get("/api/health", asyncHandler(async (_req, res) => {
+  const startedAt = Date.now();
+  let timer2;
+  const base = () => ({
+    version: VERSION3,
+    dbLatencyMs: Date.now() - startedAt,
+    uptimeSec: Math.round((Date.now() - BOOTED_AT) / 1e3)
+  });
   try {
-    await db2.execute(sql`SELECT 1`);
-    res.json({ status: "ok", version: "1.0.0", db: "connected" });
+    await Promise.race([
+      db2.execute(sql`SELECT 1`),
+      new Promise((_resolve, reject) => {
+        timer2 = setTimeout(
+          () => reject(new Error(`DB ping timed out after ${HEALTH_DB_TIMEOUT_MS} ms`)),
+          HEALTH_DB_TIMEOUT_MS
+        );
+      })
+    ]);
+    res.json({ status: "ok", db: "connected", ...base() });
   } catch (err) {
     console.error("Health check DB failure:", err);
-    res.status(503).json({ status: "error", version: "1.0.0", db: "disconnected" });
+    res.status(503).json({ status: "error", db: "disconnected", reason: classifyDbError(err), ...base() });
+  } finally {
+    clearTimeout(timer2);
   }
 }));
 app.use("/api/", (_req, res) => {
